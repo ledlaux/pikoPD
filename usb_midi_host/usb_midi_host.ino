@@ -15,13 +15,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 #include <I2S.h>
 #include "Heavy_oscilator.hpp"
 #include <Adafruit_TinyUSB.h>
 #include "usb_midi_host.h"
 
-// --- Atomic stubs for RP2040 only ---
 #if defined(ARDUINO_ARCH_RP2040)
 extern "C" bool __atomic_test_and_set(volatile void* ptr, int memorder) {
     (void)memorder;
@@ -45,11 +43,9 @@ float audioBlock[2*AUDIO_BLOCK];
 int16_t left[AUDIO_BLOCK];
 int16_t right[AUDIO_BLOCK];
 
-// --- Heavy receiver hashes ---
 #define HV_NOTEIN_HASH 0x67E37CA3
 #define HV_CCTLIN_HASH 0x41BE0F9C   // CC input hash
 
-// --- Objects ---
 I2S i2s_output(OUTPUT);
 Heavy_oscilator pd_prog(SAMPLE_RATE);
 
@@ -58,10 +54,8 @@ Heavy_oscilator pd_prog(SAMPLE_RATE);
 Adafruit_USBH_Host USBHost;
 uint8_t midi_dev_addr = 0;
 
-// --- Volume controlled via CC#7 ---
 float volume = 1.0f;
 
-// --- Heavy helpers ---
 void sendHeavyNoteOn(int note, int velocity) { 
   hv_sendMessageToReceiverFF(&pd_prog, HV_NOTEIN_HASH, 0.0, note, velocity);
 }
@@ -72,7 +66,6 @@ void sendHeavyCC(int cc, int value) {
   hv_sendMessageToReceiverFF(&pd_prog, HV_CCTLIN_HASH, 0.0, cc, value);
 }
 
-// --- USB MIDI Host handler ---
 void handleUsbMidi() {
   if (midi_dev_addr == 0) return;
 
@@ -107,7 +100,6 @@ void handleUsbMidi() {
   }
 }
 
-// --- Setup ---
 void setup() {
   MIDI_UART.begin(31250);  // MIDI baud
   USBHost.begin(0);
@@ -121,7 +113,6 @@ void setup() {
   i2s_output.begin();
 }
 
-// --- Main loop ---
 void loop() {
   USBHost.task();
   handleUsbMidi();
@@ -141,7 +132,6 @@ void loop() {
   }
 }
 
-// --- TinyUSB callbacks ---
 void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t, uint8_t, uint8_t, uint16_t) {
   midi_dev_addr = dev_addr;
 }
