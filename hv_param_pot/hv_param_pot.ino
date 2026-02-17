@@ -31,7 +31,6 @@ extern "C" void __atomic_clear(volatile void* ptr, int memorder) {
 }
 #endif
 
-// -------------------- Config --------------------
 #define I2S_DATA_PIN   9
 #define I2S_BCLK_PIN   10
 #define I2S_BUFFERS    4
@@ -39,7 +38,6 @@ extern "C" void __atomic_clear(volatile void* ptr, int memorder) {
 #define SAMPLE_RATE    44100
 #define FREQ_POT_PIN   A0
 
-// -------------------- Heavy & I2S --------------------
 Heavy_oscilator pd_prog(SAMPLE_RATE);
 I2S i2s_output(OUTPUT);
 
@@ -48,7 +46,6 @@ int16_t left_buffer[I2S_WORDS];
 int16_t right_buffer[I2S_WORDS];
 
 
-// -------------------- Setup --------------------
 void setup() {
   // --- I2S output setup ---
   i2s_output.setFrequency(SAMPLE_RATE);        
@@ -64,7 +61,6 @@ void setup() {
                
 }
 
-// -------------------- Main loop --------------------
 void loop() {
 
 int potVal = analogRead(FREQ_POT_PIN);       // 0–4095 
