@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web MIDI Fader Bank</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #efefef; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 20px; width: 100%; max-width: 900px; }
+        .fader-cell { display: flex; flex-direction: column; align-items: center; background: #2a2a2a; padding: 15px; border-radius: 8px; }
+        input[type=range] { writing-mode: bt-lr; appearance: slider-vertical; width: 40px; height: 200px; margin: 10px 0; }
+        label { font-size: 12px; text-transform: uppercase; font-weight: bold; text-align: center; height: 30px; }
+        .val-display { font-family: monospace; color: #00ffcc; }
+        .status { margin-bottom: 20px; padding: 10px; border-radius: 5px; background: #333; }
+    </style>
+</head>
+<body>
+
+    <h2>MIDI Controller</h2>
+    <div id="status" class="status">Waiting for MIDI access...</div>
+
+    <div class="grid">
+        </div>
+
+<script>
+    let midiOutput = null;
+    const grid = document.querySelector('.grid');
+    const statusDiv = document.getElementById('status');
+    
+    // Add a dropdown to the UI dynamically
+    const selector = document.createElement('select');
+    selector.style = "margin-bottom: 20px; padding: 5px; background: #333; color: white;";
+    statusDiv.after(selector);
+
+    // 1. Request MIDI Access
+    navigator.requestMIDIAccess().then(access => {
+        updateDeviceList(access);
+        
+        // Listen for unplugging/plugging devices
+        access.onstatechange = (e) => updateDeviceList(access);
+    }).catch(err => {
+        statusDiv.innerText = "Error: MIDI Access Denied. Check browser permissions.";
+    });
+
+    function updateDeviceList(access) {
+        const outputs = Array.from(access.outputs.values());
+        selector.innerHTML = '<option value="">-- Select MIDI Output --</option>';
+        
+        outputs.forEach(device => {
+            const opt = document.createElement('option');
+            opt.value = device.id;
+            opt.innerText = device.name;
+            selector.appendChild(opt);
+        });
+
+        selector.onchange = () => {
+            midiOutput = access.outputs.get(selector.value);
+            statusDiv.innerText = midiOutput ? `Active: ${midiOutput.name}` : "Please select a device";
+            statusDiv.style.color = midiOutput ? "#00ffcc" : "#ff5555";
+        };
+    }
+
+    // 2. Build UI (Same as before)
+    const controls = [
+        { cc: 7,  name: "Volume" }, { cc: 10, name: "Cracles" },
+        { cc: 11, name: "Drop Amount" }, { cc: 12, name: "Hi-Pass" },
+        { cc: 13, name: "Intensity" }, { cc: 14, name: "Wind" },
+        { cc: 15, name: "Drop Gain" }, { cc: 16, name: "Drop Size" },
+        { cc: 17, name: "Size" }
+    ];
+
+    controls.forEach(ctrl => {
+        const container = document.createElement('div');
+        container.className = 'fader-cell';
+        container.innerHTML = `
+            <label>${ctrl.name}<br>(CC ${ctrl.cc})</label>
+            <input type="range" min="0" max="127" value="0">
+            <div class="val-display" id="val-${ctrl.cc}">0</div>
+        `;
+        
+        const slider = container.querySelector('input');
+        slider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById(`val-${ctrl.cc}`).innerText = value;
+            if (midiOutput) {
+                midiOutput.send([0xB0, ctrl.cc, value]);
+            }
+        });
+        grid.appendChild(container);
+    });
+</script>
+</body>
+</html>
