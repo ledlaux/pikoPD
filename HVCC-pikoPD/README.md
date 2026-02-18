@@ -2,12 +2,12 @@
 
 This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **CMake**, and **picotool**. Extra files and custom templates will be supported.
 
-This version generates simple synthesizer with polyphonic usb midi input. In settings.json you can set i2s pins, voice count and sample rate.
+This version generates simple synthesizer with polyphonic usb midi input. 
 
 ## Features
 
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**  
-- Auto-generates `settings.json` with voice hashes  
+- Use `settings.json` to set i2s pins, voice count and sample rate.
 - Copies extra C files into project folder  
 - Builds firmware using **CMake** in a `build/` folder  
 - Automatically flashes UF2 to Pico2 devices  
@@ -27,4 +27,3 @@ Enter bootloader mode by holding boot on power on.
 python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot --flash
 ```
 Reset device.
-
