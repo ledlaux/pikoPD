@@ -25,6 +25,6 @@ Enter bootloader mode by holding boot on power on.
 
 ```bash
 python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot --flash
-
+```
 Reset device.
 
