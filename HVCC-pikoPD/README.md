@@ -1,6 +1,6 @@
 # PD → HVCC → Raspberry Pi Pico UF2 Generator (FIRST TEST)
 
-This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **CMake**, and **picotool**. Extra files and custom templates will be supported.
+This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. Extra files and custom templates will be supported.
 
 This version generates simple synthesizer with polyphonic usb midi input. 
 
