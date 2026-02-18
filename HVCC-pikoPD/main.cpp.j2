@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "pico/audio_i2s.h"
+#include "pico/binary_info.h"
+#include "tusb.h"
+#include "Heavy_{{ name }}.hpp"
+
+// -------------------- Config --------------------
+#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
+#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
+// Note: PIO I2S expects BCLK and LRCLK to be on consecutive pins usually.
+#define I2S_LRCLK_PIN (I2S_BCLK_PIN + 1) 
+
+#define SAMPLE_RATE {{ settings.sample_rate }}
+#define I2S_WORDS {{ settings.i2s_words }}
+#define MAX_VOICES {{ settings.max_voices }}
+
+// -------------------- Heavy Patch --------------------
+Heavy_{{ name }} pd_prog(SAMPLE_RATE);
+float heavy_buffer[2 * I2S_WORDS]; // interleaved stereo floats
+
+// -------------------- Voice Allocation --------------------
+struct Voice {
+    uint8_t note = 0;
+    bool active = false;
+    hv_uint32_t hash = 0;
+};
+
+constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
+{% for recv in settings.voice_hashes %}
+    {{ recv.hash }}{% if not loop.last %},{% endif %} // {{ recv.name }}
+{% endfor %}
+};
+
+Voice voices[MAX_VOICES];
+
+// -------------------- Voice Logic --------------------
+int allocateVoice(uint8_t note) {
+    for (int i = 0; i < MAX_VOICES; i++) {
+        if (!voices[i].active) {
+            voices[i].note = note;
+            voices[i].active = true;
+            voices[i].hash = VOICE_HASHES[i];
+            return i;
+        }
+    }
+    return -1;
+}
+
+int findVoiceByNote(uint8_t note) {
+    for (int i = 0; i < MAX_VOICES; i++) {
+        if (voices[i].active && voices[i].note == note) return i;
+    }
+    return -1;
+}
+
+// -------------------- MIDI Processing --------------------
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+    uint8_t type = status & 0xF0;
+    if (type == 0x90 && data2 > 0) { // Note On
+        int v = allocateVoice(data1);
+        if (v >= 0) hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, 0.0f);
+    } else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
+        int v = findVoiceByNote(data1);
+        if (v >= 0) {
+            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, 0.0f);
+            voices[v].active = false;
+        }
+    }
+}
+
+// TinyUSB MIDI Task
+void midi_task() {
+    if (tud_midi_available()) {
+        uint8_t packet[4];
+        while (tud_midi_packet_read(packet)) {
+            handle_midi_message(packet[1], packet[2], packet[3]);
+        }
+    }
+}
+
+// -------------------- Audio Setup --------------------
+struct audio_buffer_pool *init_audio() {
+    static audio_format_t audio_format = {
+        .sample_freq = SAMPLE_RATE,
+        .format = AUDIO_BUFFER_FORMAT_PCM_S16,
+        .channel_count = 2
+    };
+
+    static audio_buffer_format_t producer_format = {
+        .format = &audio_format,
+        .sample_stride = 4
+    };
+
+    struct audio_buffer_pool *pool = audio_new_producer_pool(&producer_format, 3, I2S_WORDS);
+    
+    bool __unused ok;
+    const struct audio_format *output_format;
+    struct audio_i2s_config config = {
+        .data_pin = I2S_DATA_PIN,
+        .clock_pin_base = I2S_BCLK_PIN,
+        .dma_channel = 0,
+        .pio_sm = 0
+    };
+
+    output_format = audio_i2s_setup(&audio_format, &config);
+    if (!output_format) panic("PicoAudio: Unable to open audio device.\n");
+    
+    ok = audio_i2s_connect(pool);
+    assert(ok);
+    audio_i2s_set_enabled(true);
+    return pool;
+}
+
+// -------------------- Main --------------------
+int main() {
+    stdio_init_all();
+    tusb_init();
+    
+    struct audio_buffer_pool *ap = init_audio();
+
+    while (true) {
+        tud_task(); // USB housekeeping
+        midi_task(); // Read MIDI
+
+        // Get an audio buffer from the SDK's pool
+        struct audio_buffer *buffer = take_audio_buffer(ap, false);
+        if (buffer) {
+            int16_t *samples = (int16_t *)buffer->buffer->bytes;
+            
+            // Process Heavy (calculates floats)
+            pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
+            
+            // Convert Float to S16
+            for (int i = 0; i < buffer->max_sample_count * 2; i++) {
+                samples[i] = (int16_t)(heavy_buffer[i] * 32767.0f);
+            }
+            buffer->sample_count = buffer->max_sample_count;
+            give_audio_buffer(ap, buffer);
+        }
+    }
+    return 0;
+}

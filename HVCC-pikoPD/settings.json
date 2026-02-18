@@ -1,0 +1,24 @@
+{
+    "name": "heavy",
+    "i2s_data_pin": 9,
+    "i2s_bclk_pin": 10,
+    "i2s_buffers": 2,
+    "i2s_words": 64,
+    "sample_rate": 22050,
+    "max_voices": 3,
+    "voice_hashes": [
+        {
+            "name": "NOTE1",
+            "hash": "0x3E185FE5"
+        },
+        {
+            "name": "NOTE2",
+            "hash": "0x3C682D20"
+        },
+        {
+            "name": "NOTE3",
+            "hash": "0xC430EA70"
+        }
+    ],
+    "adc_pins": {}
+}
