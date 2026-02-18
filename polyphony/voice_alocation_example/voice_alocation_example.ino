@@ -37,8 +37,7 @@ extern "C" void __atomic_clear(volatile void* ptr, int memorder) {
 #define I2S_BCLK_PIN  10
 #define I2S_BUFFERS   4
 #define I2S_WORDS     64
-#define SAMPLE_RATE   22050 // Higher sample rate is not stable
-#define MAX_VOICES    4
+#define SAMPLE_RATE   22050 // Can make 48000 on rp2350
 
 // -------------------- Heavy & I2S --------------------
 Heavy_oscilator pd_prog(SAMPLE_RATE);
