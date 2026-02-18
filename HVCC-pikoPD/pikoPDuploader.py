@@ -9,6 +9,11 @@ import jinja2
 from hvcc.core.hv2ir.HeavyLangObject import HeavyLangObject
 from hvcc.types.IR import IRGraph
 
+sdk_path = os.environ.get("PICO_SDK_PATH")
+if not sdk_path:
+    raise RuntimeError("PICO_SDK_PATH environment variable is not set.")
+
+
 heavy_hash = HeavyLangObject.get_hash
 
 class PicoUF2Generator:
@@ -105,10 +110,10 @@ class PicoUF2Generator:
         os.makedirs(build_dir, exist_ok=True)
         cmake_cmd = [
             "cmake",
-            f"-DPICO_SDK_PATH={os.environ.get('PICO_SDK_PATH', '/Users/lidlaux/pico-sdk')}",
-            f"-DPICO_BOARD=pico2",
+            f"-DPICO_SDK_PATH={sdk_path}",
+            "-DPICO_BOARD=pico2",
             f"-DCMAKE_BUILD_TYPE={build_type}",
-            "-DCMAKE_TOOLCHAIN_FILE=${PICO_SDK_PATH}/cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake",
+            f"-DCMAKE_TOOLCHAIN_FILE={sdk_path}/cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake",
             ".."
         ]
         print("[CMAKE] Configuring...")
@@ -144,7 +149,7 @@ class PicoUF2Generator:
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: generator.py <pd_patch> <project_root> [max_voices] [--flash]")
+        print("Usage: pikoPDuploader.py <pd_patch> <project_root> [--flash]")
         sys.exit(1)
 
     pd_patch = sys.argv[1]
