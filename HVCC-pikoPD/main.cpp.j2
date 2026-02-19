@@ -88,7 +88,6 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     }
 }
 
-
 void midi_task() {
     if (tud_midi_available()) {
         uint8_t packet[4];
@@ -118,6 +117,11 @@ void midi_task() {
 
         }
     }
+}
+
+void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
+    // This sends the PD [print] output directly to the USB Serial console
+    printf("[%s] %s\n", printName, str);
 }
 
 
@@ -159,6 +163,7 @@ int main() {
     tusb_init();
     
     cdc_stdio_lib_init();   // Serial console alongside usb midi 
+    pd_prog.setPrintHook(&hv_print_handler); // Print PD messages in console
 
     struct audio_buffer_pool *ap = init_audio();
 
