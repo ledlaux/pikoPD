@@ -39,6 +39,8 @@ target_link_libraries(${TARGET_NAME}
     pico_audio_i2s
     tinyusb_device
     tinyusb_board
+    hardware_clocks
+    hardware_adc
 )
 
 # 9. Hardware Config
