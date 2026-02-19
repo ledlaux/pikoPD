@@ -7,7 +7,7 @@ This version generates simple synthesizer with polyphonic usb midi input.
 ## Features
 
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**  
-- Use `settings.json` to set i2s pins, voice count and sample rate.
+- Use `settings.json` to set core frequency, i2s pins, voice count and sample rate
 - Copies extra C files into project folder  
 - Builds firmware using **CMake** in a `build/` folder  
 - Automatically flashes UF2 to Pico2 devices  
