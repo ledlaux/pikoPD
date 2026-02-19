@@ -1,12 +1,12 @@
 {
     "name": "heavy",
-    "core_freq": "250000",
+    "core_freq": "150000",
     "i2s_data_pin": 9,
     "i2s_bclk_pin": 10,
     "i2s_buffers": 2,
     "i2s_words": 64,
-    "sample_rate": 22050,
-    "max_voices": 3,
+    "sample_rate": 48000,
+    "max_voices": 4,
     "voice_hashes": [
         {
             "name": "NOTE1",
