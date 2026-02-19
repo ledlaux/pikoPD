@@ -51,12 +51,14 @@ target_compile_definitions(${TARGET_NAME} PRIVATE
     CFG_TUSB_RHPORT0_MODE=OPT_MODE_DEVICE
     PICO_RP2350=1
     HV_UNIX=1
-    PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=3000
+    PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
 # 10. USB/Serial Enable
-pico_enable_stdio_usb(${TARGET_NAME} 1)
+pico_enable_stdio_usb(${TARGET_NAME} 0)
 pico_enable_stdio_uart(${TARGET_NAME} 0)
+
+
 
 # 11. Output Generation
 pico_add_extra_outputs(${TARGET_NAME})
