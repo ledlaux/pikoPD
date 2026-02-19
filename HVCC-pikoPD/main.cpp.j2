@@ -6,18 +6,26 @@
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
+
 #include "Heavy_{{ name }}.hpp"
 
+// --- Heavy standard MIDI hashes ---
+#define HV_CTLIN_HASH          0x41BE0F9C
+#define HV_BENDIN_HASH         0x3083F0F7
+#define HV_NOTEOUT_HASH        0x0D1D4AC2
+#define HV_CTL_OUT_HASH        0xE5E2A040
+
+// --- Hardware & Config ---
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-#define I2S_LRCLK_PIN (I2S_BCLK_PIN + 1) 
+#define SAMPLE_RATE  {{ settings.sample_rate }}
+#define MAX_VOICES   {{ settings.max_voices }}
+#define I2S_BUFFER   {{ settings.buffer_size }}
 
-#define SAMPLE_RATE {{ settings.sample_rate }}
-#define I2S_WORDS {{ settings.i2s_words }}
-#define MAX_VOICES {{ settings.max_voices }}
-
+// --- Global Objects & State ---
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
-float heavy_buffer[2 * I2S_WORDS]; 
+float heavy_buffer[I2S_BUFFER * 2]; 
+float volume = 1.0f; 
 
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
@@ -64,7 +72,7 @@ int allocateVoice(uint8_t note) {
             return i;
         }
     }
-    return -1;
+    return -1; 
 }
 
 int findVoiceByNote(uint8_t note) {
@@ -74,96 +82,109 @@ int findVoiceByNote(uint8_t note) {
     return -1;
 }
 
+
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
+    uint8_t chan = status & 0x0F;
+    
     if (type == 0x90 && data2 > 0) { // Note On
         int v = allocateVoice(data1);
-        if (v >= 0) hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, 0.0f);
-    } else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
+        if (v >= 0) {
+            printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
+            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
+        } else {
+            printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
+        }
+    } 
+    else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
         int v = findVoiceByNote(data1);
         if (v >= 0) {
-            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, 0.0f);
+            printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
+            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
             voices[v].active = false;
         }
     }
-}
-
-void midi_task() {
-    if (tud_midi_available()) {
-        uint8_t packet[4];
-        
-        while (tud_midi_packet_read(packet)) {
-            // TinyUSB MIDI packets follow the USB-MIDI Event Packet format:
-            // packet[0]: Header (Cable Number + Code Index Number)
-            // packet[1]: MIDI Status Byte (e.g., 0x90 for Note On)
-            // packet[2]: Data Byte 1 (e.g., Note Number)
-            // packet[3]: Data Byte 2 (e.g., Velocity)
-
-            uint8_t status = packet[1];
-            uint8_t data1  = packet[2];
-            uint8_t data2  = packet[3];
-            uint8_t cmd    = status & 0xF0;
-
-            // Optional: Forward to your existing handler
-            handle_midi_message(status, data1, data2);
-
-        
-            if (cmd == 0x90 && data2 > 0) { 
-                printf("[MIDI] Note On: %d Velocity: %d\n", data1, data2);
-            } 
-            else if (cmd == 0x80 || (cmd == 0x90 && data2 == 0)) { 
-                printf("[MIDI] Note Off: %d\n", data1);
-            }
-
-        }
+    else if (type == 0xB0) { // CC
+        printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
+        hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+        if (data1 == 7) volume = data2 / 127.0f;
+    }
+    else if (type == 0xE0) { // Pitch Bend
+        int bend = (data2 << 7) | data1;
+        printf("[MIDI] Bend: %d\n", bend);
+        hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
+    }
+    else {
+        // Helpful for identifying why other knobs/buttons aren't working
+        printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
     }
 }
+
+
+void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
+    uint8_t packet[4] = {0};
+    if (receiverHash == HV_NOTEOUT_HASH) {
+        int note = (int)msg_getFloat(m, 0);
+        int vel = (int)msg_getFloat(m, 1);
+        packet[0] = (vel > 0 ? 0x09 : 0x08);
+        packet[1] = (vel > 0 ? 0x90 : 0x80);
+        packet[2] = (uint8_t)note;
+        packet[3] = (uint8_t)vel;
+    } else if (receiverHash == HV_CTL_OUT_HASH) {
+        packet[0] = 0x0B;
+        packet[1] = 0xB0;
+        packet[2] = (uint8_t)msg_getFloat(m, 0);
+        packet[3] = (uint8_t)msg_getFloat(m, 1);
+    }
+    if (tud_midi_mounted() && packet[0] != 0) tud_midi_packet_write(packet);
+}
+
+
+void midi_task() {
+    if (!tud_midi_available()) return;
+    uint8_t packet[4];
+    while (tud_midi_packet_read(packet)) {
+        handle_midi_message(packet[1], packet[2], packet[3]);
+    }
+}
+
 
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     // This sends the PD [print] output directly to the USB Serial console
     printf("[%s] %s\n", printName, str);
 }
 
-
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
         .sample_freq = SAMPLE_RATE,
         .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .channel_count = {{ settings.channel }}
+        .channel_count = 2
     };
-
     static audio_buffer_format_t producer_format = {
         .format = &audio_format,
-        .sample_stride = 4
+        .sample_stride = 4 
     };
 
-    struct audio_buffer_pool *pool = audio_new_producer_pool(&producer_format, 3, I2S_WORDS);
-    
-    bool __unused ok;
-    const struct audio_format *output_format;
+    struct audio_buffer_pool *pool = audio_new_producer_pool(&producer_format, 3, I2S_BUFFER);
     struct audio_i2s_config config = {
         .data_pin = I2S_DATA_PIN,
         .clock_pin_base = I2S_BCLK_PIN,
         .dma_channel = 0,
         .pio_sm = 0
     };
-
-    output_format = audio_i2s_setup(&audio_format, &config);
-    if (!output_format) panic("PicoAudio: Unable to open audio device.\n");
-    
-    ok = audio_i2s_connect(pool);
-    assert(ok);
+    audio_i2s_setup(&audio_format, &config);
+    audio_i2s_connect(pool);
     audio_i2s_set_enabled(true);
     return pool;
 }
 
-
 int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true); 
     tusb_init();
-    
-    cdc_stdio_lib_init();   // Serial console alongside usb midi 
-    pd_prog.setPrintHook(&hv_print_handler); // Print PD messages in console
+    cdc_stdio_lib_init();
+
+    pd_prog.setPrintHook(&hv_print_handler);
+    pd_prog.setSendHook(&heavyMidiOutHook);
 
     struct audio_buffer_pool *ap = init_audio();
 
@@ -175,11 +196,14 @@ int main() {
         if (buffer) {
             int16_t *samples = (int16_t *)buffer->buffer->bytes;
             
+            // Process the Heavy DSP graph
             pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
             
+            // Convert float to int16 with global volume
             for (int i = 0; i < buffer->max_sample_count * 2; i++) {
-                samples[i] = (int16_t)(heavy_buffer[i] * 32767.0f);
+                samples[i] = (int16_t)(heavy_buffer[i] * volume * 32767.0f);
             }
+            
             buffer->sample_count = buffer->max_sample_count;
             give_audio_buffer(ap, buffer);
         }
