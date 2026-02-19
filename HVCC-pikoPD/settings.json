@@ -3,10 +3,10 @@
     "core_freq": "150000",
     "i2s_data_pin": 9,
     "i2s_bclk_pin": 10,
-    "i2s_buffers": 2,
-    "i2s_words": 64,
     "sample_rate": 48000,
     "max_voices": 4,
+    "channel": 2,
+    "buffer_size": 128,
     "voice_hashes": [
         {
             "name": "NOTE1",
@@ -19,7 +19,12 @@
         {
             "name": "NOTE3",
             "hash": "0xC430EA70"
+        },
+        {
+            "name": "NOTE4",
+            "hash": "0xD3ABA527"
         }
     ],
-    "adc_pins": {}
+    "adc_pins": {},
+    "debug": true
 }
