@@ -5,7 +5,13 @@
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
+#include "cdc_stdio_lib.h"
+
+
 #include "Heavy_{{ name }}.hpp"
+
+#define board_millis() to_ms_since_boot(get_absolute_time())
+
 
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
@@ -38,6 +44,7 @@ void __atomic_clear(volatile void* ptr, int memorder) {
 } // extern "C"
 
 #endif
+
 
 
 struct Voice {
@@ -90,17 +97,41 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 void midi_task() {
     if (tud_midi_available()) {
         uint8_t packet[4];
+        
         while (tud_midi_packet_read(packet)) {
-            handle_midi_message(packet[1], packet[2], packet[3]);
+            // TinyUSB MIDI packets follow the USB-MIDI Event Packet format:
+            // packet[0]: Header (Cable Number + Code Index Number)
+            // packet[1]: MIDI Status Byte (e.g., 0x90 for Note On)
+            // packet[2]: Data Byte 1 (e.g., Note Number)
+            // packet[3]: Data Byte 2 (e.g., Velocity)
+
+            uint8_t status = packet[1];
+            uint8_t data1  = packet[2];
+            uint8_t data2  = packet[3];
+            uint8_t cmd    = status & 0xF0;
+
+            // Optional: Forward to your existing handler
+            handle_midi_message(status, data1, data2);
+
+        
+            if (cmd == 0x90 && data2 > 0) { 
+                printf("[MIDI] Note On: %d Velocity: %d\n", data1, data2);
+            } 
+            else if (cmd == 0x80 || (cmd == 0x90 && data2 == 0)) { 
+                printf("[MIDI] Note Off: %d\n", data1);
+            }
+
         }
     }
 }
+
+
 
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
         .sample_freq = SAMPLE_RATE,
         .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .channel_count = 2
+        .channel_count = {{ settings.channel }}
     };
 
     static audio_buffer_format_t producer_format = {
@@ -128,11 +159,17 @@ struct audio_buffer_pool *init_audio() {
     return pool;
 }
 
+#define board_millis() to_ms_since_boot(get_absolute_time())
+
 int main() {
-    stdio_init_all();
     set_sys_clock_khz({{ settings.core_freq }}, true); 
     tusb_init();
     
+
+    cdc_stdio_lib_init();   // Serial console alongside usb midi 
+    uint32_t last_msg = 0;
+
+
     struct audio_buffer_pool *ap = init_audio();
 
     while (true) {
