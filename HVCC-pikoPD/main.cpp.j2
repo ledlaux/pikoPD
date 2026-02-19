@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
+#include "hardware/adc.h"
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "Heavy_{{ name }}.hpp"
 
-// -------------------- Config --------------------
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
 #define I2S_LRCLK_PIN (I2S_BCLK_PIN + 1) 
@@ -15,11 +15,31 @@
 #define I2S_WORDS {{ settings.i2s_words }}
 #define MAX_VOICES {{ settings.max_voices }}
 
-// -------------------- Heavy Patch --------------------
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
-float heavy_buffer[2 * I2S_WORDS]; // interleaved stereo floats
+float heavy_buffer[2 * I2S_WORDS]; 
 
-// -------------------- Voice Allocation --------------------
+
+#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
+
+extern "C" {
+
+bool __atomic_test_and_set(volatile void* ptr, int memorder) {
+    (void)memorder;
+    bool old = *(volatile bool*)ptr;
+    *(volatile bool*)ptr = true;
+    return old;
+}
+
+void __atomic_clear(volatile void* ptr, int memorder) {
+    (void)memorder;
+    *(volatile bool*)ptr = false;
+}
+
+} // extern "C"
+
+#endif
+
+
 struct Voice {
     uint8_t note = 0;
     bool active = false;
@@ -34,7 +54,6 @@ constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
 
 Voice voices[MAX_VOICES];
 
-// -------------------- Voice Logic --------------------
 int allocateVoice(uint8_t note) {
     for (int i = 0; i < MAX_VOICES; i++) {
         if (!voices[i].active) {
@@ -54,7 +73,6 @@ int findVoiceByNote(uint8_t note) {
     return -1;
 }
 
-// -------------------- MIDI Processing --------------------
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
     if (type == 0x90 && data2 > 0) { // Note On
@@ -69,7 +87,6 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     }
 }
 
-// TinyUSB MIDI Task
 void midi_task() {
     if (tud_midi_available()) {
         uint8_t packet[4];
@@ -79,7 +96,6 @@ void midi_task() {
     }
 }
 
-// -------------------- Audio Setup --------------------
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
         .sample_freq = SAMPLE_RATE,
@@ -112,7 +128,6 @@ struct audio_buffer_pool *init_audio() {
     return pool;
 }
 
-// -------------------- Main --------------------
 int main() {
     stdio_init_all();
     set_sys_clock_khz({{ settings.core_freq }}, true); 
