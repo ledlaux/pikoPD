@@ -1,5 +1,6 @@
 {
     "name": "heavy",
+    "core_freq": "250000",
     "i2s_data_pin": 9,
     "i2s_bclk_pin": 10,
     "i2s_buffers": 2,

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "hardware/clocks.h"
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
@@ -8,7 +9,6 @@
 // -------------------- Config --------------------
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-// Note: PIO I2S expects BCLK and LRCLK to be on consecutive pins usually.
 #define I2S_LRCLK_PIN (I2S_BCLK_PIN + 1) 
 
 #define SAMPLE_RATE {{ settings.sample_rate }}
@@ -115,23 +115,21 @@ struct audio_buffer_pool *init_audio() {
 // -------------------- Main --------------------
 int main() {
     stdio_init_all();
+    set_sys_clock_khz({{ settings.core_freq }}, true); 
     tusb_init();
     
     struct audio_buffer_pool *ap = init_audio();
 
     while (true) {
-        tud_task(); // USB housekeeping
-        midi_task(); // Read MIDI
+        tud_task(); 
+        midi_task(); 
 
-        // Get an audio buffer from the SDK's pool
         struct audio_buffer *buffer = take_audio_buffer(ap, false);
         if (buffer) {
             int16_t *samples = (int16_t *)buffer->buffer->bytes;
             
-            // Process Heavy (calculates floats)
             pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
             
-            // Convert Float to S16
             for (int i = 0; i < buffer->max_sample_count * 2; i++) {
                 samples[i] = (int16_t)(heavy_buffer[i] * 32767.0f);
             }
