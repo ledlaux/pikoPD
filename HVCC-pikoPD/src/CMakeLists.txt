@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
+add_compile_definitions(HV_BARE_METAL)
+
 # 1. Project Setup
 project(heavy C CXX ASM)
 
@@ -58,3 +60,4 @@ pico_enable_stdio_uart(${TARGET_NAME} 0)
 
 # 11. Output Generation
 pico_add_extra_outputs(${TARGET_NAME})
+
