@@ -22,9 +22,8 @@ This version generates simple synthesizer with polyphonic usb midi input.
 
 ## Usage
 
-Enter bootloader mode by holding boot on power on.
+Enter bootloader mode by holding device boot button
 
 ```bash
 python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot --flash
 ```
-Reset device.
