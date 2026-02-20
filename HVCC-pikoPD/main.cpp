@@ -7,9 +7,7 @@
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
-
 #include "Heavy_{{ name }}.hpp"
-
 
 // --- Heavy hashes (inputs) ---
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -38,15 +36,15 @@
 #define MAX_VOICES   {{ settings.max_voices }}
 #define I2S_BUFFER   {{ settings.buffer_size }}
 
+#define LED_PIN {{ settings.led_builtin_pin }}  
+
 // --- Global Objects & State ---
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 float heavy_buffer[I2S_BUFFER * 2]; 
 float volume = 1.0f; 
 
 std::atomic<float> led_value{0.0f};
-#define LED_PIN {{ settings.led_builtin_pin }}         // Pico onboard LED
-const hv_uint32_t LED_HASH = 0x8B49F390;  // hardcoded for testing
-//const hv_uint32_t LED_HASH = {{ led_builtin }};
+const hv_uint32_t LED_HASH = {{ led_hash }}   ;  
 
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
@@ -77,7 +75,7 @@ struct Voice {
 };
 
 constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
-{% for recv in settings.voice_hashes %}
+{% for recv in voice_hashes %}
     {{ recv.hash }}{% if not loop.last %},{% endif %} // {{ recv.name }}
 {% endfor %}
 };
