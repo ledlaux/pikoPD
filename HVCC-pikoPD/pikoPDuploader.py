@@ -75,24 +75,16 @@ class PicoUF2Generator:
             "-n", self.patch_name
         ], check=True)
 
-    def update_settings(self):
-        # Load settings from script folder
+    def load_settings(self):
         if os.path.exists(self.settings_file):
             with open(self.settings_file) as f:
                 settings = json.load(f)
         else:
             settings = {"max_voices": 4}
 
-        max_voices = settings.get("max_voices", 4)
+        settings["max_voices"] = settings.get("max_voices", 4)
 
-        # Parse Heavy CPP receiver hashes
-        voice_list = parse_heavy_receiver_hashes(self.c_dir)
-        settings["voice_hashes"] = voice_list[:max_voices]
-
-        with open(self.settings_file, "w") as f:
-            json.dump(settings, f, indent=4)
-
-        print(f"[SETTINGS] Updated {self.settings_file} with {len(settings['voice_hashes'])} voice hashes")
+        print(f"[SETTINGS] Loaded max_voices={settings['max_voices']}")
         return settings
 
     def copy_src(self):
@@ -183,7 +175,7 @@ class PicoUF2Generator:
     def run_all(self, flash=False):
         start = time.time()
         self.run_hvcc()
-        settings = self.update_settings()
+        settings = self.load_settings()
         self.copy_src()
         self.render_main(settings)
         self.build_project()
