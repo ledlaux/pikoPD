@@ -2,7 +2,7 @@
 
 This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. Extra files and custom templates will be supported.
 
-This version generates simple synthesizer with polyphonic usb midi input. 
+Project is in very early stages. Patch in the folder generates simple synthesizer with polyphonic usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. PD is printing cc values from 0 to 1.0 into serial console. 
 
 ## Features
 
@@ -32,3 +32,4 @@ Enter bootloader mode by holding device boot button
 ```bash
 python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot --flash
 ```
+
