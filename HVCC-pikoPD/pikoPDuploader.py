@@ -95,7 +95,7 @@ class PicoUF2Generator:
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(os.path.dirname(__file__))
         )
-        template = env.get_template("main.cpp.j2")
+        template = env.get_template("main.cpp")
         output_cpp = os.path.join(self.c_dir, "main.cpp")
         
         settings["voice_hashes_cpp"] = ",\n    ".join(v["hash"] for v in settings["voice_hashes"])
