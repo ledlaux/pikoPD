@@ -6,108 +6,104 @@ import shutil
 import subprocess
 import time
 import jinja2
-from hvcc.core.hv2ir.HeavyLangObject import HeavyLangObject
-from hvcc.types.IR import IRGraph
+import glob
+import re
+import argparse
 
 sdk_path = os.environ.get("PICO_SDK_PATH")
 if not sdk_path:
     raise RuntimeError("PICO_SDK_PATH environment variable is not set.")
 
+# HEAVY PARSER 
+def parse_heavy_receiver_hashes(c_dir):
+    cpp_files = [f for f in os.listdir(c_dir) if f.startswith("Heavy_") and f.endswith(".cpp")]
+    if not cpp_files:
+        raise FileNotFoundError("No Heavy CPP found")
+    cpp_path = os.path.join(c_dir, cpp_files[0])
+    print(f"[DEBUG] Using {cpp_path}")
 
-heavy_hash = HeavyLangObject.get_hash
+    hashes = []
+    pattern = re.compile(r"case\s+(0x[0-9A-F]+):\s*{?\s*//\s*(\w+)")
+    ignore_prefix = "__hv"
 
+    with open(cpp_path, "r") as f:
+        for line in f:
+            m = pattern.search(line)
+            if m:
+                name = m.group(2)
+                if name.startswith(ignore_prefix):
+                    continue
+                hashes.append({"name": name, "hash": m.group(1)})
+
+    print(f"[DEBUG] Found {len(hashes)} receiver hashes")
+    return hashes
+
+# GENERATOR
 class PicoUF2Generator:
+
     def __init__(self, pd_path, project_root, src_dir):
         self.pd_path = os.path.abspath(pd_path)
         self.project_root = os.path.abspath(project_root)
         self.src_dir = os.path.abspath(src_dir)
-        self.ir_dir = os.path.join(project_root, "ir")
-        self.hv_dir = os.path.join(project_root, "hv")
-        self.c_dir = os.path.join(project_root, "c")
-        self.settings_file = os.path.abspath("settings.json")
-        self.patch_name = os.path.splitext(os.path.basename(pd_path))[0]
+        self.c_dir = os.path.join(self.project_root, "c")
+        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+        self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
 
     def run_hvcc(self):
+        print(f"[HVCC] Compiling {self.pd_path} → {self.project_root}")
         subprocess.run([
             "hvcc",
             self.pd_path,
-            "-o", self.project_root,   # generate all output into project root
+            "-o", self.project_root,
             "-n", self.patch_name
         ], check=True)
 
-    def update_settings(self, max_voices=None):
-        with open(self.settings_file) as f:
-            settings = json.load(f)
+    def update_settings(self):
+        # Load settings from script folder
+        if os.path.exists(self.settings_file):
+            with open(self.settings_file) as f:
+                settings = json.load(f)
+        else:
+            settings = {"max_voices": 4}
 
-    # Always take max_voices from settings.json; don't overwrite if provided
-    #    if max_voices is None:
-    #        max_voices = settings.get("max_voices", 4)
-    #    else:
-    #        settings["max_voices"] = max_voices
         max_voices = settings.get("max_voices", 4)
 
-
-    # Load IR to get receiver hashes
-        ir_path = os.path.join(self.ir_dir, f"{self.patch_name}.heavy.ir.json")
-        with open(ir_path) as f:
-            ir = json.load(f)
-
-        receivers = ir["control"]["receivers"]
-
-    # Prepare a list of dicts with name + hash
-        voice_list = []
-        for name, recv in receivers.items():
-            if name.startswith("__"):
-                continue
-            h = heavy_hash(name)
-            voice_list.append({
-                "name": name,
-                "hash": f"0x{h:08X}"
-        })
-            if len(voice_list) >= max_voices:
-                break
-
-    # Save both voice hashes and names
-        settings["voice_hashes"] = voice_list
+        # Parse Heavy CPP receiver hashes
+        voice_list = parse_heavy_receiver_hashes(self.c_dir)
+        settings["voice_hashes"] = voice_list[:max_voices]
 
         with open(self.settings_file, "w") as f:
             json.dump(settings, f, indent=4)
 
-        print(f"[SETTINGS] Updated {self.settings_file} with {len(voice_list)} voice hashes")
+        print(f"[SETTINGS] Updated {self.settings_file} with {len(settings['voice_hashes'])} voice hashes")
         return settings
 
     def copy_src(self):
-        """Copy src files into c/ folder."""
-        if not os.path.exists(self.c_dir):
-            os.makedirs(self.c_dir)
-
+        os.makedirs(self.c_dir, exist_ok=True)
         for fname in os.listdir(self.src_dir):
             src = os.path.join(self.src_dir, fname)
             dst = os.path.join(self.c_dir, fname)
             if os.path.isdir(src):
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
-                shutil.copy(src, dst)
-        print(f"[SRC] Copied src files from {self.src_dir} to {self.c_dir}")
+                shutil.copy2(src, dst)
+        print(f"[SRC] Copied src files → {self.c_dir}")
 
     def render_main(self, settings):
-        """Render main.cpp from template."""
-        env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(os.path.dirname(__file__))
-        )
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
         template = env.get_template("main.cpp")
         output_cpp = os.path.join(self.c_dir, "main.cpp")
-        
+
         settings["voice_hashes_cpp"] = ",\n    ".join(v["hash"] for v in settings["voice_hashes"])
 
         with open(output_cpp, "w") as f:
             f.write(template.render(name=self.patch_name, settings=settings))
-        print(f"[TEMPLATE] Rendered main.cpp to {output_cpp}")
+        print(f"[TEMPLATE] Rendered main.cpp")
 
-    def build_project(self, cmake_path=None, build_type="Release"):
-        """Run CMake and make."""
+    def build_project(self, build_type="Release"):
         build_dir = os.path.join(self.c_dir, "build")
         os.makedirs(build_dir, exist_ok=True)
+
         cmake_cmd = [
             "cmake",
             f"-DPICO_SDK_PATH={sdk_path}",
@@ -116,29 +112,28 @@ class PicoUF2Generator:
             f"-DCMAKE_TOOLCHAIN_FILE={sdk_path}/cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake",
             ".."
         ]
+
         print("[CMAKE] Configuring...")
-        subprocess.run(" ".join(cmake_cmd), cwd=build_dir, shell=True, check=True)
-        print("[MAKE] Building project...")
+        subprocess.run(cmake_cmd, cwd=build_dir, check=True)
+
+        print("[MAKE] Building...")
         subprocess.run(["make", "-j8"], cwd=build_dir, check=True)
-        print("[BUILD] Finished building")
 
-    def flash_uf2(self, uf2_path=None):
-        """Flash the built UF2 file from the build/ folder."""
+        print("[BUILD] Done")
+
+    def flash_uf2(self):
         build_dir = os.path.join(self.c_dir, "build")
-        if uf2_path is None:
-            # automatically find any .uf2 file in the build/ folder
-            uf2_files = [f for f in os.listdir(build_dir) if f.endswith(".uf2")]
-            if not uf2_files:
-                raise FileNotFoundError(f"No UF2 file found in {build_dir}")
-            uf2_path = os.path.join(build_dir, uf2_files[0])  # pick the first one found
+        uf2_files = [f for f in os.listdir(build_dir) if f.endswith(".uf2")]
+        if not uf2_files:
+            raise FileNotFoundError("No UF2 file found")
+        uf2_path = os.path.join(build_dir, uf2_files[0])
+        print(f"[PICOTOOL] Flashing {uf2_path}")
+        subprocess.run(["picotool", "load", "-f", "-x", uf2_path], check=True)
 
-        print(f"[PICOTOOL] Flashing UF2: {uf2_path}")
-        subprocess.run(["picotool", "load", "-f", uf2_path], check=True)
-
-    def run_all(self, max_voices=None, flash=False):
+    def run_all(self, flash=False):
         start = time.time()
         self.run_hvcc()
-        settings = self.update_settings(max_voices=max_voices)
+        settings = self.update_settings()
         self.copy_src()
         self.render_main(settings)
         self.build_project()
@@ -146,20 +141,17 @@ class PicoUF2Generator:
             self.flash_uf2()
         print(f"[DONE] Total time: {time.time() - start:.1f}s")
 
-
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: pikoPDuploader.py <pd_patch> <project_root> [--flash]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Build and flash a pikoPD Heavy patch")
+    parser.add_argument("pd_patch", help="Path to the Pure Data patch (.pd)")
+    parser.add_argument("project_root", help="Root folder for the generated project")
+    parser.add_argument("--flash", action="store_true", help="Flash the UF2 to the Pico")
+    args = parser.parse_args()
 
-    pd_patch = sys.argv[1]
-    project_root = sys.argv[2]
-    max_voices = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else None
-    flash = "--flash" in sys.argv
-
-    gen = PicoUF2Generator(
-        pd_patch,
-        project_root,
+    generator = PicoUF2Generator(
+        pd_path=args.pd_patch,
+        project_root=args.project_root,
         src_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     )
-    gen.run_all(max_voices=max_voices, flash=flash)
+
+    generator.run_all(flash=args.flash)
