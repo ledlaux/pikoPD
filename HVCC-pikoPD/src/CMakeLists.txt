@@ -43,6 +43,7 @@ target_link_libraries(${TARGET_NAME}
     tinyusb_board
     hardware_clocks
     hardware_adc
+    hardware_pwm
 )
 
 # 9. Hardware Config
@@ -57,8 +58,6 @@ target_compile_definitions(${TARGET_NAME} PRIVATE
 # 10. USB/Serial Enable
 pico_enable_stdio_usb(${TARGET_NAME} 0)
 pico_enable_stdio_uart(${TARGET_NAME} 0)
-
-
 
 # 11. Output Generation
 pico_add_extra_outputs(${TARGET_NAME})
