@@ -2,11 +2,11 @@
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/adc.h"
+#include "hardware/pwm.h"
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
-
 #include "Heavy_{{ name }}.hpp"
 
 // --- Heavy hashes (inputs) ---
@@ -36,10 +36,15 @@
 #define MAX_VOICES   {{ settings.max_voices }}
 #define I2S_BUFFER   {{ settings.buffer_size }}
 
+#define LED_PIN {{ settings.led_builtin_pin }}  
+
 // --- Global Objects & State ---
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 float heavy_buffer[I2S_BUFFER * 2]; 
 float volume = 1.0f; 
+
+std::atomic<float> led_value{0.0f};
+const hv_uint32_t LED_HASH = {{ led_hash }}   ;  
 
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
@@ -70,7 +75,7 @@ struct Voice {
 };
 
 constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
-{% for recv in settings.voice_hashes %}
+{% for recv in voice_hashes %}
     {{ recv.hash }}{% if not loop.last %},{% endif %} // {{ recv.name }}
 {% endfor %}
 };
@@ -96,6 +101,24 @@ int findVoiceByNote(uint8_t note) {
     return -1;
 }
 
+void init_led_pwm() {
+    gpio_set_function(LED_PIN, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
+    pwm_set_wrap(slice_num, 255);       // 8-bit resolution
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, 0);  // start off
+    pwm_set_enabled(slice_num, true);
+}
+
+void update_led_pwm() {
+    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
+    uint chan = pwm_gpio_to_channel(LED_PIN);
+
+    float lv = led_value.load();       // 0..1 from Pd patch
+    lv = lv * 3.0f;                    // scale up to 3×
+    if(lv > 1.0f) lv = 1.0f;           // clamp max
+
+    pwm_set_chan_level(slice_num, chan, (uint16_t)(lv * 255));
+}
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
@@ -104,33 +127,33 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     if (type == 0x90 && data2 > 0) { // Note On
         int v = allocateVoice(data1);
         if (v >= 0) {
-            printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
+    //        printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
             hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
         } else {
-            printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
+    //        printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
         }
     } 
     else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
         int v = findVoiceByNote(data1);
         if (v >= 0) {
-            printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
+    //        printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
             hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
             voices[v].active = false;
         }
     }
     else if (type == 0xB0) { // CC
-        printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
+    //    printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
         hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
         if (data1 == 7) volume = data2 / 127.0f;
     }
     else if (type == 0xE0) { // Pitch Bend
         int bend = (data2 << 7) | data1;
-        printf("[MIDI] Bend: %d\n", bend);
+    //    printf("[MIDI] Bend: %d\n", bend);
         hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
     }
     else {
         // Helpful for identifying why other knobs/buttons aren't working
-        printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
+    //    printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
     }
 }
 
@@ -168,6 +191,15 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
     printf("[%s] %s\n", printName, str);
 }
 
+void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
+    if(hash == LED_HASH) {
+        float val = msg_getFloat(m, 0);
+        led_value.store(val);
+        printf("[LED] Received: %f\n", val);
+    }
+    heavyMidiOutHook(c, name, hash, m);
+}
+
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
         .sample_freq = SAMPLE_RATE,
@@ -198,13 +230,17 @@ int main() {
     cdc_stdio_lib_init();
 
     pd_prog.setPrintHook(&hv_print_handler);
-    pd_prog.setSendHook(&heavyMidiOutHook);
+    pd_prog.setSendHook(&sendHookHandler);
+
+    init_led_pwm(); 
 
     struct audio_buffer_pool *ap = init_audio();
 
     while (true) {
         tud_task(); 
         midi_task(); 
+
+        update_led_pwm();
 
         struct audio_buffer *buffer = take_audio_buffer(ap, false);
         if (buffer) {

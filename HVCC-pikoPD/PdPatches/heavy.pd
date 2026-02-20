@@ -44,6 +44,10 @@
 #X obj 582 803 *~ 0.25;
 #X obj 812 833 *~ 0.25;
 #X obj 641 949 *~ 0.6;
+#X obj 202 72 print Slider;
+#X obj 111 72 / 127;
+#X obj 111 37 ctlin 1 1;
+#X obj 202 37 s led_builtin @hv_param 0 1;
 #X connect 0 0 22 0;
 #X connect 1 0 7 0;
 #X connect 3 0 5 0;
@@ -93,3 +97,6 @@
 #X connect 42 0 21 0;
 #X connect 43 0 21 1;
 #X connect 44 0 23 0;
+#X connect 46 0 48 0;
+#X connect 46 0 45 0;
+#X connect 47 0 46 0;
