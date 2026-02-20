@@ -14,6 +14,7 @@ sdk_path = os.environ.get("PICO_SDK_PATH")
 if not sdk_path:
     raise RuntimeError("PICO_SDK_PATH environment variable is not set.")
 
+
 # HEAVY PARSER 
 def parse_heavy_receiver_hashes(c_dir):
     cpp_files = [f for f in os.listdir(c_dir) if f.startswith("Heavy_") and f.endswith(".cpp")]
@@ -37,6 +38,7 @@ def parse_heavy_receiver_hashes(c_dir):
 
     print(f"[DEBUG] Found {len(hashes)} receiver hashes")
     return hashes
+
 
 # GENERATOR
 class PicoUF2Generator:
@@ -121,12 +123,31 @@ class PicoUF2Generator:
 
         print("[BUILD] Done")
 
+    def check_pico_bootsel(self):
+        try:
+            result = subprocess.run(
+                ["picotool", "info"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            if "No accessible PICO devices" in result.stdout:
+                return False
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
     def flash_uf2(self):
         build_dir = os.path.join(self.c_dir, "build")
         uf2_files = [f for f in os.listdir(build_dir) if f.endswith(".uf2")]
         if not uf2_files:
             raise FileNotFoundError("No UF2 file found")
         uf2_path = os.path.join(build_dir, uf2_files[0])
+
+        if not self.check_pico_bootsel():
+            print("[FLASH] No PICO device in BOOTSEL mode found, skipping flash.")
+            return
+
         print(f"[PICOTOOL] Flashing {uf2_path}")
         subprocess.run(["picotool", "load", "-f", "-x", uf2_path], check=True)
 
