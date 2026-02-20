@@ -9,11 +9,25 @@
 
 #include "Heavy_{{ name }}.hpp"
 
-// --- Heavy standard MIDI hashes ---
-#define HV_CTLIN_HASH          0x41BE0F9C
-#define HV_BENDIN_HASH         0x3083F0F7
-#define HV_NOTEOUT_HASH        0x0D1D4AC2
-#define HV_CTL_OUT_HASH        0xE5E2A040
+// --- Heavy hashes (inputs) ---
+#define HV_NOTEIN_HASH       0x67E37CA3
+#define HV_CTLIN_HASH        0x41BE0F9C
+#define HV_POLYTOUCHIN_HASH  0xBC530F59
+#define HV_PGMCHANGEIN_HASH  0x2E1EA03D
+#define HV_TOUCHIN_HASH      0x553925BD
+#define HV_BENDIN_HASH       0x3083F0F7
+#define HV_MIDIIN_HASH       0x149631BE
+#define HV_MIDIREALTIMEIN_HASH 0x6FFF0BCF
+
+// --- Heavy hashes (outputs) ---
+#define HV_NOTEOUT_HASH      0xD1D4AC2
+#define HV_CTL_OUT_HASH      0xE5E2A040
+#define HV_POLYTOUCHOUT_HASH 0xD5ACA9D1
+#define HV_PGMCHANGEOUT_HASH 0x8753E39E
+#define HV_TOUCHOUT_HASH     0x476D4387
+#define HV_BENDOUT_HASH      0xE8458013
+#define HV_MIDIOUT_HASH      0x6511DE55
+#define HV_MIDIOUTPORT_HASH  0x165707E4
 
 // --- Hardware & Config ---
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
