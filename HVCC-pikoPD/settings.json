@@ -7,24 +7,7 @@
     "max_voices": 4,
     "channel": 2,
     "buffer_size": 128,
-    "voice_hashes": [
-        {
-            "name": "NOTE1",
-            "hash": "0x3E185FE5"
-        },
-        {
-            "name": "NOTE2",
-            "hash": "0x3C682D20"
-        },
-        {
-            "name": "NOTE3",
-            "hash": "0xC430EA70"
-        },
-        {
-            "name": "NOTE4",
-            "hash": "0xD3ABA527"
-        }
-    ],
     "adc_pins": {},
-    "debug": true
+    "debug": true,
+    "led_builtin_pin": 24
 }
