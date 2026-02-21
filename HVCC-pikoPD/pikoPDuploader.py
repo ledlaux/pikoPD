@@ -39,21 +39,7 @@ def parse_heavy_receiver_hashes(c_dir):
                 voice_hashes.append({"name": name, "hash": m.group(1)})
     print(f"[DEBUG] Found {len(voice_hashes)} voice hashes")
 
-    # --- LED hash ---
-    led_hash = None
-    hook_pattern = re.compile(r'getSendHook\(\)\(_c,\s*"led_builtin",\s*(0x[0-9A-F]+),')
-    with open(cpp_path, "r") as f:
-        for line in f:
-            m = hook_pattern.search(line)
-            if m:
-                led_hash = m.group(1)
-                break
-
-    if not led_hash:
-        raise ValueError("led_builtin hash not found in Heavy CPP")
-    print(f"[DEBUG] led_builtin hash = {led_hash}")
-
-    return voice_hashes, led_hash
+    return voice_hashes
 
 # GENERATOR
 class PicoUF2Generator:
@@ -100,7 +86,7 @@ class PicoUF2Generator:
 
     def render_main(self, settings):
     # Parse all hashes from Heavy CPP
-        voice_hashes, led_hash = parse_heavy_receiver_hashes(self.c_dir)
+        voice_hashes = parse_heavy_receiver_hashes(self.c_dir)
 
     # Limit voices
         max_voices = settings.get("max_voices", 4)
@@ -109,7 +95,6 @@ class PicoUF2Generator:
     # Prepare template variables
         template_vars = {
             "name": self.patch_name,
-            "led_hash": led_hash,
             "voice_hashes": voice_hashes,
             "settings": settings
         }
@@ -120,8 +105,6 @@ class PicoUF2Generator:
 
         with open(output_cpp, "w") as f:
             f.write(template.render(**template_vars))
-
-        print(f"[TEMPLATE] Rendered main.cpp with {len(voice_hashes)} voices and LED_HASH={led_hash}")
 
     def build_project(self, build_type="Release"):
         build_dir = os.path.join(self.c_dir, "build")
