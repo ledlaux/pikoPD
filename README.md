@@ -22,7 +22,23 @@ Project is in very early stages. Patch in the folder generates simple synthesize
     - led pin
 - Copies extra C files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
-- Automatically flashes UF2 to Pico2 devices  
+- Automatically flashes UF2 to Pico2 devices
+
+## Updates
+
+- [x] led
+- [ ] button
+- [ ] pot
+- [ ] encoder
+- [ ] cv in
+- [ ] gate in
+- [ ] midi clock
+- [ ] uart midi
+- [ ] usb midi
+- [ ] screen
+- [ ] pwm audio
+- [ ] usb audio
+      
 
 ## Requirements
 
