@@ -20,7 +20,7 @@ Project is in very early stages. Patch in the folder generates simple synthesize
     - voice count 
     - sample rate
     - led pin
-- Copies extra C files into project folder from `/src`
+- Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
 - Automatically flashes UF2 to Pico2 devices
 
