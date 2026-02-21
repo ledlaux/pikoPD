@@ -130,24 +130,49 @@ void update_led_pwm() {
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
     uint8_t chan = status & 0x0F;
-    
+
     if (type == 0x90 && data2 > 0) { // Note On
-        int v = allocateVoice(data1);
-        if (v >= 0) {
-    //        printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
-            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
-        } else {
-    //        printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
-        }
-    } 
-    else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
-        int v = findVoiceByNote(data1);
-        if (v >= 0) {
-    //        printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
-            hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
-            voices[v].active = false;
-        }
+        hv_sendMessageToReceiverV(
+        &pd_prog,
+        HV_NOTEIN_HASH,
+        0.0f,
+        "fff",
+        (float)data1,
+        (float)data2,
+        (float)chan
+        );
     }
+    else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
+        hv_sendMessageToReceiverV(
+        &pd_prog,
+        HV_NOTEIN_HASH,
+        0.0f,
+        "fff",
+        (float)data1,
+        0.0f,
+        (float)chan
+        );
+    }
+        
+    // Code for polyhonic voice allocation
+    //if (type == 0x90 && data2 > 0) { // Note On
+    //    int v = allocateVoice(data1);
+    //    if (v >= 0) {
+    //        printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
+    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
+    //    } else {
+    //        printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
+    //    }
+    //} 
+    //else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
+    //    int v = findVoiceByNote(data1);
+    //    if (v >= 0) {
+    //        printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
+    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
+    //        voices[v].active = false;
+    //    }
+   // }
+        
     else if (type == 0xB0) { // CC
     //    printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
         hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
