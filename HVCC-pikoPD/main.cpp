@@ -29,6 +29,13 @@
 #define HV_MIDIOUT_HASH      0x6511DE55
 #define HV_MIDIOUTPORT_HASH  0x165707E4
 
+#define MIDI_RT_CLOCK           0xF8
+#define MIDI_RT_START           0xFA
+#define MIDI_RT_CONTINUE        0xFB
+#define MIDI_RT_STOP            0xFC
+#define MIDI_RT_ACTIVESENSE     0xFE
+#define MIDI_RT_RESET           0xFF
+
 // --- Hardware & Config ---
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
