@@ -37,7 +37,7 @@ Project is in very early stages. Project is in very early stages. Patch in the f
 - [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
-- [ ] usb midi
+- [x] usb midi
 - [ ] screen
 - [ ] pwm audio
 - [ ] usb audio
