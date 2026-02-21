@@ -53,7 +53,7 @@ float volume = 1.0f;
 
 // Hardcoded for test
 
-std::atomic<float> led_builtin{0.0f};
+std::atomic<float> LED{0.0f};
 
 // {% for obj in print_objects %}
 // std::atomic<float> {{ obj }}{0.0f};    
@@ -126,7 +126,7 @@ void update_led_pwm() {
     uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
     uint chan = pwm_gpio_to_channel(LED_PIN);
 
-    float lv = led_builtin.load();       // 0..1 from Pd patch
+    float lv = LED.load();       // 0..1 from Pd patch
     lv = lv * 3.0f;                    // scale up to 3×
     if(lv > 1.0f) lv = 1.0f;           // clamp max
 
@@ -230,10 +230,10 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 }
 
 void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
-    if(strcmp(name, "led_builtin") == 0) {
-    led_builtin.store(msg_getFloat(m, 0));
+    if(strcmp(name, "LED") == 0) {
+    LED.store(msg_getFloat(m, 0));
 
-    //printf("[LED] Received: %f\n", val);
+    //printf("Received: %f\n", val);
     }
     heavyMidiOutHook(c, name, hash, m);
 }
