@@ -30,6 +30,8 @@ Project is in very early stages. Patch in the folder generates simple synthesize
 - [ ] button
 - [ ] pot
 - [ ] encoder
+- [ ] joystic
+- [ ] sensors
 - [ ] cv in
 - [ ] gate in
 - [ ] midi clock
