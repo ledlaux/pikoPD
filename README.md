@@ -8,7 +8,7 @@ This repository contains examples of running **PD patches exported with the HVCC
 
 This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. 
 
-Project is in very early stages. Project is in very early stages. Patch in the folder is a simple synthesizer which uses [notein] object and usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. PD is printing cc values into serial console. 
+Project is in very early stages. Patch in the folder is a simple synthesizer which uses [notein] object and usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. PD is printing cc values into serial console. 
 
 ## Features
 
