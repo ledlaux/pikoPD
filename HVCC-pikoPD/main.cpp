@@ -50,8 +50,14 @@ Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 float heavy_buffer[I2S_BUFFER * 2]; 
 float volume = 1.0f; 
 
-std::atomic<float> led_value{0.0f};
-const hv_uint32_t LED_HASH = {{ led_hash }}   ;  
+
+// Hardcoded for test
+
+std::atomic<float> led_builtin{0.0f};
+
+// {% for obj in print_objects %}
+// std::atomic<float> {{ obj }}{0.0f};    
+// {% endfor %}
 
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
@@ -89,24 +95,24 @@ constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
 
 Voice voices[MAX_VOICES];
 
-int allocateVoice(uint8_t note) {
-    for (int i = 0; i < MAX_VOICES; i++) {
-        if (!voices[i].active) {
-            voices[i].note = note;
-            voices[i].active = true;
-            voices[i].hash = VOICE_HASHES[i];
-            return i;
-        }
-    }
-    return -1; 
-}
+// int allocateVoice(uint8_t note) {
+//     for (int i = 0; i < MAX_VOICES; i++) {
+//         if (!voices[i].active) {
+//             voices[i].note = note;
+//             voices[i].active = true;
+//             voices[i].hash = VOICE_HASHES[i];
+//             return i;
+//         }
+//     }
+//     return -1; 
+// }
 
-int findVoiceByNote(uint8_t note) {
-    for (int i = 0; i < MAX_VOICES; i++) {
-        if (voices[i].active && voices[i].note == note) return i;
-    }
-    return -1;
-}
+// int findVoiceByNote(uint8_t note) {
+//     for (int i = 0; i < MAX_VOICES; i++) {
+//         if (voices[i].active && voices[i].note == note) return i;
+//     }
+//     return -1;
+// }
 
 void init_led_pwm() {
     gpio_set_function(LED_PIN, GPIO_FUNC_PWM);
@@ -120,7 +126,7 @@ void update_led_pwm() {
     uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
     uint chan = pwm_gpio_to_channel(LED_PIN);
 
-    float lv = led_value.load();       // 0..1 from Pd patch
+    float lv = led_builtin.load();       // 0..1 from Pd patch
     lv = lv * 3.0f;                    // scale up to 3×
     if(lv > 1.0f) lv = 1.0f;           // clamp max
 
@@ -224,10 +230,10 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 }
 
 void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
-    if(hash == LED_HASH) {
-        float val = msg_getFloat(m, 0);
-        led_value.store(val);
-        printf("[LED] Received: %f\n", val);
+    if(strcmp(name, "led_builtin") == 0) {
+    led_builtin.store(msg_getFloat(m, 0));
+
+    //printf("[LED] Received: %f\n", val);
     }
     heavyMidiOutHook(c, name, hash, m);
 }
