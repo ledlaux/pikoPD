@@ -86,21 +86,23 @@ enum {
 #elif CFG_TUSB_MCU == OPT_MCU_CXD56
   // CXD56 USB driver has fixed endpoint type (bulk/interrupt/iso) and direction (IN/OUT) by its number
   // 0 control (IN/OUT), 1 Bulk (IN), 2 Bulk (OUT), 3 In (IN), 4 Bulk (IN), 5 Bulk (OUT), 6 In (IN)
-  #define EPNUM_MIDI_OUT  0x02
-  #define EPNUM_MIDI_IN   0x81
+  #define EPNUM_MIDI_OUT  0x03
+  #define EPNUM_MIDI_IN   0x83
 
-#elif defined(TUD_ENDPOINT_ONE_DIRECTION_ONLY)
-  // MCUs that don't support a same endpoint number with different direction IN and OUT defined in tusb_mcu.h
-  //    e.g EP1 OUT & EP1 IN cannot exist together
-  #define EPNUM_MIDI_OUT  0x01
-  #define EPNUM_MIDI_IN   0x82
+// #elif defined(TUD_ENDPOINT_ONE_DIRECTION_ONLY)
+//   // MCUs that don't support a same endpoint number with different direction IN and OUT defined in tusb_mcu.h
+//   //    e.g EP1 OUT & EP1 IN cannot exist together
+//   #define EPNUM_MIDI_OUT  0x01
+//   #define EPNUM_MIDI_IN   0x82
 
 #else
-  #define EPNUM_MIDI_OUT  0x01
-  #define EPNUM_MIDI_IN   0x81
+  // --- Unique Endpoints for MIDI ---
+#define EPNUM_MIDI_OUT  0x03  // Slot 3 (OUT)
+#define EPNUM_MIDI_IN   0x83  // Slot 3 (IN)
 #endif
 
 
+// --- Unique Endpoints for CDC ---
 #define EPNUM_CDC_NOTIF 0x81
 #define EPNUM_CDC_OUT   0x02
 #define EPNUM_CDC_IN    0x82
@@ -110,11 +112,10 @@ uint8_t const desc_fs_configuration[] = {
   // Config number, interface count, string index, total length, attribute, power in mA
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
 
-  // CDC: Control + Data Interfaces
-  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+  // CDC: Interface number, string index, EP notification address, size, EP data (out, in) size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
 
-  // MIDI: MIDI Streaming Interface
+  // MIDI: Interface number, string index, EP Out & EP In address, size
   TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 0, EPNUM_MIDI_OUT, EPNUM_MIDI_IN, 64)
 };
 
