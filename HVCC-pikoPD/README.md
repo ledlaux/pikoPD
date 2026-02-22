@@ -17,7 +17,25 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
 - Check for device in BOOTSEL mode
-- Flashes UF2 firmware to Pico2 board and restarts device 
+- Flashes UF2 firmware to Pico2 board and restarts device
+
+## Updates
+
+- [x] led
+- [ ] button
+- [ ] pot
+- [ ] encoder
+- [ ] joystic
+- [ ] sensors
+- [ ] cv in
+- [ ] gate in
+- [ ] midi clock
+- [ ] uart midi
+- [x] usb midi
+- [ ] screen
+- [ ] pwm audio
+- [ ] usb audio
+
 
 ## Requirements
 
