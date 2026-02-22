@@ -151,7 +151,7 @@ class PicoUF2Generator:
                 uf2 = glob.glob(os.path.join(self.build_dir, "*.uf2"))[0]
                 self.run_cmd(["picotool", "load", "-f", "-x", uf2], step_name="Flash")
                 duration = time.time() - start_time
-                self.print_progress(1.0, f"Finished in {duration:.1f}s | Restarting...")
+                self.print_progress(1.0, f"Finished in {duration:.1f}s | Rebooting...")
                 time.sleep(1.5) 
                 sys.stdout.write("\n")
                 flash_success = True
@@ -168,14 +168,14 @@ class PicoUF2Generator:
             self.open_serial()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("pd_patch")
-    parser.add_argument("project_root")
-    parser.add_argument("-f", "--flash", action="store_true")
-    parser.add_argument("-s", "--serial", action="store_true")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
+    parser.add_argument("pd_patch", help="Pure Data patch file (e.g., heavy.pd)")
+    parser.add_argument("project_root", help="Project folder")
+    parser.add_argument("-f", "--flash", action="store_true", help="Flash UF2 to Pico")
+    parser.add_argument("-s", "--serial", action="store_true", help="Open serial console after reboot")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug output")
     args = parser.parse_args()
-    
+        
     src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     gen = PicoUF2Generator(args.pd_patch, args.project_root, src, verbose=args.verbose)
     gen.run_all(flash=args.flash, serial=args.serial)
