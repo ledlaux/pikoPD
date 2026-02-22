@@ -6,44 +6,93 @@ import shutil
 import subprocess
 import time
 import jinja2
-import glob
-import re
 import argparse
+import zlib
+import glob
 
+# -------------------------------
+# ENVIRONMENT & CONSTANTS
+# -------------------------------
 sdk_path = os.environ.get("PICO_SDK_PATH")
 if not sdk_path:
-    raise RuntimeError("PICO_SDK_PATH environment variable is not set.")
+    raise RuntimeError("PICO_SDK_PATH environment variable is not set. Please export it.")
 
+HV_INTERNAL_MESSAGES = [
+    "__hv_noteout", "__hv_ctlout", "__hv_polytouchout", "__hv_pgmout",
+    "__hv_touchout", "__hv_bendout", "__hv_midiout", "__hv_midioutport",
+    "__hv_init", "__hv_notein", "__hv_ctlin"
+]
 
-# HEAVY PARSER 
-def parse_heavy_receiver_hashes(c_dir):
-    cpp_files = [f for f in os.listdir(c_dir) if f.startswith("Heavy_") and f.endswith(".cpp")]
-    if not cpp_files:
-        raise FileNotFoundError("No Heavy CPP found")
+class HeavyObject:
+    @staticmethod
+    def get_hash_string(name: str) -> str:
+        return f"0x{zlib.adler32(name.encode()) & 0xFFFFFFFF:08X}"
+
+# -------------------------------
+# RECURSIVE HV JSON PARSER
+# -------------------------------
+def parse_node(node, manifest):
+    if isinstance(node, list):
+        for item in node: parse_node(item, manifest)
+        return
+    if not isinstance(node, dict): return
+
+    obj_type = node.get("type", "")
+    args = node.get("args") if isinstance(node.get("args"), dict) else {}
+    name = args.get("name") or args.get("label") or node.get("name")
+
+    if isinstance(name, str) and not (name.startswith("__hv_") or name in HV_INTERNAL_MESSAGES):
+        # Parameters / Receives
+        if obj_type in ["receive", "param"]:
+            attrs = args.get("attributes", {})
+            default_val = attrs.get("default", args.get("default", 0.0))
+            vtype = attrs.get("type") or ("bool" if isinstance(default_val, bool) else "float")
+            if name not in [r["name"] for r in manifest["receives"]]:
+                manifest["receives"].append({
+                    "name": name, "hash": HeavyObject.get_hash_string(name),
+                    "type": str(vtype), "min": float(attrs.get("min", args.get("min", 0.0))),
+                    "max": float(attrs.get("max", args.get("max", 1.0))), "default": default_val
+                })
+        # Sends, Prints, Tables
+        elif obj_type in ["send", "__send"]:
+            if name not in [s["name"] for s in manifest["sends"]]:
+                manifest["sends"].append({"name": name, "hash": HeavyObject.get_hash_string(name)})
+        elif obj_type in ["print", "__print"]:
+            if name not in [p["name"] for p in manifest["prints"]]:
+                manifest["prints"].append({"name": name, "hash": HeavyObject.get_hash_string(name)})
+        elif obj_type in ["table", "__table"]:
+            if name not in [t["name"] for t in manifest["tables"]]:
+                manifest["tables"].append({
+                    "name": name, "hash": HeavyObject.get_hash_string(name), "size": args.get("size", 0)
+                })
+
+    for val in node.values():
+        if isinstance(val, (dict, list)):
+            parse_node(val, manifest)
+
+def collect_hv_manifest(hv_json_path):
+    if not os.path.exists(hv_json_path):
+        raise FileNotFoundError(f"HV JSON not found: {hv_json_path}")
+    with open(hv_json_path, "r") as f:
+        data = json.load(f)
     
-    cpp_path = os.path.join(c_dir, cpp_files[0])
-    print(f"[DEBUG] Using {cpp_path}")
+    patch_name = os.path.basename(hv_json_path).split('.')[0]
+    manifest = {
+        "patch_name": patch_name,
+        "stats": {
+            "num_inputs": data.get("stats", {}).get("numInputChannels", 0),
+            "num_outputs": data.get("stats", {}).get("numOutputChannels", 2),
+            "samplerate": data.get("stats", {}).get("samplerate", 44100)
+        },
+        "receives": [], "sends": [], "prints": [], "tables": []
+    }
+    parse_node(data, manifest)
+    return manifest
 
-    # --- Voice hashes ---
-    voice_hashes = []
-    case_pattern = re.compile(r"case\s+(0x[0-9A-F]+):\s*{?\s*//\s*(\w+)")
-    ignore_prefix = "__hv"
-
-    with open(cpp_path, "r") as f:
-        for line in f:
-            m = case_pattern.search(line)
-            if m:
-                name = m.group(2)
-                if name.startswith(ignore_prefix):
-                    continue
-                voice_hashes.append({"name": name, "hash": m.group(1)})
-    print(f"[DEBUG] Found {len(voice_hashes)} voice hashes")
-
-    return voice_hashes
-
-# GENERATOR
+# -------------------------------
+# PICO UF2 GENERATOR
+# -------------------------------
 class PicoUF2Generator:
-
     def __init__(self, pd_path, project_root, src_dir):
         self.pd_path = os.path.abspath(pd_path)
         self.project_root = os.path.abspath(project_root)
@@ -51,132 +100,87 @@ class PicoUF2Generator:
         self.c_dir = os.path.join(self.project_root, "c")
         self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
         self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
+        self.hv_json = os.path.join(self.project_root, "hv", f"{self.patch_name}.hv.json")
 
     def run_hvcc(self):
-        print(f"[HVCC] Compiling {self.pd_path} → {self.project_root}")
-        subprocess.run([
-            "hvcc",
-            self.pd_path,
-            "-o", self.project_root,
-            "-n", self.patch_name
-        ], check=True)
+        print(f"[HVCC] Processing {self.patch_name}...")
+        subprocess.run(["hvcc", self.pd_path, "-o", self.project_root, "-n", self.patch_name], check=True)
 
     def load_settings(self):
+        settings = {"max_voices": 4, "pico_board": "pico"}
         if os.path.exists(self.settings_file):
             with open(self.settings_file) as f:
-                settings = json.load(f)
-        else:
-            settings = {"max_voices": 4}
+                settings.update(json.load(f))
+        
+        tc_file = "pico_arm_cortex_m33_gcc.cmake" if settings["pico_board"] == "pico2" else "pico_arm_gcc.cmake"
+        tc_path = os.path.join(sdk_path, "cmake/preload/toolchains", tc_file)
+        
+        if not os.path.exists(tc_path):
+            print(f"[SEARCH] Hunting for {tc_file}...")
+            found = glob.glob(os.path.join(sdk_path, "**", tc_file), recursive=True)
+            if not found: raise FileNotFoundError(f"FATAL: {tc_file} not found in PICO_SDK_PATH.")
+            tc_path = found[0]
 
-        settings["max_voices"] = settings.get("max_voices", 4)
-
-        print(f"[SETTINGS] Loaded max_voices={settings['max_voices']}")
+        settings["toolchain_path"] = tc_path
+        print(f"[SETTINGS] Board: {settings['pico_board']} | Toolchain: {os.path.basename(tc_path)}")
         return settings
 
     def copy_src(self):
         os.makedirs(self.c_dir, exist_ok=True)
-        for fname in os.listdir(self.src_dir):
-            src = os.path.join(self.src_dir, fname)
-            dst = os.path.join(self.c_dir, fname)
-            if os.path.isdir(src):
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            else:
-                shutil.copy2(src, dst)
-        print(f"[SRC] Copied src files → {self.c_dir}")
+        if os.path.exists(self.src_dir):
+            shutil.copytree(self.src_dir, self.c_dir, dirs_exist_ok=True)
 
-    def render_main(self, settings):
-    # Parse all hashes from Heavy CPP
-        voice_hashes = parse_heavy_receiver_hashes(self.c_dir)
-
-    # Limit voices
-        max_voices = settings.get("max_voices", 4)
-        voice_hashes = voice_hashes[:max_voices]
-
-    # Prepare template variables
-        template_vars = {
-            "name": self.patch_name,
-            "voice_hashes": voice_hashes,
-            "settings": settings
-        }
-
-        env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
+    def render_and_save_manifest(self, settings):
+        manifest = collect_hv_manifest(self.hv_json)
+        
+        # SAVE JSON TO ROOT
+        manifest_path = os.path.join(self.project_root, "pico_manifest.json")
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=4)
+        
+        # RENDER main.cpp
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(os.path.abspath(__file__))))
         template = env.get_template("main.cpp")
-        output_cpp = os.path.join(self.c_dir, "main.cpp")
+        with open(os.path.join(self.c_dir, "main.cpp"), "w") as f:
+            f.write(template.render(name=self.patch_name, settings=settings, hv_manifest=manifest))
+        
+        print(f"[MANIFEST] Saved to: {manifest_path}")
+        print(f"[TEXT] RECV: {', '.join([r['name'] for r in manifest['receives']])}")
+        print(f"[TEXT] SEND: {', '.join([s['name'] for s in manifest['sends']])}")
 
-        with open(output_cpp, "w") as f:
-            f.write(template.render(**template_vars))
-
-    def build_project(self, build_type="Release"):
+    def build_project(self, settings):
         build_dir = os.path.join(self.c_dir, "build")
         os.makedirs(build_dir, exist_ok=True)
-
-        cmake_cmd = [
-            "cmake",
-            f"-DPICO_SDK_PATH={sdk_path}",
-            "-DPICO_BOARD=pico2",
-            f"-DCMAKE_BUILD_TYPE={build_type}",
-            f"-DCMAKE_TOOLCHAIN_FILE={sdk_path}/cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake",
-            ".."
-        ]
-
-        print("[CMAKE] Configuring...")
-        subprocess.run(cmake_cmd, cwd=build_dir, check=True)
-
-        print("[MAKE] Building...")
-        subprocess.run(["make", "-j8"], cwd=build_dir, check=True)
-
-        print("[BUILD] Done")
-
-    def check_pico_bootsel(self):
-        try:
-            result = subprocess.run(
-                ["picotool", "info"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            if "No accessible PICO devices" in result.stdout:
-                return False
-            return True
-        except subprocess.CalledProcessError:
-            return False
+        
+        subprocess.run([
+            "cmake", f"-DPICO_SDK_PATH={sdk_path}", f"-DPICO_BOARD={settings['pico_board']}",
+            f"-DCMAKE_TOOLCHAIN_FILE={settings['toolchain_path']}", "-DCMAKE_BUILD_TYPE=Release", ".."
+        ], cwd=build_dir, check=True)
+        
+        subprocess.run(["make", f"-j{os.cpu_count() or 4}"], cwd=build_dir, check=True)
 
     def flash_uf2(self):
-        build_dir = os.path.join(self.c_dir, "build")
-        uf2_files = [f for f in os.listdir(build_dir) if f.endswith(".uf2")]
-        if not uf2_files:
-            raise FileNotFoundError("No UF2 file found")
-        uf2_path = os.path.join(build_dir, uf2_files[0])
-
-        if not self.check_pico_bootsel():
-            print("[FLASH] No PICO device in BOOTSEL mode found, skipping flash.")
-            return
-
-        print(f"[PICOTOOL] Flashing {uf2_path}")
-        subprocess.run(["picotool", "load", "-f", "-x", uf2_path], check=True)
+        uf2s = glob.glob(os.path.join(self.c_dir, "build", "*.uf2"))
+        if uf2s:
+            print(f"[FLASH] Loading {os.path.basename(uf2s[0])}...")
+            subprocess.run(["picotool", "load", "-f", "-x", uf2s[0]], check=False)
 
     def run_all(self, flash=False):
         start = time.time()
         self.run_hvcc()
         settings = self.load_settings()
         self.copy_src()
-        self.render_main(settings)
-        self.build_project()
-        if flash:
-            self.flash_uf2()
-        print(f"[DONE] Total time: {time.time() - start:.1f}s")
+        self.render_and_save_manifest(settings)
+        self.build_project(settings)
+        if flash: self.flash_uf2()
+        print(f"[DONE] Time: {time.time() - start:.1f}s")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build and flash a pikoPD Heavy patch")
-    parser.add_argument("pd_patch", help="Path to the Pure Data patch (.pd)")
-    parser.add_argument("project_root", help="Root folder for the generated project")
-    parser.add_argument("--flash", action="store_true", help="Flash the UF2 to the Pico")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("pd_patch")
+    parser.add_argument("project_root")
+    parser.add_argument("--flash", action="store_true")
     args = parser.parse_args()
 
-    generator = PicoUF2Generator(
-        pd_path=args.pd_patch,
-        project_root=args.project_root,
-        src_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
-    )
-
-    generator.run_all(flash=args.flash)
+    gen = PicoUF2Generator(args.pd_patch, args.project_root, os.path.join(os.path.dirname(__file__), "src"))
+    gen.run_all(flash=args.flash)
