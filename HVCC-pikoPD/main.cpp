@@ -220,23 +220,20 @@ void midi_task() {
 }
 
 
-// Generated print handler
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
-     bool handled = false;
+    bool handled = false;
 
-    // check each print object individually
-    if (strcmp(printName, "value") == 0) {
-        printf("[value] %s\n", str);
+    // Check each print object discovered in the manifest
+    {% for p in hv_manifest.prints -%}
+    if (strcmp(printName, "{{ p.name }}") == 0) {
+        printf("[%s] %s\n", printName, str);
         handled = true;
     }
-    if (strcmp(printName, "value2") == 0) {
-        printf("[TEST] %s\n", str);
-        handled = true;
-    }
+    {% endfor %}
 
-    // fallback for unknown
+    // Fallback for print messages
     if (!handled) {
-        printf("[UNKNOWN] %s: %s\n", printName, str);
+        printf("[print] %s: %s\n", printName, str);
     }
 }
 
