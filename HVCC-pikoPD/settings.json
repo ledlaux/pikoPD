@@ -1,13 +1,14 @@
 {
     "name": "heavy",
-    "core_freq": "150000",
+    "pico_board": "pico2",
+    "core_freq": "200000",
     "i2s_data_pin": 9,
     "i2s_bclk_pin": 10,
-    "sample_rate": 48000,
-    "max_voices": 4,
+    "sample_rate": 32000,
+    "max_voices": 3,
     "channel": 2,
-    "buffer_size": 128,
+    "buffer_size": 64,
     "adc_pins": {},
     "debug": true,
-    "led_builtin_pin": 24
+    "led_builtin_pin": 25
 }
