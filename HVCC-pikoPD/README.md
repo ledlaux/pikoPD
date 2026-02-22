@@ -31,7 +31,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 Enter bootloader mode by holding device boot button
 
 ```bash
-python3 pikopd.py PdPatches/heavy.pd MyProjectRoot 
+python3 pikopd.py patches/heavy.pd MyProjectRoot 
 
 optional arguments:
   -h, --help           Show help message and exit
