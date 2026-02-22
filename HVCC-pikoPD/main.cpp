@@ -51,13 +51,9 @@ float heavy_buffer[I2S_BUFFER * 2];
 float volume = 1.0f; 
 
 
-// Hardcoded for test
-
-std::atomic<float> LED{0.0f};
-
-// {% for obj in print_objects %}
-// std::atomic<float> {{ obj }}{0.0f};    
-// {% endfor %}
+{% for send in hv_manifest.sends %}
+std::atomic<float> {{ send.name }}{0.0f};
+{% endfor %}
 
 
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
@@ -225,17 +221,31 @@ void midi_task() {
 
 
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
-    // This sends the PD [print] output directly to the USB Serial console
-    printf("[%s] %s\n", printName, str);
+    bool handled = false;
+
+    // Check each print object discovered in the manifest
+    {% for p in hv_manifest.prints -%}
+    if (strcmp(printName, "{{ p.name }}") == 0) {
+        printf("[%s] %s\n", printName, str);
+        handled = true;
+    }
+    {% endfor %}
+
+    // Fallback for print messages
+    if (!handled) {
+        printf("[print] %s: %s\n", printName, str);
+    }
 }
 
 void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
-    if(strcmp(name, "LED") == 0) {
-    LED.store(msg_getFloat(m, 0));
-
-    //printf("Received: %f\n", val);
+{% for send in hv_manifest.sends %}
+    if (strcmp(name, "{{ send.name }}") == 0) {
+        {{ send.name }}.store(msg_getFloat(m, 0));
+    } else
+{% endfor %}
+    {
+        heavyMidiOutHook(c, name, hash, m);
     }
-    heavyMidiOutHook(c, name, hash, m);
 }
 
 struct audio_buffer_pool *init_audio() {
