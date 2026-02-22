@@ -31,6 +31,11 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 Enter bootloader mode by holding device boot button
 
 ```bash
-python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot --flash
+python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot 
+
+-h        Show help message and exit
+-f        Flash generated UF2 to Pico (BOOTSEL mode required)
+-s        Open serial console after upload
+-v        Enable verbose debug output
 ```
 
