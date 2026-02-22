@@ -20,7 +20,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040 | RP2350  v0.01 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.1 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
