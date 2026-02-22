@@ -98,10 +98,9 @@ class PicoUF2Generator:
             elif t == "__print": manifest["prints"].append(entry)
             elif t == "__table": manifest["tables"].append(entry)
         
-        # EXPLICIT SAVE: Writing the processed manifest to a JSON file
         with open(self.manifest_out, "w") as f:
             json.dump(manifest, f, indent=2)
-            
+        
         return manifest
 
     def run_all(self, flash=False, serial=False):
@@ -124,7 +123,7 @@ class PicoUF2Generator:
                 shutil.copy2(s, d)
 
         self.print_progress(0.5, "Updating C++ & Manifest")
-        # This now collects AND saves the JSON file
+
         manifest = self.collect_and_save_manifest()
         
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(os.path.abspath(__file__))))
@@ -172,8 +171,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("pd_patch")
     parser.add_argument("project_root")
-    parser.add_argument("--flash", action="store_true")
-    parser.add_argument("--serial", action="store_true")
+    parser.add_argument("-f", "--flash", action="store_true")
+    parser.add_argument("-s", "--serial", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     
