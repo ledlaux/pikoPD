@@ -44,6 +44,7 @@ target_link_libraries(${TARGET_NAME}
     hardware_clocks
     hardware_adc
     hardware_pwm
+    pico_multicore
 )
 
 # 9. Hardware Config
