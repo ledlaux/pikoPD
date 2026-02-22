@@ -33,9 +33,10 @@ Enter bootloader mode by holding device boot button
 ```bash
 python3 pikoPDuploader.py PdPatches/heavy.pd MyProjectRoot 
 
--h        Show help message and exit
--f        Flash generated UF2 to Pico (BOOTSEL mode required)
--s        Open serial console after upload
--v        Enable verbose debug output
+optional arguments:
+  -h, --help           Show help message and exit
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -v, --verbose        Enable verbose debug output
 ```
 
