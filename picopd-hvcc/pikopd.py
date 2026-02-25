@@ -12,6 +12,7 @@ class PicoUF2Generator:
         self.c_dir = os.path.join(self.project_root, "c")
         self.build_dir = os.path.join(self.c_dir, "build")
         self.manifest_out = os.path.join(self.project_root, f"{self.patch_name}_manifest.json")
+        self.hv_lib_path = os.path.abspath(os.path.join(self.project_root, "..", "heavylib-develop"))
 
     def print_logo(self):
         logo = r"""
@@ -107,9 +108,22 @@ class PicoUF2Generator:
         self.print_logo()
         start_time = time.time()
         print(f"\033[1mBuilding: {self.patch_name}\033[0m")
+
+        if not os.path.exists(self.hv_lib_path):
+            print(f"❌ Heavy library path not found: {self.hv_lib_path}")
+            sys.exit(1)
         
         self.print_progress(0.1, "Heavy Compiler")
-        self.run_cmd(["hvcc", self.pd_path, "-o", self.project_root, "-n", self.patch_name], step_name="HVCC")
+        hvcc_cmd = [
+        "hvcc",
+        self.pd_path,                         # your patch
+        "-o", self.project_root,              # output folder
+        "-n", self.patch_name,                # patch name
+        "-g", "c",                            # generate C code
+        "-p", self.hv_lib_path  # Heavy lib path
+        ]
+
+        self.run_cmd(hvcc_cmd, step_name="HVCC")
 
         self.print_progress(0.3, "Syncing Source")
         settings = {"pico_board": "pico2"}
