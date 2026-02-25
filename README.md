@@ -48,7 +48,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Python 3.10+  
 - [hvcc](https://github.com/enzienaudio/hvcc)  
 - Raspberry Pi Pico SDK
-- pico-extras library
+- pico-extras library (put inside pico-sdk folder)
+- Wasted-Audio/heavylib (put inside root folder)
 - [picotool](https://github.com/raspberrypi/picotool)  
 
 ## Usage
