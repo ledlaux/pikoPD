@@ -51,6 +51,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 4. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but it now works with [print] objects.
 5. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.
 6. Switching compiler to pico from pico2 in settings.json not yet implemented.
+7. Sample loading works on RP2350 (tested loading 3 short sample arrays), on RP2040 can load one sample (needs more testing). 
 
 
 ## Requirements
