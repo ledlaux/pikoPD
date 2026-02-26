@@ -36,12 +36,21 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] pwm audio
 - [ ] usb audio
 
+### Working state
+
+1. HVCC supported vanilla pd objects should work.
+2. Added heavylib object support (hv.osc, hv.lfo and other).
+3. [print] objects are parsed automatically, so you can have many of them inside the patch. 
+4. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.  
+
 
 ## Requirements
 
 - Python 3.10+  
 - [hvcc](https://github.com/enzienaudio/hvcc)  
-- Raspberry Pi Pico SDK  
+- Raspberry Pi Pico SDK
+- pico-extras library (put inside pico-sdk folder)
+- Wasted-Audio/heavylib (put inside root folder)
 - [picotool](https://github.com/raspberrypi/picotool)  
 
 ## Usage
@@ -58,3 +67,6 @@ optional arguments:
   -v, --verbose        Enable verbose debug output
 ```
 
+## Usefull 
+
+- https://wasted-audio.github.io/hvcc/
