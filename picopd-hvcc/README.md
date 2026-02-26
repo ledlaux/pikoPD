@@ -67,7 +67,7 @@ optional arguments:
   -v, --verbose        Enable verbose debug output
 ```
 
-## Usefull links
+## Useful links
 
 - About HVCC compiler  
   https://wasted-audio.github.io/hvcc/
