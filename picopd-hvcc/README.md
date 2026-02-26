@@ -22,6 +22,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 ## Updates
 
 - [x] led
+- [x] usb midi
+- [x] serial console 
 - [ ] button
 - [ ] pot
 - [ ] encoder
@@ -31,7 +33,6 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
-- [x] usb midi
 - [ ] screen
 - [ ] pwm audio
 - [ ] usb audio
@@ -40,8 +41,10 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 1. HVCC supported vanilla pd objects should work.
 2. Added heavylib object support (hv.osc, hv.lfo and other).
-3. [print] objects are parsed automatically, so you can have many of them inside the patch. 
-4. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.  
+3. [print] objects are parsed automatically, so you can have many of them inside the patch.
+4. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but it now works with [print] objects.
+5. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.
+6. Switching compiler to pico from pico2 in settings.json not yet implemented.
 
 
 ## Requirements
@@ -73,3 +76,4 @@ optional arguments:
   https://wasted-audio.github.io/hvcc/
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
+
