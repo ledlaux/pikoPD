@@ -46,9 +46,10 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 1. HVCC supported vanilla pd objects should work.
 2. Added heavylib object support (hv.osc, hv.lfo and other).
-3. [print] objects are parsed automatically, so you can have many of them inside the patch. 
-4. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.
-5. Switching compiler to pico from pico2 in settings.json not yet implemented.
+3. [print] objects are parsed automatically, so you can have many of them inside the patch.
+4. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but it now works with [print] objects.
+5. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.
+6. Switching compiler to pico from pico2 in settings.json not yet implemented.
 
 
 ## Requirements
