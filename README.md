@@ -74,6 +74,10 @@ optional arguments:
   -v, --verbose        Enable verbose debug output
 ```
 
-## Usefull 
+## Usefull links
 
-- https://wasted-audio.github.io/hvcc/
+- About HVCC compiler  
+  https://wasted-audio.github.io/hvcc/
+- Tutorial of how to load samples into the pd patch for the HVCC compiler  
+  https://www.youtube.com/watch?v=0qgkYWsYdTo
+
