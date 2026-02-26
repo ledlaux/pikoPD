@@ -28,6 +28,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 ## Updates
 
 - [x] led
+- [x] usb midi
+- [x] serial console 
 - [ ] button
 - [ ] pot
 - [ ] encoder
@@ -37,7 +39,6 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
-- [x] usb midi
 - [ ] screen
 - [ ] pwm audio
 - [ ] usb audio
