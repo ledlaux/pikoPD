@@ -32,6 +32,11 @@ file(GLOB ALL_SOURCES CONFIGURE_DEPENDS
 set(TARGET_NAME "heavy.elf")
 add_executable(${TARGET_NAME} ${ALL_SOURCES})
 
+target_compile_options(${TARGET_NAME} PRIVATE
+    -O3
+    -ffast-math
+)
+
 # 7. Include Paths
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
@@ -44,7 +49,6 @@ target_link_libraries(${TARGET_NAME}
     hardware_clocks
     hardware_adc
     hardware_pwm
-    pico_multicore
 )
 
 # 9. Hardware Config
