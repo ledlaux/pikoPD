@@ -235,15 +235,29 @@ int main() {
         {% endfor %}
 
         // Buttons
+        //{% for btn in settings.buttons %}
+        //if (Pico::buttonPressed({{ loop.index0 }})) {
+        //    hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 1.0f);
+        //} 
+        //else if (Pico::buttonReleased({{ loop.index0 }})) {
+        //    hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 0.0f);
+        //}
+        //{% endfor %}
+
+        // Buttons
         {% for btn in settings.buttons %}
-        if (Pico::buttonPressed({{ loop.index0 }})) {
-            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 1.0f);
+        {% set idx = loop.index0 %}
+        {% if hv_manifest.receives|length > idx %}
+        if (Pico::buttonPressed({{ idx }})) {
+            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[idx].hash }}, 1.0f);
         } 
-        else if (Pico::buttonReleased({{ loop.index0 }})) {
-            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 0.0f);
+        else if (Pico::buttonReleased({{ idx }})) {
+            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[idx].hash }}, 0.0f);
         }
+        {% endif %}
         {% endfor %}
 
+            
         // Pots
         // {% for pot in settings.adc_pins %}
         // {% set send_list = hv_manifest.sends | selectattr("name","equalto", pot.name) | list %}
