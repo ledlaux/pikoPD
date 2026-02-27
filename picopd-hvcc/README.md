@@ -66,7 +66,7 @@ _float table -> const float table_
 
 Enter bootloader mode by holding device boot button
 
-```bash
+```
 python3 pikopd.py patches/heavy.pd project_name 
 
 optional arguments:
