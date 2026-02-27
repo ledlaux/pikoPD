@@ -131,14 +131,19 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 void sendHookHandler(HeavyContextInterface *c, const char *name,
                      hv_uint32_t hash, const HvMessage *m) {
 
+{% if hv_manifest.sends|length > 0 %}
     {% for send in hv_manifest.sends %}
     if (strcmp(name, "{{ send.name }}") == 0) {
         Pico::hvAtomicMap["{{ send.name }}"].store(msg_getFloat(m, 0));
-    } 
-    else {% endfor %}
-    {
-        heavyMidiOutHook(c, name, hash, m);
     }
+    {% if not loop.last %}
+    else
+    {% endif %}
+    {% endfor %}
+{% endif %}
+
+    // Fallback always exists
+    heavyMidiOutHook(c, name, hash, m);
 }
 
 
