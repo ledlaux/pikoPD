@@ -9,12 +9,11 @@
   "channel": 2,
   "buffer_size": 64,
   "adc_pins": [
-    { "name": "POT_CUTOFF", "pin": 26 },
-    { "name": "POT_RESONANCE", "pin": 27 }
+    { "name": "POT", "pin": 26 },
   ],
 
   "leds": [
-    { "name": "LED_STATUS", "pin": 24 }
+    { "name": "LED", "pin": 24 }
   ],
 
   "buttons": [
