@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
-#include "hardware/adc.h"
-#include "hardware/pwm.h"
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
 #include "Heavy_{{ name }}.hpp"
+#include "PicoControl.hpp"
 
 // --- Heavy hashes (inputs) ---
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -36,98 +35,15 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
-// --- Hardware & Config ---
+#define SAMPLE_RATE {{ settings.sample_rate }}
 #define I2S_DATA_PIN {{ settings.i2s_data_pin }}
 #define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-#define SAMPLE_RATE  {{ settings.sample_rate }}
-#define MAX_VOICES   {{ settings.max_voices }}
 #define I2S_BUFFER   {{ settings.buffer_size }}
 
-#define LED_PIN {{ settings.led_builtin_pin }}  
-
-// --- Global Objects & State ---
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
-float heavy_buffer[I2S_BUFFER * 2]; 
-float volume = 1.0f; 
 
-
-{% for send in hv_manifest.sends %}
-std::atomic<float> {{ send.name }}{0.0f};
-{% endfor %}
-
-
-#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
-
-extern "C" {
-
-bool __atomic_test_and_set(volatile void* ptr, int memorder) {
-    (void)memorder;
-    bool old = *(volatile bool*)ptr;
-    *(volatile bool*)ptr = true;
-    return old;
-}
-
-void __atomic_clear(volatile void* ptr, int memorder) {
-    (void)memorder;
-    *(volatile bool*)ptr = false;
-}
-
-} // extern "C"
-
-#endif
-
-
-struct Voice {
-    uint8_t note = 0;
-    bool active = false;
-    hv_uint32_t hash = 0;
-};
-
-constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
-{% for recv in voice_hashes %}
-    {{ recv.hash }}{% if not loop.last %},{% endif %} // {{ recv.name }}
-{% endfor %}
-};
-
-Voice voices[MAX_VOICES];
-
-// int allocateVoice(uint8_t note) {
-//     for (int i = 0; i < MAX_VOICES; i++) {
-//         if (!voices[i].active) {
-//             voices[i].note = note;
-//             voices[i].active = true;
-//             voices[i].hash = VOICE_HASHES[i];
-//             return i;
-//         }
-//     }
-//     return -1; 
-// }
-
-// int findVoiceByNote(uint8_t note) {
-//     for (int i = 0; i < MAX_VOICES; i++) {
-//         if (voices[i].active && voices[i].note == note) return i;
-//     }
-//     return -1;
-// }
-
-void init_led_pwm() {
-    gpio_set_function(LED_PIN, GPIO_FUNC_PWM);
-    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
-    pwm_set_wrap(slice_num, 255);       // 8-bit resolution
-    pwm_set_chan_level(slice_num, PWM_CHAN_A, 0);  // start off
-    pwm_set_enabled(slice_num, true);
-}
-
-void update_led_pwm() {
-    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
-    uint chan = pwm_gpio_to_channel(LED_PIN);
-
-    float lv = LED.load();       // 0..1 from Pd patch
-    lv = lv * 3.0f;                    // scale up to 3×
-    if(lv > 1.0f) lv = 1.0f;           // clamp max
-
-    pwm_set_chan_level(slice_num, chan, (uint16_t)(lv * 255));
-}
+float heavy_buffer[I2S_BUFFER * 2];
+float volume = 1.0f;
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
@@ -155,26 +71,6 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
         (float)chan
         );
     }
-        
-    // Code for polyhonic voice allocation
-    //if (type == 0x90 && data2 > 0) { // Note On
-    //    int v = allocateVoice(data1);
-    //    if (v >= 0) {
-    //        printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
-    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
-    //    } else {
-    //        printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
-    //    }
-    //} 
-    //else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
-    //    int v = findVoiceByNote(data1);
-    //    if (v >= 0) {
-    //        printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
-    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
-    //        voices[v].active = false;
-    //    }
-   // }
-        
     else if (type == 0xB0) { // CC
     //    printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
         hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
@@ -186,11 +82,10 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
         hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
     }
     else {
-        // Helpful for identifying why other knobs/buttons aren't working
-    //    printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
+       
+        //printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
     }
 }
-
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t packet[4] = {0};
@@ -223,7 +118,6 @@ void midi_task() {
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     bool handled = false;
 
-    // Check each print object discovered in the manifest
     {% for p in hv_manifest.prints -%}
     if (strcmp(printName, "{{ p.name }}") == 0) {
         printf("[%s] %s\n", printName, str);
@@ -237,16 +131,19 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
     }
 }
 
-void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
-{% for send in hv_manifest.sends %}
+void sendHookHandler(HeavyContextInterface *c, const char *name,
+                     hv_uint32_t hash, const HvMessage *m) {
+
+    {% for send in hv_manifest.sends %}
     if (strcmp(name, "{{ send.name }}") == 0) {
-        {{ send.name }}.store(msg_getFloat(m, 0));
-    } else
-{% endfor %}
+        Pico::hvAtomicMap["{{ send.name }}"].store(msg_getFloat(m, 0));
+    } 
+    else {% endfor %}
     {
         heavyMidiOutHook(c, name, hash, m);
     }
 }
+
 
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
@@ -272,23 +169,44 @@ struct audio_buffer_pool *init_audio() {
     return pool;
 }
 
+
 int main() {
-    set_sys_clock_khz({{ settings.core_freq }}, true); 
+    set_sys_clock_khz({{ settings.core_freq }}, true);
     tusb_init();
     cdc_stdio_lib_init();
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    init_led_pwm(); 
+    Pico::init();
 
-    struct audio_buffer_pool *ap = init_audio();
+
+    // Initialize LEDs
+    {% for led in settings.leds %}
+    Pico::ledInit("{{ led.name }}", {{ led.pin }});
+    {% endfor %}
+
+    // Initialize buttons
+     {% for btn in settings.buttons %}
+    // Using std::to_string converts your index into a valid string name "0", "1", etc.
+    Pico::buttonInit(std::to_string({{ loop.index0 }}), {{ btn.pin }}, true);
+    {% endfor %}
+
+    // // Initialize pots
+    // {% for pot in settings.adc_pins %}
+    // Pico::potInit("{{ pot.name }}", {{ pot.pin }});
+    // {% endfor %}
+
+    // // Initialize encoders
+    // {% for enc in settings.encoders %}
+    // Pico::encoderInit("{{ enc.name }}", {{ enc.pinA }}, {{ enc.pinB }});
+    // {% endfor %}
+
+    auto *ap = init_audio();
 
     while (true) {
-        tud_task(); 
-        midi_task(); 
-
-        update_led_pwm();
+        tud_task();      
+        midi_task();     
 
         struct audio_buffer *buffer = take_audio_buffer(ap, false);
         if (buffer) {
@@ -305,6 +223,41 @@ int main() {
             buffer->sample_count = buffer->max_sample_count;
             give_audio_buffer(ap, buffer);
         }
-    }
+
+        // Update all hardware states
+        Pico::update();  
+
+        // Update LEDs
+        for (auto &led : Pico::leds) {
+            float val = Pico::getAtomic(led.name).load();
+            Pico::led(led.name, val);
+        }
+
+        // Send pots to Heavy
+        // {% for pot in settings.adc_pins %}
+        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", pot.name) | list %}
+        // {% if send_list|length > 0 %}
+        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, Pico::pot("{{ pot.name }}"));
+        // {% endif %}
+        // {% endfor %}
+
+        // // Send encoders to Heavy
+        // {% for enc in settings.encoders %}
+        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", enc.name) | list %}
+        // {% if send_list|length > 0 %}
+        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, static_cast<float>(Pico::encoder("{{ enc.name }}")));
+        // {% endif %}
+        // {% endfor %}
+
+        // Buttons
+       {% for btn in settings.buttons %}
+        if (Pico::buttonPressed({{ loop.index0 }})) {
+            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 1.0f);
+        } 
+        else if (Pico::buttonReleased({{ loop.index0 }})) {
+            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 0.0f);
+        }
+        {% endfor %}
+     }
     return 0;
 }
