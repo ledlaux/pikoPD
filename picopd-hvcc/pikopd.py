@@ -126,8 +126,6 @@ class PicoUF2Generator:
             "prints": [],
         }
 
-        # --- 1. Pull Receives from Control Section ---
-        # This is where 'BTN' and other params store their '0x64D0537D'
         control = data.get("control", {})
         for r_name, r_body in control.get("receivers", {}).items():
             if "__hv_" in r_name: continue
@@ -136,22 +134,18 @@ class PicoUF2Generator:
                 "hash": r_body.get("hash", "0")
             })
 
-        # --- 2. Pull everything else from Objects Section ---
         for obj_id, obj_body in data.get("objects", {}).items():
             t = obj_body.get("type", "")
             args = obj_body.get("args", {})
             
-            # Determine name
             name = args.get("name") or args.get("label")
             if not name or "__hv_" in name: continue
 
-            # Pull hash exactly as Heavy provided it
             obj_hash = args.get("hash", "0")
 
             entry = {"name": name, "hash": obj_hash}
 
             if t == "__send":
-                # Ensure we don't duplicate sends with the same name
                 if not any(s['name'] == name for s in manifest["sends"]):
                     manifest["sends"].append(entry)
             elif t == "__print":
@@ -301,7 +295,6 @@ class PicoUF2Generator:
 
         if serial and flash_success:
             self.open_serial()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
