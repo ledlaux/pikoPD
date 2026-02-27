@@ -13,12 +13,13 @@
   ],
 
   "leds": [
-    { "name": "LED", "pin": 24 }
+    { "name": "LED1", "pin": 24 }
+    { "name": "LED2", "pin": 24 }
   ],
 
   "buttons": [
-    { "name": "BTN", "pin": 12 },
-    { "name": "BTN1", "pin": 13 }
+    { "name": "BTN1", "pin": 12 },
+    { "name": "BTN2", "pin": 13 }
   ],
 
   "encoders": [
