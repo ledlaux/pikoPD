@@ -8,7 +8,6 @@
 #include "Heavy_{{ name }}.hpp"
 #include "PicoControl.hpp"
 
-// --- Heavy hashes (inputs) ---
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
 #define HV_POLYTOUCHIN_HASH  0xBC530F59
@@ -18,7 +17,6 @@
 #define HV_MIDIIN_HASH       0x149631BE
 #define HV_MIDIREALTIMEIN_HASH 0x6FFF0BCF
 
-// --- Heavy hashes (outputs) ---
 #define HV_NOTEOUT_HASH      0xD1D4AC2
 #define HV_CTL_OUT_HASH      0xE5E2A040
 #define HV_POLYTOUCHOUT_HASH 0xD5ACA9D1
@@ -82,8 +80,7 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
         hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
     }
     else {
-       
-        //printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
+    //    printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
     }
 }
 
@@ -180,16 +177,14 @@ int main() {
 
     Pico::init();
 
+     // Initialize Buttons
+     {% for btn in settings.buttons %}
+    Pico::buttonInit(std::to_string({{ loop.index0 }}), {{ btn.pin }}, true);
+    {% endfor %}
 
     // Initialize LEDs
     {% for led in settings.leds %}
-    Pico::ledInit("{{ led.name }}", {{ led.pin }});
-    {% endfor %}
-
-    // Initialize buttons
-     {% for btn in settings.buttons %}
-    // Using std::to_string converts your index into a valid string name "0", "1", etc.
-    Pico::buttonInit(std::to_string({{ loop.index0 }}), {{ btn.pin }}, true);
+    Pico::ledInit({{ loop.index0 }}, "{{ led.name }}", {{ led.pin }});
     {% endfor %}
 
     // // Initialize pots
@@ -215,7 +210,6 @@ int main() {
             // Process the Heavy DSP graph
             pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
             
-            // Convert float to int16 with global volume
             for (int i = 0; i < buffer->max_sample_count * 2; i++) {
                 samples[i] = (int16_t)(heavy_buffer[i] * volume * 32767.0f);
             }
@@ -227,30 +221,16 @@ int main() {
         // Update all hardware states
         Pico::update();  
 
-        // Update LEDs
-        for (auto &led : Pico::leds) {
-            float val = Pico::getAtomic(led.name).load();
-            Pico::led(led.name, val);
+        // Led
+        {% for idx in range(settings.leds|length) %}
+        {
+        float val = Pico::getAtomic(Pico::leds[{{ idx }}].name).load();
+        Pico::led({{ idx }}, val);
         }
-
-        // Send pots to Heavy
-        // {% for pot in settings.adc_pins %}
-        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", pot.name) | list %}
-        // {% if send_list|length > 0 %}
-        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, Pico::pot("{{ pot.name }}"));
-        // {% endif %}
-        // {% endfor %}
-
-        // // Send encoders to Heavy
-        // {% for enc in settings.encoders %}
-        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", enc.name) | list %}
-        // {% if send_list|length > 0 %}
-        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, static_cast<float>(Pico::encoder("{{ enc.name }}")));
-        // {% endif %}
-        // {% endfor %}
+        {% endfor %}
 
         // Buttons
-       {% for btn in settings.buttons %}
+        {% for btn in settings.buttons %}
         if (Pico::buttonPressed({{ loop.index0 }})) {
             hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 1.0f);
         } 
@@ -258,6 +238,22 @@ int main() {
             hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 0.0f);
         }
         {% endfor %}
-     }
+
+        // Pots
+        // {% for pot in settings.adc_pins %}
+        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", pot.name) | list %}
+        // {% if send_list|length > 0 %}
+        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, Pico::pot("{{ pot.name }}"));
+        // {% endif %}
+        // {% endfor %}
+
+        // // Encoders
+        // {% for enc in settings.encoders %}
+        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", enc.name) | list %}
+        // {% if send_list|length > 0 %}
+        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, static_cast<float>(Pico::encoder("{{ enc.name }}")));
+        // {% endif %}
+        // {% endfor %}
+    }
     return 0;
 }
