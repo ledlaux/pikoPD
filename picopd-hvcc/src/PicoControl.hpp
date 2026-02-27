@@ -9,10 +9,6 @@
 
 namespace Pico {
 
-// ----------------------------------------
-// Hardware structures
-// ----------------------------------------
-
 struct Led {
     std::string name;
     uint32_t pin = 255;
@@ -25,7 +21,6 @@ struct Button {
     uint32_t pin = 255;
     bool state = false;
     bool last = false;
-    // Add these for debouncing
     uint32_t last_debounce_time = 0;
     bool last_raw_state = false;
 };
@@ -60,15 +55,22 @@ void init();
 // ----------------------------------------
 // Button API
 // ----------------------------------------
-void buttonInit(const std::string &name, uint32_t pin, bool pullup); // no default here
-bool button(int id);               // index-based
-bool buttonPressed(int id);        // index-based
-bool buttonReleased(int id); // <--- Add this line
+void buttonInit(const std::string &name, uint32_t pin, bool pullup); 
+bool button(int id);              
+bool buttonPressed(int id);        
+bool buttonReleased(int id); 
 
-// Helper: convert "BTN", "BTN1", "BTN2" → index
 inline int buttonIndex(const std::string &name) {
     if (name == "BTN") return 0;
     if (name.rfind("BTN", 0) == 0) {
+        return std::stoi(name.substr(3));
+    }
+    return -1;
+}
+
+inline int ledIndex(const std::string &name) {
+    if (name == "LED") return 0;
+    if (name.rfind("LED", 0) == 0) { 
         return std::stoi(name.substr(3));
     }
     return -1;
@@ -90,14 +92,21 @@ int encoder(int id);
 // LED API
 // ----------------------------------------
 void ledInit(const std::string &name, uint32_t pin);
+inline void ledInit(int idx, const std::string &name, uint32_t pin) {
+    (void)idx;          // index unused but keeps API uniform
+    ledInit(name, pin);
+}
 void led(const std::string &name, float value);
+inline void led(int idx, float value) {
+    if (idx < 0 || idx >= (int)leds.size()) return;  
+    led(leds[idx].name, value);                      
+}
 
 // ----------------------------------------
 // Atomic access (thread-safe)
+// ----------------------------------------
 std::atomic<float>& getAtomic(const std::string &name);
 
-// ----------------------------------------
-// Update all controls
 void update();
 
 } // namespace Pico
