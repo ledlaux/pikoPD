@@ -53,7 +53,7 @@ extern std::map<std::string, size_t> buttonIndexMap;
 void init();
 
 // ----------------------------------------
-// Button API
+// Button 
 // ----------------------------------------
 void buttonInit(const std::string &name, uint32_t pin, bool pullup); 
 bool button(int id);              
@@ -77,19 +77,19 @@ inline int ledIndex(const std::string &name) {
 }
 
 // ----------------------------------------
-// Pot API
+// Pot 
 // ----------------------------------------
 void potInit(const std::string &name, uint32_t pin);
 float pot(int id);
 
 // ----------------------------------------
-// Encoder API
+// Encoder 
 // ----------------------------------------
 void encoderInit(const std::string &name, uint32_t pinA, uint32_t pinB);
 int encoder(int id);
 
 // ----------------------------------------
-// LED API
+// LED 
 // ----------------------------------------
 void ledInit(const std::string &name, uint32_t pin);
 inline void ledInit(int idx, const std::string &name, uint32_t pin) {
