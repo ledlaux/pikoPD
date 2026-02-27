@@ -81,7 +81,7 @@ optional arguments:
 
 - About HVCC compiler  
   https://wasted-audio.github.io/hvcc/
-- Supported vanilla objects
+- Supported vanilla objects  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
