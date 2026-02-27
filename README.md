@@ -48,7 +48,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 1. HVCC supported vanilla pd objects should work.
 2. Added heavylib object support (hv.osc, hv.lfo and other).
-4. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.  
+3. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.  
 
 ### Sample loading
 
