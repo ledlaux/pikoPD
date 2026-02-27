@@ -31,7 +31,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [x] led
 - [x] usb midi
 - [x] serial console 
-- [ ] button
+- [x] button
 - [ ] pot
 - [ ] encoder
 - [ ] joystic
