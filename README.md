@@ -92,11 +92,3 @@ optional arguments:
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
 
-
-## Useful links
-
-- About HVCC compiler  
-  https://wasted-audio.github.io/hvcc/
-- Tutorial of how to load samples into the pd patch for the HVCC compiler  
-  https://www.youtube.com/watch?v=0qgkYWsYdTo
-
