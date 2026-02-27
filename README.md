@@ -15,6 +15,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**
 - Uses main.cpp as a template
 - Set in `settings.json`:
+    - board (pico, pico_w, pico2)
     - core frequency,
     - i2s pins,
     - voice count 
@@ -50,8 +51,13 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 3. [print] objects are parsed automatically, so you can have many of them inside the patch.
 4. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but it now works with [print] objects.
 5. Some things are still hardcoded like LED inside the main.cpp. [s LED] needs to be kept inside pd patch.
-6. Switching compiler to pico from pico2 in settings.json not yet implemented.
 
+### Sample loading
+
+After some tests sample array loading works with arduino and pico-sdk for pico boards. Pico stores float values into the ram, 
+to overcome limitation and load data to the flash we need to manually set tables to const in Heavy_patchname.cpp:
+
+_float table -> const float table_
 
 ## Requirements
 
@@ -59,7 +65,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [hvcc](https://github.com/enzienaudio/hvcc)  
 - Raspberry Pi Pico SDK
 - pico-extras library (put inside pico-sdk folder)
-- Wasted-Audio/heavylib (put inside root folder)
+- Wasted-Audio/heavylib (lib/ )
 - [picotool](https://github.com/raspberrypi/picotool)  
 
 ## Usage
@@ -67,10 +73,11 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 Enter bootloader mode by holding device boot button
 
 ```bash
-python3 pikopd.py patches/heavy.pd MyProjectRoot 
+python3 pikopd.py patches/heavy.pd project_name 
 
 optional arguments:
   -h, --help           Show help message and exit
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
   -s, --serial         Open serial console after reboot
   -v, --verbose        Enable verbose debug output
@@ -80,6 +87,8 @@ optional arguments:
 
 - About HVCC compiler  
   https://wasted-audio.github.io/hvcc/
+- Supported vanilla objects  
+  https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
 
