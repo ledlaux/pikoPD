@@ -54,7 +54,6 @@ void buttonInit(const std::string &name, uint32_t pin, bool pullup) {
     b.last_debounce_time = 0;
     
     buttons.push_back(b);
-    buttonIndexMap[name] = buttons.size() - 1;
     hvAtomicMap[name] = 0.0f;
 }
 
@@ -62,17 +61,16 @@ bool button(int id) {
     return (id >= 0 && id < (int)buttons.size()) ? buttons[id].state : false;
 }
 
-// ID-based pressed helper for main loop
 bool buttonPressed(int id) {
     if (id < 0 || id >= (int)buttons.size()) return false;
     return buttons[id].state && !buttons[id].last;
 }
 
-// String-based pressed helper (overload)
-bool buttonPressed(const std::string &name) {
-    int id = buttonIndex(name);
-    return buttonPressed(id);
-}
+// // String-based pressed helper (overload)
+// bool buttonPressed(const std::string &name) {
+//     int id = buttonIndex(name);
+//     return buttonPressed(id);
+// }
 
 bool buttonReleased(int id) {
     if (id < 0 || id >= (int)buttons.size()) return false;
@@ -95,25 +93,25 @@ float pot(int id) {
     return (id >= 0 && id < (int)pots.size()) ? pots[id].value : 0.0f;
 }
 
-// ----------------------------------------
-// ENCODERS
-// ----------------------------------------
-void encoderInit(const std::string &name, uint32_t pinA, uint32_t pinB) {
-    gpio_init(pinA); gpio_set_dir(pinA, GPIO_IN); gpio_pull_up(pinA);
-    gpio_init(pinB); gpio_set_dir(pinB, GPIO_IN); gpio_pull_up(pinB);
+// // ----------------------------------------
+// // ENCODERS
+// // ----------------------------------------
+// void encoderInit(const std::string &name, uint32_t pinA, uint32_t pinB) {
+//     gpio_init(pinA); gpio_set_dir(pinA, GPIO_IN); gpio_pull_up(pinA);
+//     gpio_init(pinB); gpio_set_dir(pinB, GPIO_IN); gpio_pull_up(pinB);
 
-    Encoder e{};
-    e.a = pinA;
-    e.b = pinB;
-    e.lastState = (gpio_get(pinA) << 1) | gpio_get(pinB);
-    e.delta = 0;
-    encoders.push_back(e);
-    hvAtomicMap[name] = 0.0f;
-}
+//     Encoder e{};
+//     e.a = pinA;
+//     e.b = pinB;
+//     e.lastState = (gpio_get(pinA) << 1) | gpio_get(pinB);
+//     e.delta = 0;
+//     encoders.push_back(e);
+//     hvAtomicMap[name] = 0.0f;
+// }
 
-int encoder(int id) {
-    return (id >= 0 && id < (int)encoders.size()) ? encoders[id].delta : 0;
-}
+// int encoder(int id) {
+//     return (id >= 0 && id < (int)encoders.size()) ? encoders[id].delta : 0;
+// }
 
 // ----------------------------------------
 // LEDS
@@ -154,6 +152,8 @@ void led(const std::string &name, float value) {
     }
 }
 
+
+
 // ----------------------------------------
 // Atomic access
 // ----------------------------------------
@@ -180,28 +180,28 @@ void update() {
         b.last_raw_state = raw;
     }
 
-    // 2. Pots with Smoothing (LPF)
-    for (auto &p : pots) {
-        if (p.adc < 0) continue;
-        adc_select_input(p.adc);
-        float raw = static_cast<float>(adc_read()) / 4095.0f;
-        p.value = (p.value * 0.9f) + (raw * 0.1f);
-    }
+    // // 2. Pots with Smoothing (LPF)
+    // for (auto &p : pots) {
+    //     if (p.adc < 0) continue;
+    //     adc_select_input(p.adc);
+    //     float raw = static_cast<float>(adc_read()) / 4095.0f;
+    //     p.value = (p.value * 0.9f) + (raw * 0.1f);
+    // }
 
-    // 3. Encoders
-    for (auto &e : encoders) {
-        int state = (gpio_get(e.a) << 1) | gpio_get(e.b);
-        if (state != e.lastState) {
-            if ((e.lastState == 0 && state == 1) || (e.lastState == 1 && state == 3) || 
-                (e.lastState == 3 && state == 2) || (e.lastState == 2 && state == 0)) {
-                e.delta++;
-            } else if ((e.lastState == 0 && state == 2) || (e.lastState == 2 && state == 3) || 
-                       (e.lastState == 3 && state == 1) || (e.lastState == 1 && state == 0)) {
-                e.delta--;
-            }
-            e.lastState = state;
-        }
-    }
+    // // 3. Encoders
+    // for (auto &e : encoders) {
+    //     int state = (gpio_get(e.a) << 1) | gpio_get(e.b);
+    //     if (state != e.lastState) {
+    //         if ((e.lastState == 0 && state == 1) || (e.lastState == 1 && state == 3) || 
+    //             (e.lastState == 3 && state == 2) || (e.lastState == 2 && state == 0)) {
+    //             e.delta++;
+    //         } else if ((e.lastState == 0 && state == 2) || (e.lastState == 2 && state == 3) || 
+    //                    (e.lastState == 3 && state == 1) || (e.lastState == 1 && state == 0)) {
+    //             e.delta--;
+    //         }
+    //         e.lastState = state;
+    //     }
+    // }
 }
 
 } // namespace Pico
