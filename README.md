@@ -65,7 +65,7 @@ _float table -> const float table_
 - [hvcc](https://github.com/enzienaudio/hvcc)  
 - Raspberry Pi Pico SDK
 - pico-extras library (put inside pico-sdk folder)
-- Wasted-Audio/heavylib (lib/ )
+- Wasted-Audio/heavylib 
 - [picotool](https://github.com/raspberrypi/picotool)  
 
 ## Usage
