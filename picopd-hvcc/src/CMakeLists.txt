@@ -48,6 +48,7 @@ target_link_libraries(heavy.elf
     hardware_clocks
     hardware_adc
     hardware_pwm
+    pico_multicore
 )
 
 set(CMAKE_CXX_STANDARD 17)
