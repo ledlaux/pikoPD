@@ -9,17 +9,18 @@
   "channel": 2,
   "buffer_size": 64,
   "adc_pins": [
-    { "name": "POT", "pin": 26 },
+    { "name": "POT1", "pin": 26 },
+    { "name": "POT2", "pin": 27 }
   ],
 
   "leds": [
-    { "name": "LED1", "pin": 24 }
-    { "name": "LED2", "pin": 24 }
+    { "name": "LED1", "pin": 24 },
+    { "name": "LED2", "pin": 25 }
   ],
 
   "buttons": [
-    { "name": "BTN1", "pin": 12 },
-    { "name": "BTN2", "pin": 13 }
+    { "name": "BTN1", "pin": 13, "mode": "toggle" },
+    { "name": "BTN2", "pin": 12 , "mode": "bang" }
   ],
 
   "encoders": [
