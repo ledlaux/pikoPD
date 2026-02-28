@@ -44,6 +44,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] uart midi
 - [ ] screen
 - [ ] pwm audio
+- [ ] bluetooth midi
 - [ ] usb audio
 
 ### Working state
