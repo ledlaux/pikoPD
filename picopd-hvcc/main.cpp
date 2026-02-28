@@ -191,9 +191,27 @@ struct audio_buffer_pool *init_audio() {
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    {% for b in settings.buttons %} Pico::addBtn({{ loop.index0 }}, {{ b.pin }}); {% endfor %}
-    {% for p in settings.adc_pins %} Pico::addKnob({{ loop.index0 }}, {{ p.pin }}); {% endfor %}
-    {% for l in settings.leds %} Pico::addLed({{ loop.index0 }}, {{ l.pin }}); {% endfor %}
+    {% set b_count = namespace(value=0) %}
+    {% for b in settings.buttons %}
+        {%- for r in hv_manifest.receives if r.name == b.name -%}
+    Pico::addBtn({{ b_count.value }}, {{ b.pin }});
+            {%- set b_count.value = b_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
+    {% set k_count = namespace(value=0) %}
+    {% for p in settings.adc_pins %}
+        {%- for r in hv_manifest.receives if r.name == p.name -%}
+    Pico::addKnob({{ k_count.value }}, {{ p.pin }});
+            {%- set k_count.value = k_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
+    {% set l_count = namespace(value=0) %}
+    {% for l in settings.leds %}
+        {%- for s in hv_manifest.sends if s.name == l.name -%}
+    Pico::addLed({{ l_count.value }}, {{ l.pin }});
+            {%- set l_count.value = l_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
 
     auto *ap = init_audio();
     uint32_t last_hw_tick = 0;
