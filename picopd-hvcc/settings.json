@@ -9,8 +9,8 @@
   "channel": 2,
   "buffer_size": 64,
   "adc_pins": [
-    { "name": "POT1", "pin": 26 },
-    { "name": "POT2", "pin": 27 }
+    { "name": "KNOB", "pin": 26 },
+    { "name": "POT", "pin": 27 }
   ],
 
   "leds": [
