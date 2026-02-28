@@ -43,30 +43,30 @@
 {% set active_btns = [] %}
 {%- for b in settings.buttons -%}
     {%- for r in hv_manifest.receives if r.name == b.name -%}
-        {%- set _ = active_btns.append(r.hash) -%}
+        {%- set _ = active_btns.append({'hash': r.hash, 'pin': b.pin, 'mode': b.mode}) -%}
     {%- endfor -%}
 {%- endfor -%}
-{%- set active_leds = [] -%}
-{%- for l in settings.leds -%}
-    {%- for s in hv_manifest.sends if s.name == l.name -%}
-        {%- set _ = active_leds.append(s.hash) -%}
-    {%- endfor -%}
-{%- endfor -%}
-{%- set active_knobs = [] -%}
+{% set active_knobs = [] -%}
 {%- for k in settings.adc_pins -%}
     {%- for r in hv_manifest.receives if r.name == k.name -%}
-        {%- set _ = active_knobs.append(r.hash) -%}
+        {%- set _ = active_knobs.append({'hash': r.hash, 'pin': k.pin}) -%}
+    {%- endfor -%}
+{%- endfor -%}
+{% set active_leds = [] -%}
+{%- for l in settings.leds -%}
+    {%- for s in hv_manifest.sends if s.name == l.name -%}
+        {%- set _ = active_leds.append({'hash': s.hash, 'pin': l.pin}) -%}
     {%- endfor -%}
 {%- endfor -%}
 
-{% if active_btns %}
-static const uint32_t btn_hashes[] = { {{ active_btns | join(', ') }} };
+{% if active_btns -%}
+static const uint32_t btn_hash[] = { {% for b in active_btns %}{{ b.hash }}{{ ", " if not loop.last }}{% endfor %} };
 {% endif -%}
-{% if active_leds %}
-static const uint32_t led_hashes[] = { {{ active_leds | join(', ') }} };
+{% if active_knobs -%}
+static const uint32_t knob_hash[] = { {% for k in active_knobs %}{{ k.hash }}{{ ", " if not loop.last }}{% endfor %} };
 {% endif -%}
-{% if active_knobs %}
-static const uint32_t knob_hashes[] = { {{ active_knobs | join(', ') }} };
+{% if active_leds -%}
+static const uint32_t led_hash[] = { {% for l in active_leds %}{{ l.hash }}{{ ", " if not loop.last }}{% endfor %} };
 {% endif %}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
@@ -160,7 +160,7 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
     {% if active_leds %}
     for (int i = 0; i < {{ active_leds|length }}; i++) {
-        if (hash == led_hashes[i]) {
+        if (hash == led_hash[i]) {
             Pico::led_vals[i].store(hv_msg_getFloat(m, 0));
             return;
         }
@@ -212,6 +212,8 @@ void core1_audio_entry() {
         }
     }
 }
+
+
 int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true);
     stdio_init_all(); 
@@ -221,28 +223,16 @@ int main() {
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    {% set b_count = namespace(value=0) %}
-    {% for b in settings.buttons %}
-        {%- for r in hv_manifest.receives if r.name == b.name -%}
-            Pico::addBtn({{ b_count.value }}, {{ b.pin }});
-            {%- set b_count.value = b_count.value + 1 -%}
-        {%- endfor -%}
-    {% endfor %}
-    
-    {% set k_count = namespace(value=0) %}
-    {% for p in settings.adc_pins %}
-        {%- for r in hv_manifest.receives if r.name == p.name -%}
-            Pico::addKnob({{ k_count.value }}, {{ p.pin }});
-            {%- set k_count.value = k_count.value + 1 -%}
-        {%- endfor -%}
+    {% for btn in active_btns -%}
+    Pico::addBtn({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
     {% endfor %}
 
-    {% set l_count = namespace(value=0) %}
-    {% for l in settings.leds %}
-        {%- for s in hv_manifest.sends if s.name == l.name -%}
-            Pico::addLed({{ l_count.value }}, {{ l.pin }});
-            {%- set l_count.value = l_count.value + 1 -%}
-        {%- endfor -%}
+    {% for knob in active_knobs -%}
+    Pico::addKnob({{ loop.index0 }}, {{ knob.pin }});
+    {% endfor %}
+
+    {% for led in active_leds -%}
+    Pico::addLed({{ loop.index0 }}, {{ led.pin }});
     {% endfor %}
 
     struct audio_buffer_pool *ap = init_audio();
@@ -264,47 +254,34 @@ int main() {
             last_hw_tick = now;
             Pico::update();
 
-            // BUTTONS
-            {% set b_idx = namespace(value=0) %}
-            {% for b in settings.buttons %}
-                {%- for r in hv_manifest.receives if r.name == b.name -%}
-                {
-                    auto& btn = Pico::btns[{{ b_idx.value }}];
-                    bool phys = btn.state.load();
-                    {% if b.mode == "bang" %}
-                        if (phys && !btn.last) { btn.last = true; hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 1.0f); } 
-                        else if (!phys && btn.last) { btn.last = false; hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 0.0f); }
-                    {% elif b.mode == "toggle" %}
-                        if (phys && !btn.last) { btn.last = true; btn.toggle_state = !btn.toggle_state; hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, btn.toggle_state ? 1.0f : 0.0f); } 
-                        else if (!phys) { btn.last = false; }
-                    {% endif %}
+            // --- BUTTONS ---
+            {% if active_btns %}
+            for (int i = 0; i < {{ active_btns | length }}; i++) {
+                float val; bool send;
+                Pico::processButton(i, val, send);
+                if (send) {
+                    hv_sendFloatToReceiver(&pd_prog, btn_hash[i], val);
                 }
-                {%- set b_idx.value = b_idx.value + 1 -%}
-                {%- endfor -%}
-            {% endfor %}
+            }
+            {% endif %}
 
-            // KNOBS
-            {% set k_idx = namespace(value=0) %}
-            {% for k in settings.adc_pins %}
-                {%- for r in hv_manifest.receives if r.name == k.name -%}
-                {
-                    float v;
-                    if (Pico::knobChanged({{ k_idx.value }}, v)) {
-                        hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
-                    }
+            // --- KNOBS ---
+            {% if active_knobs %}
+            for (int i = 0; i < {{ active_knobs | length }}; i++) {
+                float v;
+                if (Pico::knobChanged(i, v)) {
+                    hv_sendFloatToReceiver(&pd_prog, knob_hash[i], v);
                 }
-                {%- set k_idx.value = k_idx.value + 1 -%}
-                {%- endfor -%}
-            {% endfor %}
+            }
+            {% endif %}
 
-            // LEDS
-            {% set l_idx = namespace(value=0) %}
-            {% for l in settings.leds %}
-                {%- for s in hv_manifest.sends if s.name == l.name -%}
-                    Pico::setLedHardware({{ l_idx.value }}, Pico::led_vals[{{ l_idx.value }}].load());
-                    {%- set l_idx.value = l_idx.value + 1 -%}
-                {%- endfor -%}
-            {% endfor %}
+            // --- LEDS ---
+            {% if active_leds %}
+            for (int i = 0; i < {{ active_leds | length }}; i++) {
+                // Using the atomic led_vals directly from the Pico class
+                Pico::setLedHardware(i, Pico::led_vals[i].load());
+            }
+            {% endif %}
         } 
     } 
     return 0; 
