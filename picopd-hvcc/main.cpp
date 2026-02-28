@@ -59,14 +59,28 @@
     {%- endfor -%}
 {%- endfor -%}
 
-{% if active_btns -%}
-static const uint32_t btn_hash[] = { {% for b in active_btns %}{{ b.hash }}{{ ", " if not loop.last }}{% endfor %} };
-{% endif -%}
-{% if active_knobs -%}
-static const uint32_t knob_hash[] = { {% for k in active_knobs %}{{ k.hash }}{{ ", " if not loop.last }}{% endfor %} };
-{% endif -%}
-{% if active_leds -%}
-static const uint32_t led_hash[] = { {% for l in active_leds %}{{ l.hash }}{{ ", " if not loop.last }}{% endfor %} };
+{% if active_btns %}
+static const uint32_t btn_hash[] = {
+    {%- for b in active_btns %}
+    {{ b.hash }}{{ "," if not loop.last }}
+    {%- endfor %}
+};
+{% endif %}
+
+{% if active_knobs %}
+static const uint32_t knob_hash[] = {
+    {%- for k in active_knobs %}
+    {{ k.hash }}{{ "," if not loop.last }}
+    {%- endfor %}
+};
+{% endif %}
+
+{% if active_leds %}
+static const uint32_t led_hash[] = {
+    {%- for l in active_leds %}
+    {{ l.hash }}{{ "," if not loop.last }}
+    {%- endfor %}
+};
 {% endif %}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
@@ -158,7 +172,7 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 }
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
-
+  
     {% if active_leds %}
     for (int i = 0; i < {{ active_leds | length }}; i++) {
         if (hash == led_hash[i]) {
