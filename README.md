@@ -36,7 +36,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [x] usb midi
 - [x] serial console 
 - [x] button
-- [x] potentiometer
+- [x] adc
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
