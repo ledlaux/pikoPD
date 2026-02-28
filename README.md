@@ -16,8 +16,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Uses main.cpp as a template
 - Set in `settings.json`:
     - board (pico, pico_w, pico2)
-    - core frequency,
-    - i2s pins,
+    - core frequency
+    - i2s pins
     - voice count 
     - sample rate
     - led pins
