@@ -8,39 +8,21 @@
   "max_voices": 3,
   "channel": 2,
   "buffer_size": 64,
+  
   "adc_pins": [
-    { "name": "KNOB", "pin": 26 },
-    { "name": "POT", "pin": 27 }
-  ],
-
-  "leds": [
-    { "name": "LED1", "pin": 24 },
-    { "name": "LED2", "pin": 25 }
+    { "name": "knob", "pin": 26, "type": "knob" },
+    { "name": "pot", "pin": 27, "type": "knob" }
   ],
 
   "buttons": [
-    { "name": "BTN1", "pin": 13, "mode": "toggle" },
-    { "name": "BTN2", "pin": 12 , "mode": "bang" }
+    { "name": "btn1", "pin": 12 , "mode": "bang" },
+    { "name": "btn2", "pin": 13, "mode": "toggle" },
+    { "name": "btn3", "pin": 14, "mode": "switch" }
   ],
 
-  "encoders": [
-    { "name": "ENC", "pinA": 10, "pinB": 11 }
-  ],
-
-  "usb_midi": true,
-  "usb_midi_host": false,
-  "uart_midi": [
-    {
-      "enabled": true,
-      "uart_id": 0,
-      "tx_pin": 0,
-      "rx_pin": 1
-    },
-    {
-      "enabled": false,
-      "uart_id": 1,
-      "tx_pin": 4,
-      "rx_pin": 5
-    }
+  "leds": [
+    { "name": "led1", "pin": 24 },
+    { "name": "led2", "pin": 25 }
   ]
+
 }
