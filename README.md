@@ -21,6 +21,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - voice count 
     - sample rate
     - led pins
+    - adc pins
     - button pins and type (bang, switch)
 - Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
