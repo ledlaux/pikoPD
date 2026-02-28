@@ -8,6 +8,11 @@
 #include "Heavy_{{ name }}.hpp"
 #include "PicoControl.hpp"
 
+#define SAMPLE_RATE {{ settings.sample_rate }}
+#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
+#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
+#define I2S_BUFFER   {{ settings.buffer_size }}
+
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
 #define HV_POLYTOUCHIN_HASH  0xBC530F59
@@ -33,10 +38,25 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
-#define SAMPLE_RATE {{ settings.sample_rate }}
-#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
-#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-#define I2S_BUFFER   {{ settings.buffer_size }}
+{%- set active_btns = [] -%}
+{%- for b in settings.buttons -%}
+    {%- for r in hv_manifest.receives if r.name == b.name -%}
+        {%- set _ = active_btns.append(r.hash) -%}
+    {%- endfor -%}
+{%- endfor -%}
+{%- set active_leds = [] -%}
+{%- for l in settings.leds -%}
+    {%- for s in hv_manifest.sends if s.name == l.name -%}
+        {%- set _ = active_leds.append(s.hash) -%}
+    {%- endfor -%}
+{%- endfor -%}
+{% if active_btns %}
+
+static const uint32_t btn_hashes[] = { {{ active_btns | join(', ') }} };
+{% endif %}
+{% if active_leds %}
+static const uint32_t led_hashes[] = { {{ active_leds | join(', ') }} };
+{% endif %}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 
@@ -121,31 +141,22 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
         handled = true;
     }
     {% endfor %}
-
-    // Fallback for print messages
     if (!handled) {
         printf("[print] %s: %s\n", printName, str);
     }
 }
 
-void sendHookHandler(HeavyContextInterface *c, const char *name,
-                     hv_uint32_t hash, const HvMessage *m) {
-
-{% if hv_manifest.sends|length > 0 %}
-    {% for send in hv_manifest.sends %}
-    if (strcmp(name, "{{ send.name }}") == 0) {
-        Pico::hvAtomicMap["{{ send.name }}"].store(msg_getFloat(m, 0));
+void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+    {% if active_leds %}
+    for (int i = 0; i < {{ active_leds|length }}; i++) {
+        if (hash == led_hashes[i]) {
+            Pico::led_vals[i].store(hv_msg_getFloat(m, 0));
+            return;
+        }
     }
-    {% if not loop.last %}
-    else
     {% endif %}
-    {% endfor %}
-{% endif %}
-
-    // Fallback always exists
-    heavyMidiOutHook(c, name, hash, m);
+    hv_print_handler(vc, name, name, m); 
 }
-
 
 struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
@@ -171,108 +182,94 @@ struct audio_buffer_pool *init_audio() {
     return pool;
 }
 
-
-int main() {
+    int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true);
-    tusb_init();
+    stdio_init_all(); 
+    tusb_init(); 
     cdc_stdio_lib_init();
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    Pico::init();
-
-     // Initialize Buttons
-     {% for btn in settings.buttons %}
-    Pico::buttonInit(std::to_string({{ loop.index0 }}), {{ btn.pin }}, true);
-    {% endfor %}
-
-    // Initialize LEDs
-    {% for led in settings.leds %}
-    Pico::ledInit({{ loop.index0 }}, "{{ led.name }}", {{ led.pin }});
-    {% endfor %}
-
-    // // Initialize pots
-    // {% for pot in settings.adc_pins %}
-    // Pico::potInit("{{ pot.name }}", {{ pot.pin }});
-    // {% endfor %}
-
-    // // Initialize encoders
-    // {% for enc in settings.encoders %}
-    // Pico::encoderInit("{{ enc.name }}", {{ enc.pinA }}, {{ enc.pinB }});
-    // {% endfor %}
+    {% for b in settings.buttons %} Pico::addBtn({{ loop.index0 }}, {{ b.pin }}); {% endfor %}
+    {% for p in settings.adc_pins %} Pico::addKnob({{ loop.index0 }}, {{ p.pin }}); {% endfor %}
+    {% for l in settings.leds %} Pico::addLed({{ loop.index0 }}, {{ l.pin }}); {% endfor %}
 
     auto *ap = init_audio();
+    uint32_t last_hw_tick = 0;
 
     while (true) {
-        tud_task();      
-        midi_task();     
+        tud_task(); 
+        midi_task();
 
         struct audio_buffer *buffer = take_audio_buffer(ap, false);
         if (buffer) {
-            int16_t *samples = (int16_t *)buffer->buffer->bytes;
-            
-            // Process the Heavy DSP graph
             pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
-            
+            int16_t *smp = (int16_t *)buffer->buffer->bytes;
             for (int i = 0; i < buffer->max_sample_count * 2; i++) {
-                samples[i] = (int16_t)(heavy_buffer[i] * volume * 32767.0f);
+                smp[i] = (int16_t)(heavy_buffer[i] * 0.8f * 32767.0f);
             }
-            
             buffer->sample_count = buffer->max_sample_count;
             give_audio_buffer(ap, buffer);
         }
 
-        // Update all hardware states
-        Pico::update();  
+        uint32_t now = to_ms_since_boot(get_absolute_time()); 
+        if (now != last_hw_tick) {
+            last_hw_tick = now;
+            Pico::update();
 
-        // Led
-        {% for idx in range(settings.leds|length) %}
-        {
-        float val = Pico::getAtomic(Pico::leds[{{ idx }}].name).load();
-        Pico::led({{ idx }}, val);
-        }
-        {% endfor %}
+            // --- BUTTONS ---
+            {% for b in settings.buttons %}
+                {% set b_idx = loop.index0 %}
+                {%- for r in hv_manifest.receives if r.name == b.name -%}
+            {
+                auto& btn = Pico::btns[{{ b_idx }}];
+                bool phys = btn.state.load();
 
-        // Buttons
-        //{% for btn in settings.buttons %}
-        //if (Pico::buttonPressed({{ loop.index0 }})) {
-        //    hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 1.0f);
-        //} 
-        //else if (Pico::buttonReleased({{ loop.index0 }})) {
-        //    hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[loop.index0].hash }}, 0.0f);
-        //}
-        //{% endfor %}
+                {% if b.mode == "bang" %}
+                if (phys && !btn.last) {
+                    btn.last = true;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 1.0f);
+                } 
+                else if (!phys && btn.last) {
+                    btn.last = false;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 0.0f);
+                }
+                {% elif b.mode == "toggle" %}
+                if (phys && !btn.last) {
+                    btn.last = true;
+                    btn.toggle_state = !btn.toggle_state;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, btn.toggle_state ? 1.0f : 0.0f);
+                } 
+                else if (!phys) {
+                    btn.last = false;
+                }
+                {% endif %}
+            } 
+                {%- endfor -%}
+            {% endfor %}
 
-        // Buttons
-        {% for btn in settings.buttons %}
-        {% set idx = loop.index0 %}
-        {% if hv_manifest.receives|length > idx %}
-        if (Pico::buttonPressed({{ idx }})) {
-            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[idx].hash }}, 1.0f);
+            // --- KNOBS ---
+            {% for k in settings.adc_pins %}
+                {% set k_idx = loop.index0 %}
+                {%- for r in hv_manifest.receives if r.name == k.name -%}
+            {
+                float v;
+                if (Pico::knobChanged({{ k_idx }}, v)) {
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
+                }
+            }
+                {%- endfor -%}
+            {% endfor %}
+
+            // --- LEDS ---
+            {% for l in settings.leds %}
+                {% set l_idx = loop.index0 %}
+                {%- for s in hv_manifest.sends if s.name == l.name -%}
+            Pico::setLedHardware({{ l_idx }}, Pico::led_vals[{{ l_idx }}].load());
+                {%- endfor -%}
+            {% endfor %}
         } 
-        else if (Pico::buttonReleased({{ idx }})) {
-            hv_sendFloatToReceiver(&pd_prog, {{ hv_manifest.receives[idx].hash }}, 0.0f);
-        }
-        {% endif %}
-        {% endfor %}
-
-            
-        // Pots
-        // {% for pot in settings.adc_pins %}
-        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", pot.name) | list %}
-        // {% if send_list|length > 0 %}
-        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, Pico::pot("{{ pot.name }}"));
-        // {% endif %}
-        // {% endfor %}
-
-        // // Encoders
-        // {% for enc in settings.encoders %}
-        // {% set send_list = hv_manifest.sends | selectattr("name","equalto", enc.name) | list %}
-        // {% if send_list|length > 0 %}
-        // hv_sendFloatToReceiver(&pd_prog, {{ send_list[0].hash }}, static_cast<float>(Pico::encoder("{{ enc.name }}")));
-        // {% endif %}
-        // {% endfor %}
-    }
-    return 0;
+    } 
+    return 0; 
 }
