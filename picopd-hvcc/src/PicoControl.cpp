@@ -22,7 +22,7 @@ namespace Pico {
         btns[index].last = false;
         btns[index].raw_prev = false;
         btns[index].last_time = 0;
-        btns[index].mode = MODE_SWITCH;
+        btns[index].mode = MODE_BANG;
         if (index >= n_btn) n_btn = index + 1; 
     }
 
@@ -83,7 +83,7 @@ namespace Pico {
 
     bool buttonPressed(int i) {
         bool s = btns[i].state.load();
-        if (s && !btns[i].last) { /
+        if (s && !btns[i].last) { 
             btns[i].last = true;
             return true;
         }
