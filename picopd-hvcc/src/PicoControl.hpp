@@ -8,9 +8,12 @@
 
 namespace Pico {
 
+    const uint32_t BANG_PULSE_WIDTH_MS = 50;
+
     enum ButtonMode {
-        MODE_TOGGLE = 0, 
-        MODE_BANG   = 1  
+        MODE_BANG   = 0,
+        MODE_SWITCH   = 1,  
+        MODE_TOGGLE = 2    
     };
 
     struct Button {
@@ -21,6 +24,7 @@ namespace Pico {
         uint32_t last_time;
         ButtonMode mode;
         bool toggle_state;
+        uint32_t reset_at = 0;
     };
 
     struct Knob {
