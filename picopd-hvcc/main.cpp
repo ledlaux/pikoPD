@@ -158,15 +158,16 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 }
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+
     {% if active_leds %}
-    for (int i = 0; i < {{ active_leds|length }}; i++) {
+    for (int i = 0; i < {{ active_leds | length }}; i++) {
         if (hash == led_hash[i]) {
             Pico::led_vals[i].store(hv_msg_getFloat(m, 0));
-            return;
+            return; 
         }
     }
     {% endif %}
-    hv_print_handler(vc, name, name, m); 
+    heavyMidiOutHook(vc, name, hash, m); 
 }
 
 struct audio_buffer_pool *init_audio() {
