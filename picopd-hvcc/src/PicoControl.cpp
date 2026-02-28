@@ -13,18 +13,20 @@ namespace Pico {
     std::atomic<float> led_vals[16];
     int n_btn = 0, n_knob = 0, n_led = 0;
 
-    void addBtn(int index, uint32_t pin) {
-        gpio_init(pin);
-        gpio_set_dir(pin, GPIO_IN);
-        gpio_pull_up(pin);
-        btns[index].pin = pin;
-        btns[index].state.store(false);
-        btns[index].last = false;
-        btns[index].raw_prev = false;
-        btns[index].last_time = 0;
-        btns[index].mode = MODE_BANG;
-        if (index >= n_btn) n_btn = index + 1; 
-    }
+    void addBtn(int index, uint32_t pin, ButtonMode mode) {
+    gpio_init(pin);
+    gpio_set_dir(pin, GPIO_IN);
+    gpio_pull_up(pin);
+    btns[index].pin = pin;
+    btns[index].state.store(false);
+    btns[index].last = false;
+    btns[index].raw_prev = false;
+    btns[index].last_time = 0;
+    btns[index].toggle_state = false; 
+    btns[index].reset_at = 0;         
+    btns[index].mode = mode;         
+    if (index >= n_btn) n_btn = index + 1; 
+}
 
     void addKnob(int index, uint32_t pin) {
         if (n_knob == 0) adc_init();
@@ -115,6 +117,41 @@ namespace Pico {
     }
     if (!s) btns[i].last = false;
     return false;
+}
+
+
+void processButton(int i, float &outVal, bool &shouldSend) {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    bool s;
+    shouldSend = false;
+
+    switch (btns[i].mode) {
+        case BANG:
+            if (buttonPressed(i)) {
+                outVal = 1.0f;
+                shouldSend = true;
+                btns[i].reset_at = now + BANG_PULSE_WIDTH_MS;
+            } else if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                btns[i].reset_at = 0;
+                outVal = 0.0f;
+                shouldSend = true;
+            }
+            break;
+
+        case TOGGLE:
+            if (buttonToggled(i, s)) {
+                outVal = s ? 1.0f : 0.0f;
+                shouldSend = true;
+            }
+            break;
+
+        case SWITCH:
+            if (buttonChanged(i, s)) {
+                outVal = s ? 1.0f : 0.0f;
+                shouldSend = true;
+            }
+            break;
+    }
 }
 
     bool knobChanged(int i, float& outVal) {

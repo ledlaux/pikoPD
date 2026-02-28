@@ -11,9 +11,9 @@ namespace Pico {
     const uint32_t BANG_PULSE_WIDTH_MS = 50;
 
     enum ButtonMode {
-        MODE_BANG   = 0,
-        MODE_SWITCH   = 1,  
-        MODE_TOGGLE = 2    
+        BANG   = 0,
+        SWITCH   = 1,  
+        TOGGLE = 2    
     };
 
     struct Button {
@@ -47,10 +47,11 @@ namespace Pico {
     extern int n_btn, n_knob, n_led;
 
     void update();
-    void addBtn(int index, uint32_t pin);   
+    void addBtn(int index, uint32_t pin, ButtonMode mode);  
     void addKnob(int index, uint32_t pin);  
     void addLed(int index, uint32_t pin);   
     void setLedHardware(int index, float value);
+    void processButton(int i, float &outVal, bool &shouldSend);
 
     bool buttonChanged(int i, bool& outState);
     bool buttonPressed(int i);
