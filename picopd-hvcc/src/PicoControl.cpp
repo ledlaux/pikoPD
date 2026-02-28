@@ -134,7 +134,7 @@ void processButton(int i, float &outVal, bool &shouldSend) {
             } else if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
                 btns[i].reset_at = 0;
                 outVal = 0.0f;
-                shouldSend = true;
+                shouldSend = false;   // If true it will trigger second time after reset 
             }
             break;
 
