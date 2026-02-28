@@ -1,207 +1,125 @@
 #include "PicoControl.hpp"
-#include <algorithm>
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
-#include "hardware/irq.h"
 #include "hardware/gpio.h"
 #include "pico/time.h"
+#include <cmath>
 
 namespace Pico {
 
-// ----------------------------------------
-// Internal Extended Structure for Debouncing
-// ----------------------------------------
-struct ButtonInternal : Button {
-    uint32_t last_debounce_time = 0;
-    bool last_raw_state = false;
-};
+    Button btns[16];
+    Knob knobs[8];
+    Led leds[16];
+    std::atomic<float> led_vals[16];
+    int n_btn = 0, n_knob = 0, n_led = 0;
 
-// ----------------------------------------
-// Globals
-// ----------------------------------------
-std::map<std::string, std::atomic<float>> hvAtomicMap;
-std::vector<Button> buttons; // Changed to Internal type
-std::vector<Pot> pots;
-std::vector<Encoder> encoders;
-std::vector<Led> leds;
-std::map<std::string, size_t> buttonIndexMap;
+    void addBtn(int index, uint32_t pin) {
+        gpio_init(pin);
+        gpio_set_dir(pin, GPIO_IN);
+        gpio_pull_up(pin);
+        btns[index].pin = pin;
+        btns[index].state.store(false);
+        btns[index].last = false;
+        btns[index].raw_prev = false;
+        btns[index].last_time = 0;
+        btns[index].mode = MODE_SWITCH;
+        if (index >= n_btn) n_btn = index + 1; 
+    }
 
-// ----------------------------------------
-// Init
-// ----------------------------------------
-void init() {
-    buttons.reserve(16);
-    pots.reserve(8);
-    encoders.reserve(8);
-    leds.reserve(16);
-    adc_init();
-}
+    void addKnob(int index, uint32_t pin) {
+        if (n_knob == 0) adc_init();
+        adc_gpio_init(pin);
+        knobs[index].adc_ch = pin - 26;
+        knobs[index].value.store(0.0f);
+        knobs[index].last_val = 0.0f;
+        if (index >= n_knob) n_knob = index + 1;
+    }
 
-// ----------------------------------------
-// BUTTONS
-// ----------------------------------------
-void buttonInit(const std::string &name, uint32_t pin, bool pullup) {
-    gpio_init(pin);
-    gpio_set_dir(pin, GPIO_IN);
-    if (pullup) gpio_pull_up(pin);
-    else gpio_pull_down(pin);
-
-    ButtonInternal b;
-    b.pin   = pin;
-    b.last_raw_state = !gpio_get(pin);
-    b.state = b.last_raw_state;
-    b.last  = b.state;
-    b.last_debounce_time = 0;
-    
-    buttons.push_back(b);
-    hvAtomicMap[name] = 0.0f;
-}
-
-bool button(int id) {
-    return (id >= 0 && id < (int)buttons.size()) ? buttons[id].state : false;
-}
-
-bool buttonPressed(int id) {
-    if (id < 0 || id >= (int)buttons.size()) return false;
-    return buttons[id].state && !buttons[id].last;
-}
-
-// // String-based pressed helper (overload)
-// bool buttonPressed(const std::string &name) {
-//     int id = buttonIndex(name);
-//     return buttonPressed(id);
-// }
-
-bool buttonReleased(int id) {
-    if (id < 0 || id >= (int)buttons.size()) return false;
-    return !buttons[id].state && buttons[id].last;
-}
-
-// ----------------------------------------
-// POTS
-// ----------------------------------------
-void potInit(const std::string &name, uint32_t pin) {
-    adc_gpio_init(pin);
-    Pot p{};
-    p.adc = pin - 26; 
-    p.value = 0.0f;
-    pots.push_back(p);
-    hvAtomicMap[name] = 0.0f;
-}
-
-float pot(int id) {
-    return (id >= 0 && id < (int)pots.size()) ? pots[id].value : 0.0f;
-}
-
-// // ----------------------------------------
-// // ENCODERS
-// // ----------------------------------------
-// void encoderInit(const std::string &name, uint32_t pinA, uint32_t pinB) {
-//     gpio_init(pinA); gpio_set_dir(pinA, GPIO_IN); gpio_pull_up(pinA);
-//     gpio_init(pinB); gpio_set_dir(pinB, GPIO_IN); gpio_pull_up(pinB);
-
-//     Encoder e{};
-//     e.a = pinA;
-//     e.b = pinB;
-//     e.lastState = (gpio_get(pinA) << 1) | gpio_get(pinB);
-//     e.delta = 0;
-//     encoders.push_back(e);
-//     hvAtomicMap[name] = 0.0f;
-// }
-
-// int encoder(int id) {
-//     return (id >= 0 && id < (int)encoders.size()) ? encoders[id].delta : 0;
-// }
-
-// ----------------------------------------
-// LEDS
-// ----------------------------------------
-void ledInit(const std::string &name, uint32_t pin) {
-    gpio_init(pin);
-    gpio_set_dir(pin, GPIO_OUT);
-    gpio_put(pin, 0);
-
-    Led l{};
-    l.name = name;
-    l.pin  = pin;
-    l.is_pwm = (pin != 25); 
-    leds.push_back(l);
-
-    hvAtomicMap[name] = 0.0f;
-
-    if (l.is_pwm) {
+    void addLed(int index, uint32_t pin) {
         gpio_set_function(pin, GPIO_FUNC_PWM);
         uint slice = pwm_gpio_to_slice_num(pin);
+        uint chan = pwm_gpio_to_channel(pin);
         pwm_set_wrap(slice, 255);
-        pwm_set_chan_level(slice, pwm_gpio_to_channel(pin), 0);
         pwm_set_enabled(slice, true);
+        leds[index].pin = pin;
+        leds[index].slice = slice;
+        leds[index].chan = chan;
+        if (index >= n_led) n_led = index + 1;
     }
-}
 
-void led(const std::string &name, float value) {
-    for (auto &l : leds) {
-        if (l.name == name) {
-            float val = std::clamp(value, 0.0f, 1.0f);
-            if (l.is_pwm) {
-                pwm_set_gpio_level(l.pin, (uint16_t)(val * 255.0f));
-            } else {
-                gpio_put(l.pin, val > 0.5f);
+    void update() {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        for (int i = 0; i < n_btn; i++) {
+            bool r = !gpio_get(btns[i].pin); 
+            if (r != btns[i].raw_prev) { 
+                btns[i].last_time = now; 
+                btns[i].raw_prev = r; 
             }
-            break;
+            if ((now - btns[i].last_time) > 20) {
+                btns[i].state.store(r);
+            }
+        }
+        for (int i = 0; i < n_knob; i++) {
+            adc_select_input(knobs[i].adc_ch);
+            float raw = (float)adc_read() / 4095.0f;
+            knobs[i].value.store((knobs[i].value.load() * 0.9f) + (raw * 0.1f));
         }
     }
-}
 
-
-
-// ----------------------------------------
-// Atomic access
-// ----------------------------------------
-std::atomic<float>& getAtomic(const std::string &name) {
-    return hvAtomicMap[name];
-}
-
-// ----------------------------------------
-// UPDATE ALL CONTROLS
-// ----------------------------------------
-void update() {
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    // 1. Debounced Buttons
-    for (auto &b : buttons) {
-        bool raw = !gpio_get(b.pin);
-        if (raw != b.last_raw_state) {
-            b.last_debounce_time = now;
-        }
-        if ((now - b.last_debounce_time) > 20) {
-            b.last = b.state;
-            b.state = raw;
-        }
-        b.last_raw_state = raw;
+    void setLedHardware(int index, float value) {
+        pwm_set_chan_level(leds[index].slice, leds[index].chan, (uint16_t)(value * 255.0f));
     }
 
-    // // 2. Pots with Smoothing (LPF)
-    // for (auto &p : pots) {
-    //     if (p.adc < 0) continue;
-    //     adc_select_input(p.adc);
-    //     float raw = static_cast<float>(adc_read()) / 4095.0f;
-    //     p.value = (p.value * 0.9f) + (raw * 0.1f);
-    // }
 
-    // // 3. Encoders
-    // for (auto &e : encoders) {
-    //     int state = (gpio_get(e.a) << 1) | gpio_get(e.b);
-    //     if (state != e.lastState) {
-    //         if ((e.lastState == 0 && state == 1) || (e.lastState == 1 && state == 3) || 
-    //             (e.lastState == 3 && state == 2) || (e.lastState == 2 && state == 0)) {
-    //             e.delta++;
-    //         } else if ((e.lastState == 0 && state == 2) || (e.lastState == 2 && state == 3) || 
-    //                    (e.lastState == 3 && state == 1) || (e.lastState == 1 && state == 0)) {
-    //             e.delta--;
-    //         }
-    //         e.lastState = state;
-    //     }
-    // }
+    bool buttonChanged(int i, bool& outState) {
+        bool s = btns[i].state.load();
+        if (s != btns[i].last) {
+            btns[i].last = s;
+            outState = s;
+            return true;
+        }
+        return false;
+    }
+
+    bool buttonPressed(int i) {
+        bool s = btns[i].state.load();
+        if (s && !btns[i].last) { /
+            btns[i].last = true;
+            return true;
+        }
+        if (!s) btns[i].last = false; 
+        return false;
+    }
+
+    bool buttonReleased(int i) {
+        bool s = btns[i].state.load();
+        if (!s && btns[i].last) { 
+            btns[i].last = false;
+            return true;
+        }
+        if (s) btns[i].last = true; 
+        return false;
+    }
+
+   bool buttonToggled(int i, bool& outState) {
+    bool s = btns[i].state.load();
+    if (s && !btns[i].last) {
+        btns[i].last = true;
+        btns[i].toggle_state = !btns[i].toggle_state;
+        outState = btns[i].toggle_state;
+        return true;
+    }
+    if (!s) btns[i].last = false;
+    return false;
 }
 
-} // namespace Pico
+    bool knobChanged(int i, float& outVal) {
+        float v = knobs[i].value.load();
+        if (std::abs(v - knobs[i].last_val) > 0.005f) {
+            knobs[i].last_val = v;
+            outVal = v;
+            return true;
+        }
+        return false;
+    }
+}
