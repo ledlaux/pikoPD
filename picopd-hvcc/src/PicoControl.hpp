@@ -26,7 +26,8 @@ namespace Pico {
     struct Knob {
         uint32_t adc_ch;
         std::atomic<float> value;
-        float last_val;   
+        float last_val;  
+        float coeff; 
     };
 
     struct Led {

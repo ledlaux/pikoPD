@@ -33,7 +33,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [x] usb midi
 - [x] serial console 
 - [x] button
-- [ ] pot
+- [x] potentiometer
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
@@ -91,5 +91,6 @@ optional arguments:
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
+
 
 
