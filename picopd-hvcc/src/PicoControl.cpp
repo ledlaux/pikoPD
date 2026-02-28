@@ -32,6 +32,7 @@ namespace Pico {
         knobs[index].adc_ch = pin - 26;
         knobs[index].value.store(0.0f);
         knobs[index].last_val = 0.0f;
+        knobs[index].coeff = 0.1f;  // can asign different smoothing for knobs using index
         if (index >= n_knob) n_knob = index + 1;
     }
 
@@ -60,11 +61,14 @@ namespace Pico {
             }
         }
         for (int i = 0; i < n_knob; i++) {
-            adc_select_input(knobs[i].adc_ch);
-            float raw = (float)adc_read() / 4095.0f;
-            knobs[i].value.store((knobs[i].value.load() * 0.9f) + (raw * 0.1f));
+        adc_select_input(knobs[i].adc_ch);
+        float raw = (float)adc_read() / 4095.0f;
+        float prev = knobs[i].value.load();
+        float smoothed = prev + (raw - prev) * knobs[i].coeff;
+        knobs[i].value.store(smoothed);
         }
     }
+    
 
     void setLedHardware(int index, float value) {
         pwm_set_chan_level(leds[index].slice, leds[index].chan, (uint16_t)(value * 255.0f));
