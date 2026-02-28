@@ -1,14 +1,46 @@
 {
-    "name": "heavy",
-    "pico_board": "pico2",
-    "core_freq": "200000",
-    "i2s_data_pin": 9,
-    "i2s_bclk_pin": 10,
-    "sample_rate": 32000,
-    "max_voices": 3,
-    "channel": 2,
-    "buffer_size": 64,
-    "adc_pins": {},
-    "debug": true,
-    "led_builtin_pin": 25
+  "name": "heavy",
+  "pico_board": "pico2",
+  "core_freq": "200000",
+  "i2s_data_pin": 9,
+  "i2s_bclk_pin": 10,
+  "sample_rate": 32000,
+  "max_voices": 3,
+  "channel": 2,
+  "buffer_size": 64,
+  "adc_pins": [
+    { "name": "POT1", "pin": 26 },
+    { "name": "POT2", "pin": 27 }
+  ],
+
+  "leds": [
+    { "name": "LED1", "pin": 24 },
+    { "name": "LED2", "pin": 25 }
+  ],
+
+  "buttons": [
+    { "name": "BTN1", "pin": 13, "mode": "toggle" },
+    { "name": "BTN2", "pin": 12 , "mode": "bang" }
+  ],
+
+  "encoders": [
+    { "name": "ENC", "pinA": 10, "pinB": 11 }
+  ],
+
+  "usb_midi": true,
+  "usb_midi_host": false,
+  "uart_midi": [
+    {
+      "enabled": true,
+      "uart_id": 0,
+      "tx_pin": 0,
+      "rx_pin": 1
+    },
+    {
+      "enabled": false,
+      "uart_id": 1,
+      "tx_pin": 4,
+      "rx_pin": 5
+    }
+  ]
 }

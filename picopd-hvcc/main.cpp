@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
-#include "hardware/adc.h"
-#include "hardware/pwm.h"
 #include "pico/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
 #include "Heavy_{{ name }}.hpp"
+#include "PicoControl.hpp"
 
-// --- Heavy hashes (inputs) ---
+#define SAMPLE_RATE {{ settings.sample_rate }}
+#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
+#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
+#define I2S_BUFFER   {{ settings.buffer_size }}
+
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
 #define HV_POLYTOUCHIN_HASH  0xBC530F59
@@ -19,7 +22,6 @@
 #define HV_MIDIIN_HASH       0x149631BE
 #define HV_MIDIREALTIMEIN_HASH 0x6FFF0BCF
 
-// --- Heavy hashes (outputs) ---
 #define HV_NOTEOUT_HASH      0xD1D4AC2
 #define HV_CTL_OUT_HASH      0xE5E2A040
 #define HV_POLYTOUCHOUT_HASH 0xD5ACA9D1
@@ -36,98 +38,30 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
-// --- Hardware & Config ---
-#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
-#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-#define SAMPLE_RATE  {{ settings.sample_rate }}
-#define MAX_VOICES   {{ settings.max_voices }}
-#define I2S_BUFFER   {{ settings.buffer_size }}
+{%- set active_btns = [] -%}
+{%- for b in settings.buttons -%}
+    {%- for r in hv_manifest.receives if r.name == b.name -%}
+        {%- set _ = active_btns.append(r.hash) -%}
+    {%- endfor -%}
+{%- endfor -%}
+{%- set active_leds = [] -%}
+{%- for l in settings.leds -%}
+    {%- for s in hv_manifest.sends if s.name == l.name -%}
+        {%- set _ = active_leds.append(s.hash) -%}
+    {%- endfor -%}
+{%- endfor -%}
+{% if active_btns %}
 
-#define LED_PIN {{ settings.led_builtin_pin }}  
+static const uint32_t btn_hashes[] = { {{ active_btns | join(', ') }} };
+{% endif %}
+{% if active_leds %}
+static const uint32_t led_hashes[] = { {{ active_leds | join(', ') }} };
+{% endif %}
 
-// --- Global Objects & State ---
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
-float heavy_buffer[I2S_BUFFER * 2]; 
-float volume = 1.0f; 
 
-
-{% for send in hv_manifest.sends %}
-std::atomic<float> {{ send.name }}{0.0f};
-{% endfor %}
-
-
-#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_PLATFORM)
-
-extern "C" {
-
-bool __atomic_test_and_set(volatile void* ptr, int memorder) {
-    (void)memorder;
-    bool old = *(volatile bool*)ptr;
-    *(volatile bool*)ptr = true;
-    return old;
-}
-
-void __atomic_clear(volatile void* ptr, int memorder) {
-    (void)memorder;
-    *(volatile bool*)ptr = false;
-}
-
-} // extern "C"
-
-#endif
-
-
-struct Voice {
-    uint8_t note = 0;
-    bool active = false;
-    hv_uint32_t hash = 0;
-};
-
-constexpr hv_uint32_t VOICE_HASHES[MAX_VOICES] = {
-{% for recv in voice_hashes %}
-    {{ recv.hash }}{% if not loop.last %},{% endif %} // {{ recv.name }}
-{% endfor %}
-};
-
-Voice voices[MAX_VOICES];
-
-// int allocateVoice(uint8_t note) {
-//     for (int i = 0; i < MAX_VOICES; i++) {
-//         if (!voices[i].active) {
-//             voices[i].note = note;
-//             voices[i].active = true;
-//             voices[i].hash = VOICE_HASHES[i];
-//             return i;
-//         }
-//     }
-//     return -1; 
-// }
-
-// int findVoiceByNote(uint8_t note) {
-//     for (int i = 0; i < MAX_VOICES; i++) {
-//         if (voices[i].active && voices[i].note == note) return i;
-//     }
-//     return -1;
-// }
-
-void init_led_pwm() {
-    gpio_set_function(LED_PIN, GPIO_FUNC_PWM);
-    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
-    pwm_set_wrap(slice_num, 255);       // 8-bit resolution
-    pwm_set_chan_level(slice_num, PWM_CHAN_A, 0);  // start off
-    pwm_set_enabled(slice_num, true);
-}
-
-void update_led_pwm() {
-    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
-    uint chan = pwm_gpio_to_channel(LED_PIN);
-
-    float lv = LED.load();       // 0..1 from Pd patch
-    lv = lv * 3.0f;                    // scale up to 3×
-    if(lv > 1.0f) lv = 1.0f;           // clamp max
-
-    pwm_set_chan_level(slice_num, chan, (uint16_t)(lv * 255));
-}
+float heavy_buffer[I2S_BUFFER * 2];
+float volume = 1.0f;
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
@@ -155,26 +89,6 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
         (float)chan
         );
     }
-        
-    // Code for polyhonic voice allocation
-    //if (type == 0x90 && data2 > 0) { // Note On
-    //    int v = allocateVoice(data1);
-    //    if (v >= 0) {
-    //        printf("[MIDI] Note On:  %d | Vel: %d | Voice: %d\n", data1, data2, v);
-    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
-    //    } else {
-    //        printf("[MIDI] Note On:  %d | OUT OF VOICES\n", data1);
-    //    }
-    //} 
-    //else if (type == 0x80 || (type == 0x90 && data2 == 0)) { // Note Off
-    //    int v = findVoiceByNote(data1);
-    //    if (v >= 0) {
-    //        printf("[MIDI] Note Off: %d | Voice: %d\n", data1, v);
-    //        hv_sendMessageToReceiverV(&pd_prog, voices[v].hash, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
-    //        voices[v].active = false;
-    //    }
-   // }
-        
     else if (type == 0xB0) { // CC
     //    printf("[MIDI] CC: %d | Val: %d\n", data1, data2);
         hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
@@ -186,11 +100,9 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
         hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
     }
     else {
-        // Helpful for identifying why other knobs/buttons aren't working
     //    printf("[MIDI] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
     }
 }
-
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t packet[4] = {0};
@@ -223,29 +135,27 @@ void midi_task() {
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     bool handled = false;
 
-    // Check each print object discovered in the manifest
     {% for p in hv_manifest.prints -%}
     if (strcmp(printName, "{{ p.name }}") == 0) {
         printf("[%s] %s\n", printName, str);
         handled = true;
     }
     {% endfor %}
-
-    // Fallback for print messages
     if (!handled) {
         printf("[print] %s: %s\n", printName, str);
     }
 }
 
-void sendHookHandler(HeavyContextInterface *c, const char *name, hv_uint32_t hash, const HvMessage *m) {
-{% for send in hv_manifest.sends %}
-    if (strcmp(name, "{{ send.name }}") == 0) {
-        {{ send.name }}.store(msg_getFloat(m, 0));
-    } else
-{% endfor %}
-    {
-        heavyMidiOutHook(c, name, hash, m);
+void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+    {% if active_leds %}
+    for (int i = 0; i < {{ active_leds|length }}; i++) {
+        if (hash == led_hashes[i]) {
+            Pico::led_vals[i].store(hv_msg_getFloat(m, 0));
+            return;
+        }
     }
+    {% endif %}
+    hv_print_handler(vc, name, name, m); 
 }
 
 struct audio_buffer_pool *init_audio() {
@@ -272,39 +182,112 @@ struct audio_buffer_pool *init_audio() {
     return pool;
 }
 
-int main() {
-    set_sys_clock_khz({{ settings.core_freq }}, true); 
-    tusb_init();
+    int main() {
+    set_sys_clock_khz({{ settings.core_freq }}, true);
+    stdio_init_all(); 
+    tusb_init(); 
     cdc_stdio_lib_init();
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    init_led_pwm(); 
+    {% set b_count = namespace(value=0) %}
+    {% for b in settings.buttons %}
+        {%- for r in hv_manifest.receives if r.name == b.name -%}
+    Pico::addBtn({{ b_count.value }}, {{ b.pin }});
+            {%- set b_count.value = b_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
+    {% set k_count = namespace(value=0) %}
+    {% for p in settings.adc_pins %}
+        {%- for r in hv_manifest.receives if r.name == p.name -%}
+    Pico::addKnob({{ k_count.value }}, {{ p.pin }});
+            {%- set k_count.value = k_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
+    {% set l_count = namespace(value=0) %}
+    {% for l in settings.leds %}
+        {%- for s in hv_manifest.sends if s.name == l.name -%}
+    Pico::addLed({{ l_count.value }}, {{ l.pin }});
+            {%- set l_count.value = l_count.value + 1 -%}
+        {%- endfor -%}
+    {% endfor %}
 
-    struct audio_buffer_pool *ap = init_audio();
+    auto *ap = init_audio();
+    uint32_t last_hw_tick = 0;
 
     while (true) {
         tud_task(); 
-        midi_task(); 
-
-        update_led_pwm();
+        midi_task();
 
         struct audio_buffer *buffer = take_audio_buffer(ap, false);
         if (buffer) {
-            int16_t *samples = (int16_t *)buffer->buffer->bytes;
-            
-            // Process the Heavy DSP graph
             pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
-            
-            // Convert float to int16 with global volume
+            int16_t *smp = (int16_t *)buffer->buffer->bytes;
             for (int i = 0; i < buffer->max_sample_count * 2; i++) {
-                samples[i] = (int16_t)(heavy_buffer[i] * volume * 32767.0f);
+                smp[i] = (int16_t)(heavy_buffer[i] * 0.8f * 32767.0f);
             }
-            
             buffer->sample_count = buffer->max_sample_count;
             give_audio_buffer(ap, buffer);
         }
-    }
-    return 0;
+
+        uint32_t now = to_ms_since_boot(get_absolute_time()); 
+        if (now != last_hw_tick) {
+            last_hw_tick = now;
+            Pico::update();
+
+            // --- BUTTONS ---
+            {% for b in settings.buttons %}
+                {% set b_idx = loop.index0 %}
+                {%- for r in hv_manifest.receives if r.name == b.name -%}
+            {
+                auto& btn = Pico::btns[{{ b_idx }}];
+                bool phys = btn.state.load();
+
+                {% if b.mode == "bang" %}
+                if (phys && !btn.last) {
+                    btn.last = true;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 1.0f);
+                } 
+                else if (!phys && btn.last) {
+                    btn.last = false;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, 0.0f);
+                }
+                {% elif b.mode == "toggle" %}
+                if (phys && !btn.last) {
+                    btn.last = true;
+                    btn.toggle_state = !btn.toggle_state;
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, btn.toggle_state ? 1.0f : 0.0f);
+                } 
+                else if (!phys) {
+                    btn.last = false;
+                }
+                {% endif %}
+            } 
+                {%- endfor -%}
+            {% endfor %}
+
+            // --- KNOBS ---
+            {% for k in settings.adc_pins %}
+                {% set k_idx = loop.index0 %}
+                {%- for r in hv_manifest.receives if r.name == k.name -%}
+            {
+                float v;
+                if (Pico::knobChanged({{ k_idx }}, v)) {
+                    hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
+                }
+            }
+                {%- endfor -%}
+            {% endfor %}
+
+            // --- LEDS ---
+            {% for l in settings.leds %}
+                {% set l_idx = loop.index0 %}
+                {%- for s in hv_manifest.sends if s.name == l.name -%}
+            Pico::setLedHardware({{ l_idx }}, Pico::led_vals[{{ l_idx }}].load());
+                {%- endfor -%}
+            {% endfor %}
+        } 
+    } 
+    return 0; 
 }

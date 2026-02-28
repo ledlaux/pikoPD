@@ -1,0 +1,125 @@
+#include "PicoControl.hpp"
+#include "hardware/adc.h"
+#include "hardware/pwm.h"
+#include "hardware/gpio.h"
+#include "pico/time.h"
+#include <cmath>
+
+namespace Pico {
+
+    Button btns[16];
+    Knob knobs[8];
+    Led leds[16];
+    std::atomic<float> led_vals[16];
+    int n_btn = 0, n_knob = 0, n_led = 0;
+
+    void addBtn(int index, uint32_t pin) {
+        gpio_init(pin);
+        gpio_set_dir(pin, GPIO_IN);
+        gpio_pull_up(pin);
+        btns[index].pin = pin;
+        btns[index].state.store(false);
+        btns[index].last = false;
+        btns[index].raw_prev = false;
+        btns[index].last_time = 0;
+        btns[index].mode = MODE_BANG;
+        if (index >= n_btn) n_btn = index + 1; 
+    }
+
+    void addKnob(int index, uint32_t pin) {
+        if (n_knob == 0) adc_init();
+        adc_gpio_init(pin);
+        knobs[index].adc_ch = pin - 26;
+        knobs[index].value.store(0.0f);
+        knobs[index].last_val = 0.0f;
+        if (index >= n_knob) n_knob = index + 1;
+    }
+
+    void addLed(int index, uint32_t pin) {
+        gpio_set_function(pin, GPIO_FUNC_PWM);
+        uint slice = pwm_gpio_to_slice_num(pin);
+        uint chan = pwm_gpio_to_channel(pin);
+        pwm_set_wrap(slice, 255);
+        pwm_set_enabled(slice, true);
+        leds[index].pin = pin;
+        leds[index].slice = slice;
+        leds[index].chan = chan;
+        if (index >= n_led) n_led = index + 1;
+    }
+
+    void update() {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        for (int i = 0; i < n_btn; i++) {
+            bool r = !gpio_get(btns[i].pin); 
+            if (r != btns[i].raw_prev) { 
+                btns[i].last_time = now; 
+                btns[i].raw_prev = r; 
+            }
+            if ((now - btns[i].last_time) > 20) {
+                btns[i].state.store(r);
+            }
+        }
+        for (int i = 0; i < n_knob; i++) {
+            adc_select_input(knobs[i].adc_ch);
+            float raw = (float)adc_read() / 4095.0f;
+            knobs[i].value.store((knobs[i].value.load() * 0.9f) + (raw * 0.1f));
+        }
+    }
+
+    void setLedHardware(int index, float value) {
+        pwm_set_chan_level(leds[index].slice, leds[index].chan, (uint16_t)(value * 255.0f));
+    }
+
+
+    bool buttonChanged(int i, bool& outState) {
+        bool s = btns[i].state.load();
+        if (s != btns[i].last) {
+            btns[i].last = s;
+            outState = s;
+            return true;
+        }
+        return false;
+    }
+
+    bool buttonPressed(int i) {
+        bool s = btns[i].state.load();
+        if (s && !btns[i].last) { 
+            btns[i].last = true;
+            return true;
+        }
+        if (!s) btns[i].last = false; 
+        return false;
+    }
+
+    bool buttonReleased(int i) {
+        bool s = btns[i].state.load();
+        if (!s && btns[i].last) { 
+            btns[i].last = false;
+            return true;
+        }
+        if (s) btns[i].last = true; 
+        return false;
+    }
+
+   bool buttonToggled(int i, bool& outState) {
+    bool s = btns[i].state.load();
+    if (s && !btns[i].last) {
+        btns[i].last = true;
+        btns[i].toggle_state = !btns[i].toggle_state;
+        outState = btns[i].toggle_state;
+        return true;
+    }
+    if (!s) btns[i].last = false;
+    return false;
+}
+
+    bool knobChanged(int i, float& outVal) {
+        float v = knobs[i].value.load();
+        if (std::abs(v - knobs[i].last_val) > 0.005f) {
+            knobs[i].last_val = v;
+            outVal = v;
+            return true;
+        }
+        return false;
+    }
+}

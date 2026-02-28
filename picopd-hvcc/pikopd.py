@@ -113,13 +113,7 @@ class PicoUF2Generator:
 
     def collect_and_save_manifest(self):
         if not os.path.exists(self.ir_json):
-            return {
-                "patch_name": self.patch_name,
-                "receives": [],
-                "sends": [],
-                "tables": [],
-                "prints": [],
-            }
+            return {"receives": [], "sends": [], "tables": [], "prints": []}
 
         with open(self.ir_json, "r") as f:
             data = json.load(f)
@@ -131,21 +125,32 @@ class PicoUF2Generator:
             "tables": [],
             "prints": [],
         }
-        for _, obj_body in data.get("objects", {}).items():
-            args = obj_body.get("args", {})
-            if not isinstance(args, dict):
-                continue
-            name = args.get("name") or args.get("label")
-            if not name or "__hv_" in name:
-                continue
-            entry = {"name": name, "hash": args.get("hash", "0")}
+
+        control = data.get("control", {})
+        for r_name, r_body in control.get("receivers", {}).items():
+            if "__hv_" in r_name: continue
+            manifest["receives"].append({
+                "name": r_name,
+                "hash": r_body.get("hash", "0")
+            })
+
+        for obj_id, obj_body in data.get("objects", {}).items():
             t = obj_body.get("type", "")
+            args = obj_body.get("args", {})
+            
+            name = args.get("name") or args.get("label")
+            if not name or "__hv_" in name: continue
+
+            obj_hash = args.get("hash", "0")
+
+            entry = {"name": name, "hash": obj_hash}
+
             if t == "__send":
-                manifest["sends"].append(entry)
-            elif t == "__receive" or args.get("extern") == "param":
-                manifest["receives"].append(entry)
+                if not any(s['name'] == name for s in manifest["sends"]):
+                    manifest["sends"].append(entry)
             elif t == "__print":
-                manifest["prints"].append(entry)
+                if not any(p['name'] == name for p in manifest["prints"]):
+                    manifest["prints"].append(entry)
             elif t == "__table":
                 manifest["tables"].append(entry)
 
@@ -290,7 +295,6 @@ class PicoUF2Generator:
 
         if serial and flash_success:
             self.open_serial()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
