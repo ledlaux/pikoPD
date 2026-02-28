@@ -9,6 +9,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**
 - Uses main.cpp as a template
 - Set in `settings.json`:
+  
     - board (pico, pico_w, pico2)
     - core frequency
     - i2s pins
@@ -17,6 +18,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - led pins
     - adc pins
     - button pins and type (bang, toggle, switch)
+      
 - Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
 - Check for device in BOOTSEL mode
