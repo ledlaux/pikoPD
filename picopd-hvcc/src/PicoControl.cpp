@@ -17,22 +17,27 @@ namespace Pico {
     int n_knob = 0;
     int n_led = 0;
 
-    
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
         
         for (int i = 0; i < n_btn; i++) {
-            if (btns[i].mode == GATE_OUT) continue; 
+            if (btns[i].mode == GATE_OUT) {
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    gpio_put(btns[i].pin, 0);
+                    btns[i].state.store(false, std::memory_order_relaxed);
+                    btns[i].reset_at = 0; 
+                }
+                continue; 
+            }
 
             bool r = (all_pins & btns[i].mask) == 0;
-            
             if (btns[i].mode == GATE_IN) {
                 btns[i].state.store(r, std::memory_order_relaxed);
             } else {
                 if (r != btns[i].raw_prev) {
                     btns[i].last_time = now;
                     btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {   // debounce ms
+                } else if ((now - btns[i].last_time) > 20) {     // debounce ms
                     btns[i].state.store(r, std::memory_order_relaxed);
                 }
             }
@@ -42,7 +47,7 @@ namespace Pico {
             adc_select_input(knobs[i].adc_ch);
             float raw = (float)adc_read() / 4095.0f;
             float prev = knobs[i].value.load(std::memory_order_relaxed);
-            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);   // smoothing
+            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothing 
         }
     }
    
@@ -112,6 +117,36 @@ namespace Pico {
             setLedHardware(index, val);
         }
     }
+
+   void updateGate(int index, float val) {
+    if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
+        int state = (val > 0.5f) ? 1 : 0;
+        
+        // --- SET PULSE LENGTH HERE ---
+        // Change this to 0 to disable the timer entirely
+        uint32_t duration = 0; 
+
+        switch (state) {
+            case 1:
+                gpio_put(btns[index].pin, 1);
+                btns[index].state.store(true, std::memory_order_relaxed);
+                
+                if (duration > 0) {
+                    uint32_t now = to_ms_since_boot(get_absolute_time());
+                    btns[index].reset_at = now + duration;
+                }
+                break;
+
+            case 0:
+                if (duration == 0) {
+                    gpio_put(btns[index].pin, 0);
+                    btns[index].state.store(false, std::memory_order_relaxed);
+                }
+                break;
+        }
+    }
+}
+   
 
     bool buttonPressed(int i) {
         bool s = btns[i].state.load(std::memory_order_relaxed);

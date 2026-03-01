@@ -56,6 +56,7 @@ namespace Pico {
     void addLed(int index, uint32_t pin);   
     void update(uint32_t now);
     void updateLed(int index, float val); 
+    void updateGate(int index, float val);
     void processPin(int i, float &outVal, bool &shouldSend);
     bool knobChanged(int i, float& outVal);
     bool buttonChanged(int i, bool& outState);
