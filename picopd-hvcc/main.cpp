@@ -44,7 +44,6 @@
 {%- set active_btns = [] -%}
 {%- for b in settings.buttons -%}
     {%- for r in hv_manifest.receives if r.name == b.name -%}
-        {# SAVE THE HASH HERE #}
         {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': r.hash}) -%}
     {%- endfor -%}
 {%- endfor -%}
@@ -52,10 +51,16 @@
 {%- set active_gates = [] -%}
 {%- for g in settings.gate_in -%}
     {%- for r in hv_manifest.receives if r.name == g.name -%}
-        {# SAVE THE HASH HERE AND FORCE MODE GATE_IN #}
         {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': r.hash}) -%}
     {%- endfor -%}
 {%- endfor -%}
+
+{%- set active_gate_outs = [] -%}
+{%- for go in settings.gate_out -%}
+    {%- for s in hv_manifest.sends if s.name == go.name -%}
+        {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': s.hash}) -%}
+    {%- endfor -%}
+{%- endfor %}
 
 {%- set active_knobs = [] -%}
 {%- for k in settings.adc_pins -%}
@@ -189,6 +194,12 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             return;
         {% endfor %}
 
+        {% for gate_out in active_gate_outs %}
+        case {{ gate_out.hash }}: 
+            Pico::updateGate({{ active_btns|length + active_gates|length + loop.index0 }}, val);
+            return;
+        {% endfor %}
+
         default:
             heavyMidiOutHook(vc, name, hash, m);
             break;
@@ -247,7 +258,6 @@ int main() {
     tusb_init(); 
     cdc_stdio_lib_init();
 
-    multicore_launch_core1(core1_audio_entry);
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
@@ -258,6 +268,11 @@ int main() {
 
     {% for gate in active_gates %}
     Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, Pico::GATE_IN);
+    {% endfor %}
+
+    {# GATE OUT implementation #}
+    {% for gate_out in active_gate_outs %}
+    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, Pico::GATE_OUT);
     {% endfor %}
 
     {% for knob in active_knobs %}
@@ -271,6 +286,9 @@ int main() {
     {% for led in active_leds %}
     Pico::addLed({{ loop.index0 }}, {{ led.pin }});
     {% endfor %}
+
+    multicore_launch_core1(core1_audio_entry);
+
 
     uint32_t last_hw_tick = 0;
     uint32_t last_print_time = 0;
