@@ -58,7 +58,12 @@
 {%- set active_gate_outs = [] -%}
 {%- for go in settings.gate_out -%}
     {%- for s in hv_manifest.sends if s.name == go.name -%}
-        {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': s.hash}) -%}
+        {%- if go.mode == "trigger" -%}
+            {%- set dur = 15 -%} {# Set your preferred trigger length in ms #}
+        {%- else -%}
+            {%- set dur = 0 -%}  {# Gate mode #}
+        {%- endif -%}
+        {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': s.hash, 'duration': dur}) -%}
     {%- endfor -%}
 {%- endfor %}
 
@@ -270,9 +275,8 @@ int main() {
     Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, Pico::GATE_IN);
     {% endfor %}
 
-    {# GATE OUT implementation #}
     {% for gate_out in active_gate_outs %}
-    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, Pico::GATE_OUT);
+    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, Pico::GATE_OUT, {{ gate_out.duration }});
     {% endfor %}
 
     {% for knob in active_knobs %}
@@ -307,7 +311,6 @@ int main() {
             bool send;
             float v;
 
-            // --- Process Buttons ---
             {% for btn in active_btns %}
             Pico::processPin({{ loop.index0 }}, val, send); 
             if (send) { 
@@ -315,15 +318,12 @@ int main() {
             }
             {% endfor %}
 
-            // --- Process Gate In ---
             {% for gate in active_gates %}
             Pico::processPin({{ active_btns|length + loop.index0 }}, val, send);
             if (send) {
                 hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
             }
             {% endfor %}
-
-            // --- Process Knobs ---
 
             {% for knob in active_knobs -%}
             if (Pico::knobChanged({{ loop.index0 }}, v)) {
