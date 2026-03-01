@@ -32,8 +32,11 @@
   ],
 
   "gate_out": [
-  { "name": "kick", "pin": 1, "mode": "gate" },
-  { "name": "vca", "pin": 2, "mode": "trigger" }
+  { "name": "kick", "pin": 3, "mode": "trigger" },
+  { "name": "vca", "pin": 2, "mode": "gate" }
+],
+"encoders": [
+  { "name": "enc", "pin_a": 0, "pin_b": 1 }
 ]
   
 }
