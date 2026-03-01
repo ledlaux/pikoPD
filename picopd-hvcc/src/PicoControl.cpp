@@ -121,10 +121,8 @@ namespace Pico {
    void updateGate(int index, float val) {
     if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
         int state = (val > 0.5f) ? 1 : 0;
-        
-        // --- SET PULSE LENGTH HERE ---
-        // Change this to 0 to disable the timer entirely
-        uint32_t duration = 0; 
+         
+        uint32_t duration = 0; // Gate : 0 ms | Trigger : 10 ms
 
         switch (state) {
             case 1:
