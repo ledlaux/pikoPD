@@ -261,23 +261,24 @@ int main() {
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         if (now != last_hw_tick) {
-    last_hw_tick = now;
-    Pico::update();
+        last_hw_tick = now;
+        Pico::update(now);
 
-    float val; bool send;
-    float v;
+        float val; bool send;
+        float v;
 
-    {% for btn in active_btns %}
-    Pico::processButton({{ loop.index0 }}, val, send);
-    if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
-    {% endfor %}
+        {% for btn in active_btns %}
+        Pico::processButton({{ loop.index0 }}, val, send);
+        if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
+        {% endfor %}
 
-    {% for knob in active_knobs %}
-    if (Pico::knobChanged({{ loop.index0 }}, v)) {
-        hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+        {% for knob in active_knobs %}
+        if (Pico::knobChanged({{ loop.index0 }}, v)) {
+            hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+        }
+        {% endfor %}
+        }
+        
+        } 
+        return 0; 
     }
-    {% endfor %}
-}
-    } 
-    return 0; 
-}
