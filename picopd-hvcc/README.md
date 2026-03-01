@@ -17,6 +17,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - sample rate
     - led pins
     - adc pins (knob, cv_in)
+    - encoder pins
     - gate in/out pins (gate or trigger mode)
     - button pins and type (bang, toggle, switch)
       
@@ -35,7 +36,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [x] cv in
 - [x] gate in
 - [x] gate out
-- [ ] encoder
+- [x] encoder
 - [ ] joystic
 - [ ] sensors
 - [ ] midi clock

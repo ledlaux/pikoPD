@@ -72,6 +72,11 @@
     {%- set _ = active_leds.append({'hash': sends[l.name], 'pin': l.pin}) -%}
 {%- endfor -%}
 
+{%- set active_encoders = [] -%}
+{%- for e in settings.encoders if e.name in receives -%}
+    {%- set _ = active_encoders.append({'a': e.pin_a, 'b': e.pin_b, 'hash': receives[e.name]}) -%}
+{%- endfor -%}
+
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 
 
@@ -282,6 +287,10 @@ int main() {
     Pico::addLed({{ loop.index0 }}, {{ led.pin }});
     {% endfor %}
 
+    {% for enc in active_encoders -%}
+    Pico::addEncoder({{ loop.index0 }}, {{ enc.a }}, {{ enc.b }});
+    {% endfor %}
+
     multicore_launch_core1(core1_audio_entry);
 
 
@@ -319,6 +328,12 @@ int main() {
             {% for knob in active_knobs -%}
             if (Pico::knobChanged({{ loop.index0 }}, v)) {
                 hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+            }
+            {% endfor %}
+
+            {% for enc in active_encoders -%}
+            if (Pico::processEnc({{ loop.index0 }}, v)) {
+                hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             }
             {% endfor %}
         }
