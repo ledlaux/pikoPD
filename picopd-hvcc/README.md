@@ -38,7 +38,6 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
-- [ ] cv in
 - [ ] midi clock
 - [ ] uart midi
 - [ ] screen
