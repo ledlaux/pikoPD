@@ -43,14 +43,14 @@ namespace Pico {
     };
 
     struct Encoder {
-   uint32_t pinA;
-    uint32_t pinB;
-    bool last_clk;      
-    bool last_dt;      
-    int8_t lastState;
-    int last_sent_count;      
-    std::atomic<int> value;
-    };
+        uint32_t pinA;
+        uint32_t pinB;
+        bool last_clk;      
+        bool last_dt;      
+       // int8_t lastState;
+        int last_sent_count;      
+        std::atomic<int> value;
+        };
 
     extern Button btns[12];
     extern Knob knobs[4];
