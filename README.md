@@ -23,8 +23,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - sample rate
     - led pins
     - adc pins (knob, cv_in)
-    - gate in/out pins
-    - button pins and type (bang, toggle, switch)
+    - gate in/out pins (gate or trigger mode)
+    - button pins and type (bang, toggle, switch)  
       
 - Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -33,9 +33,9 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 ## Updates
 
+- [x] serial console 
 - [x] led
 - [x] usb midi
-- [x] serial console 
 - [x] button
 - [x] adc
 - [x] cv in
@@ -44,7 +44,6 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
-- [ ] cv in
 - [ ] midi clock
 - [ ] uart midi
 - [ ] screen
