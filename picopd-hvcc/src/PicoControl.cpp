@@ -17,16 +17,22 @@ namespace Pico {
     int n_knob = 0;
     int n_led = 0;
 
+    
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
+        
         for (int i = 0; i < n_btn; i++) {
-            bool r = !(all_pins & btns[i].mask); 
+            bool r = (all_pins & btns[i].mask) == 0;
             
-            if (r != btns[i].raw_prev) {
-                btns[i].last_time = now;
-                btns[i].raw_prev = r;
-            } else if ((now - btns[i].last_time) > 20) {  //debounce
+            if (btns[i].mode == GATE_IN) {
                 btns[i].state.store(r, std::memory_order_relaxed);
+            } else {
+                if (r != btns[i].raw_prev) {
+                    btns[i].last_time = now;
+                    btns[i].raw_prev = r;
+                } else if ((now - btns[i].last_time) > 20) {
+                    btns[i].state.store(r, std::memory_order_relaxed);
+                }
             }
         }
 
@@ -37,22 +43,27 @@ namespace Pico {
             knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);
         }
     }
+   
+void addPin(int index, uint32_t pin, ButtonMode mode) {
+    gpio_init(pin);
+    gpio_set_dir(pin, GPIO_IN);
+    gpio_pull_up(pin); 
 
-    void addBtn(int index, uint32_t pin, ButtonMode mode) {
-        gpio_init(pin);
-        gpio_set_dir(pin, GPIO_IN);
-        gpio_pull_up(pin);
-        btns[index].pin = pin;
-        btns[index].mask = (1u << pin); 
-        btns[index].state.store(false, std::memory_order_relaxed);
-        btns[index].last = false;
-        btns[index].raw_prev = false;
-        btns[index].last_time = 0;
-        btns[index].toggle_state = false; 
-        btns[index].reset_at = 0;         
-        btns[index].mode = mode;         
-        if (index >= n_btn) n_btn = index + 1;
-    }
+    btns[index].pin = pin;
+    btns[index].mask = (1u << pin); 
+    btns[index].mode = mode;         
+    bool physical_now = gpio_get(pin);
+    bool is_pressed = !physical_now;
+    btns[index].state.store(is_pressed, std::memory_order_relaxed);
+    btns[index].last = is_pressed;
+    btns[index].raw_prev = is_pressed;
+
+    btns[index].last_time = 0;
+    btns[index].toggle_state = false; 
+    btns[index].reset_at = 0;         
+    
+    if (index >= n_btn) n_btn = index + 1;
+}
 
     void addKnob(int index, uint32_t pin) {
         if (index == 0) adc_init();
@@ -62,6 +73,11 @@ namespace Pico {
         knobs[index].last_val = 0.0f;
         knobs[index].coeff = 0.1f; 
         if (index >= n_knob) n_knob = index + 1;
+    }
+
+    void addCV(int index, uint32_t pin) {
+        addKnob(index, pin); 
+        knobs[index].coeff = 1.0f; 
     }
 
     void addLed(int index, uint32_t pin) {
@@ -82,20 +98,20 @@ namespace Pico {
     }
 
     void updateLed(int index, float val) {
-        if (index < 16) {
+        if (index < 12) {
             led_vals[index].store(val, std::memory_order_relaxed);
             setLedHardware(index, val);
         }
     }
 
     bool buttonPressed(int i) {
-    bool s = btns[i].state.load(std::memory_order_relaxed);
-    if (s && !btns[i].last) { 
-        btns[i].last = true; 
-        return true;
-    }
-    if (!s) btns[i].last = false; 
-    return false;
+        bool s = btns[i].state.load(std::memory_order_relaxed);
+        if (s && !btns[i].last) {
+            btns[i].last = true;
+            return true;
+        }
+        if (!s) btns[i].last = false;
+        return false;
     }
 
     bool buttonToggled(int i, bool& outState) {
@@ -120,7 +136,7 @@ namespace Pico {
         return false;
     }
 
-    void processButton(int i, float &outVal, bool &shouldSend) {
+    void processPin(int i, float &outVal, bool &shouldSend) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
         bool is_down = btns[i].state.load(std::memory_order_relaxed);
         bool s;
@@ -128,20 +144,18 @@ namespace Pico {
 
         switch (btns[i].mode) {
             case BANG:
-                if (buttonPressed(i)) {
-                    outVal = 1.0f;
-                    shouldSend = true;
-
-                    // Bang reset timer
-                    // btns[i].reset_at = now + 10; 
-                } 
-                    // if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                    //     btns[i].reset_at = 0; 
-                    //     outVal = 0.0f;
-                    //     shouldSend = true;    
-                    // }
-                    
-                break;
+            if (buttonPressed(i)) {
+                outVal = 1.0f;
+                shouldSend = true;
+                btns[i].reset_at = now + 10; 
+            } 
+            
+            if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                btns[i].reset_at = 0; 
+                outVal = 0.0f;
+                shouldSend = true;    
+            }
+            break;
 
             case TOGGLE:
                 if (buttonToggled(i, s)) {
@@ -156,6 +170,13 @@ namespace Pico {
                     shouldSend = true;
                 }
                 break;
+
+            case GATE_IN:
+                if (buttonChanged(i, s)) {
+                outVal = s ? 1.0f : 0.0f;
+                shouldSend = true;
+                }
+                break;
         }
     }
 
@@ -168,4 +189,6 @@ namespace Pico {
         }
         return false;
     }
+
+
 }
