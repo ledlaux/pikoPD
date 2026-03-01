@@ -332,7 +332,7 @@ int main() {
             {% endfor %}
 
             {% for enc in active_encoders -%}
-            if (Pico::encoderChanged({{ loop.index0 }}, v)) {
+            if (Pico::processEnc({{ loop.index0 }}, v)) {
                 hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             }
             {% endfor %}
