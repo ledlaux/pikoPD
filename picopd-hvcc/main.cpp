@@ -40,46 +40,37 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
+{% set receives = {} %}
+{%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}{%- endfor -%}
+
+{%- set sends = {} -%}
+{%- for s in hv_manifest.sends -%}{%- set _ = sends.update({s.name: s.hash}) -%}{%- endfor -%}
 
 {%- set active_btns = [] -%}
-{%- for b in settings.buttons -%}
-    {%- for r in hv_manifest.receives if r.name == b.name -%}
-        {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': r.hash}) -%}
-    {%- endfor -%}
+{%- for b in settings.buttons if b.name in receives -%}
+    {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': receives[b.name]}) -%}
 {%- endfor -%}
 
 {%- set active_gates = [] -%}
-{%- for g in settings.gate_in -%}
-    {%- for r in hv_manifest.receives if r.name == g.name -%}
-        {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': r.hash}) -%}
-    {%- endfor -%}
+{%- for g in settings.gate_in if g.name in receives -%}
+    {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': receives[g.name]}) -%}
 {%- endfor -%}
 
 {%- set active_gate_outs = [] -%}
-{%- for go in settings.gate_out -%}
-    {%- for s in hv_manifest.sends if s.name == go.name -%}
-        {%- if go.mode == "trigger" -%}
-            {%- set dur = 15 -%} {# Set your preferred trigger length in ms #}
-        {%- else -%}
-            {%- set dur = 0 -%}  {# Gate mode #}
-        {%- endif -%}
-        {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': s.hash, 'duration': dur}) -%}
-    {%- endfor -%}
-{%- endfor %}
+{%- for go in settings.gate_out if go.name in sends -%}
+    {%- set dur = 15 if go.mode == "trigger" else 0 -%}
+    {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': sends[go.name], 'duration': dur}) -%}
+{%- endfor -%}
 
 {%- set active_knobs = [] -%}
-{%- for k in settings.adc_pins -%}
-    {%- for r in hv_manifest.receives if r.name == k.name -%}
-        {%- set _ = active_knobs.append({'hash': r.hash, 'pin': k.pin, 'type': k.type}) -%}
-    {%- endfor -%}
+{%- for k in settings.adc_pins if k.name in receives -%}
+    {%- set _ = active_knobs.append({'hash': receives[k.name], 'pin': k.pin, 'type': k.type}) -%}
 {%- endfor -%}
 
 {%- set active_leds = [] -%}
-{%- for l in settings.leds -%}
-    {%- for s in hv_manifest.sends if s.name == l.name -%}
-        {%- set _ = active_leds.append({'hash': s.hash, 'pin': l.pin}) -%}
-    {%- endfor -%}
-{%- endfor %}
+{%- for l in settings.leds if l.name in sends -%}
+    {%- set _ = active_leds.append({'hash': sends[l.name], 'pin': l.pin}) -%}
+{%- endfor -%}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 
