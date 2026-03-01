@@ -10,14 +10,16 @@ namespace Pico {
     enum ButtonMode {
         BANG   = 0,
         SWITCH = 1,  
-        TOGGLE = 2    
+        TOGGLE = 2,
+        GATE_IN = 3    
     };
 
     struct Button {
         uint32_t pin;
         uint32_t mask;      
         std::atomic<bool> state;
-        bool last;        
+        bool last;   
+    //    bool inverted;     
         bool raw_prev;   
         uint32_t last_time;
         ButtonMode mode;
@@ -47,12 +49,13 @@ namespace Pico {
     extern int n_knob;
     extern int n_led;
 
-    void addBtn(int index, uint32_t pin, ButtonMode mode);  
-    void addKnob(int index, uint32_t pin);  
+    void addPin(int index, uint32_t pin, ButtonMode mode);
+    void addKnob(int index, uint32_t pin); 
+    void addCV(int index, uint32_t pin);   
     void addLed(int index, uint32_t pin);   
     void update(uint32_t now);
     void updateLed(int index, float val); 
-    void processButton(int i, float &outVal, bool &shouldSend);
+    void processPin(int i, float &outVal, bool &shouldSend);
     bool knobChanged(int i, float& outVal);
     bool buttonChanged(int i, bool& outState);
     bool buttonPressed(int i);
