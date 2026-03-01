@@ -31,11 +31,13 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - [x] serial console 
 - [x] button
 - [x] adc
+- [x] cv in
+- [x] gate in
+- [x] gate out
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
 - [ ] cv in
-- [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
 - [ ] screen
