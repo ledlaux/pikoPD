@@ -17,13 +17,13 @@
   ],
 
   "buttons": [
-    { "name": "btn1", "pin": 12, "mode": "switch" },
-    { "name": "btn2", "pin": 13, "mode": "switch" },
-    { "name": "hat", "pin": 14, "mode": "toggle" }
+    { "name": "btn1", "pin": 12, "mode": "bang" },
+    { "name": "btn2", "pin": 13, "mode": "toggle" },
+    { "name": "btn3", "pin": 14, "mode": "switch" }
   ],
 
   "leds": [
-    { "name": "gate_t", "pin": 24 },
+    { "name": "led1", "pin": 24 },
     { "name": "led2", "pin": 25 }
   ],
   "gate_in": [
