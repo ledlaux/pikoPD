@@ -26,6 +26,7 @@ namespace Pico {
         PinMode mode;
         bool toggle_state;
         uint32_t reset_at = 0;
+        uint32_t pulse_duration;
     };
 
     struct Knob {
@@ -50,7 +51,7 @@ namespace Pico {
     extern int n_knob;
     extern int n_led;
 
-    void addPin(int index, uint32_t pin, PinMode mode);
+    void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0);
     void addKnob(int index, uint32_t pin); 
     void addCV(int index, uint32_t pin);   
     void addLed(int index, uint32_t pin);   

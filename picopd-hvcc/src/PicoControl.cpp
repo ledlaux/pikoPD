@@ -51,33 +51,35 @@ namespace Pico {
         }
     }
    
-    void addPin(int index, uint32_t pin, PinMode mode) {
-            gpio_init(pin);
-            btns[index].pin = pin;
-            btns[index].mode = mode;
-            btns[index].mask = (1u << pin);
+    void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
+        gpio_init(pin);
+        btns[index].pin = pin;
+        btns[index].mode = mode;
+        btns[index].mask = (1u << pin);
+        
+        btns[index].pulse_duration = duration;
 
-            if (mode == GATE_OUT) {
-                gpio_set_dir(pin, GPIO_OUT);
-                gpio_put(pin, 0);
-                btns[index].state.store(false, std::memory_order_relaxed);
-                btns[index].last = false;
-            } else {
-                gpio_set_dir(pin, GPIO_IN);
-                gpio_pull_up(pin);
-                
-                bool is_pressed = !gpio_get(pin);
-                btns[index].state.store(is_pressed, std::memory_order_relaxed);
-                btns[index].last = is_pressed;
-                btns[index].raw_prev = is_pressed;
-            }
-
-            btns[index].last_time = 0;
-            btns[index].toggle_state = false;
-            btns[index].reset_at = 0;
-
-            if (index >= n_btn) n_btn = index + 1;
+        if (mode == GATE_OUT) {
+            gpio_set_dir(pin, GPIO_OUT);
+            gpio_put(pin, 0);
+            btns[index].state.store(false, std::memory_order_relaxed);
+            btns[index].last = false;
+        } else {
+            gpio_set_dir(pin, GPIO_IN);
+            gpio_pull_up(pin);
+            
+            bool is_pressed = !gpio_get(pin);
+            btns[index].state.store(is_pressed, std::memory_order_relaxed);
+            btns[index].last = is_pressed;
+            btns[index].raw_prev = is_pressed;
         }
+
+        btns[index].last_time = 0;
+        btns[index].toggle_state = false;
+        btns[index].reset_at = 0;
+
+        if (index >= n_btn) n_btn = index + 1;
+    }
 
     void addKnob(int index, uint32_t pin) {
         if (index == 0) adc_init();
@@ -122,10 +124,10 @@ namespace Pico {
     if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
         int state = (val > 0.5f) ? 1 : 0;
          
-        uint32_t duration = 0; // Gate : 0 ms | Trigger : 10 ms
+        uint32_t duration = btns[index].pulse_duration; 
 
         switch (state) {
-            case 1:
+            case 1:  // Trigger
                 gpio_put(btns[index].pin, 1);
                 btns[index].state.store(true, std::memory_order_relaxed);
                 
@@ -135,7 +137,7 @@ namespace Pico {
                 }
                 break;
 
-            case 0:
+            case 0:    // Gate
                 if (duration == 0) {
                     gpio_put(btns[index].pin, 0);
                     btns[index].state.store(false, std::memory_order_relaxed);
