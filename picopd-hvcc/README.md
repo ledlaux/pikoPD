@@ -27,9 +27,9 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 ## Updates
 
+- [x] serial console 
 - [x] led
 - [x] usb midi
-- [x] serial console 
 - [x] button
 - [x] adc
 - [x] cv in
