@@ -30,7 +30,7 @@ namespace Pico {
                 if (r != btns[i].raw_prev) {
                     btns[i].last_time = now;
                     btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {
+                } else if ((now - btns[i].last_time) > 20) {  // debounce
                     btns[i].state.store(r, std::memory_order_relaxed);
                 }
             }
@@ -40,30 +40,30 @@ namespace Pico {
             adc_select_input(knobs[i].adc_ch);
             float raw = (float)adc_read() / 4095.0f;
             float prev = knobs[i].value.load(std::memory_order_relaxed);
-            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);
+            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);   // smoothing
         }
     }
    
-void addPin(int index, uint32_t pin, ButtonMode mode) {
-    gpio_init(pin);
-    gpio_set_dir(pin, GPIO_IN);
-    gpio_pull_up(pin); 
+    void addPin(int index, uint32_t pin, ButtonMode mode) {
+        gpio_init(pin);
+        gpio_set_dir(pin, GPIO_IN);
+        gpio_pull_up(pin); 
 
-    btns[index].pin = pin;
-    btns[index].mask = (1u << pin); 
-    btns[index].mode = mode;         
-    bool physical_now = gpio_get(pin);
-    bool is_pressed = !physical_now;
-    btns[index].state.store(is_pressed, std::memory_order_relaxed);
-    btns[index].last = is_pressed;
-    btns[index].raw_prev = is_pressed;
+        btns[index].pin = pin;
+        btns[index].mask = (1u << pin); 
+        btns[index].mode = mode;         
+        bool physical_now = gpio_get(pin);
+        bool is_pressed = !physical_now;
+        btns[index].state.store(is_pressed, std::memory_order_relaxed);
+        btns[index].last = is_pressed;
+        btns[index].raw_prev = is_pressed;
 
-    btns[index].last_time = 0;
-    btns[index].toggle_state = false; 
-    btns[index].reset_at = 0;         
-    
-    if (index >= n_btn) n_btn = index + 1;
-}
+        btns[index].last_time = 0;
+        btns[index].toggle_state = false; 
+        btns[index].reset_at = 0;         
+        
+        if (index >= n_btn) n_btn = index + 1;
+    }
 
     void addKnob(int index, uint32_t pin) {
         if (index == 0) adc_init();
@@ -147,7 +147,7 @@ void addPin(int index, uint32_t pin, ButtonMode mode) {
             if (buttonPressed(i)) {
                 outVal = 1.0f;
                 shouldSend = true;
-                btns[i].reset_at = now + 10; 
+                btns[i].reset_at = now + 10; // bang button reset ms
             } 
             
             if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
