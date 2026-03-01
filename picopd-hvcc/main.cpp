@@ -41,24 +41,35 @@
 #define MIDI_RT_RESET           0xFF
 
 
-{% set active_btns = [] %}
+{%- set active_btns = [] -%}
 {%- for b in settings.buttons -%}
     {%- for r in hv_manifest.receives if r.name == b.name -%}
-        {%- set _ = active_btns.append({'hash': r.hash, 'pin': b.pin, 'mode': b.mode}) -%}
+        {# SAVE THE HASH HERE #}
+        {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': r.hash}) -%}
     {%- endfor -%}
 {%- endfor -%}
-{% set active_knobs = [] -%}
+
+{%- set active_gates = [] -%}
+{%- for g in settings.gate_in -%}
+    {%- for r in hv_manifest.receives if r.name == g.name -%}
+        {# SAVE THE HASH HERE AND FORCE MODE GATE_IN #}
+        {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': r.hash}) -%}
+    {%- endfor -%}
+{%- endfor -%}
+
+{%- set active_knobs = [] -%}
 {%- for k in settings.adc_pins -%}
     {%- for r in hv_manifest.receives if r.name == k.name -%}
-        {%- set _ = active_knobs.append({'hash': r.hash, 'pin': k.pin}) -%}
+        {%- set _ = active_knobs.append({'hash': r.hash, 'pin': k.pin, 'type': k.type}) -%}
     {%- endfor -%}
 {%- endfor -%}
-{% set active_leds = [] -%}
+
+{%- set active_leds = [] -%}
 {%- for l in settings.leds -%}
     {%- for s in hv_manifest.sends if s.name == l.name -%}
         {%- set _ = active_leds.append({'hash': s.hash, 'pin': l.pin}) -%}
     {%- endfor -%}
-{%- endfor -%}
+{%- endfor %}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
 
@@ -241,14 +252,24 @@ int main() {
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    {% for btn in active_btns -%}
-    Pico::addBtn({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
+    {% for btn in active_btns %}
+    Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
     {% endfor %}
-    {% for led in active_leds -%}
-    Pico::addLed({{ loop.index0 }}, {{ led.pin }});
+
+    {% for gate in active_gates %}
+    Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, Pico::GATE_IN);
     {% endfor %}
-    {% for knob in active_knobs -%}
+
+    {% for knob in active_knobs %}
+        {% if knob.type == 'cv_in' %}
+    Pico::addCV({{ loop.index0 }}, {{ knob.pin }});
+        {% else %}
     Pico::addKnob({{ loop.index0 }}, {{ knob.pin }});
+        {% endif %}
+    {% endfor %}
+
+    {% for led in active_leds %}
+    Pico::addLed({{ loop.index0 }}, {{ led.pin }});
     {% endfor %}
 
     uint32_t last_hw_tick = 0;
@@ -256,29 +277,42 @@ int main() {
 
     while (true) {
         tud_task(); 
-        midi_task();
+        midi_task(); 
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         if (now != last_hw_tick) {
-        last_hw_tick = now;
-        Pico::update(now);
+            last_hw_tick = now;
+            Pico::update(now); 
 
-        float val; bool send;
-        float v;
+            float val; 
+            bool send;
+            float v;
 
-        {% for btn in active_btns %}
-        Pico::processButton({{ loop.index0 }}, val, send);
-        if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
-        {% endfor %}
+            // --- Process Buttons ---
+            {% for btn in active_btns %}
+            Pico::processPin({{ loop.index0 }}, val, send); 
+            if (send) { 
+                hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
+            }
+            {% endfor %}
 
-        {% for knob in active_knobs %}
-        if (Pico::knobChanged({{ loop.index0 }}, v)) {
-            hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+            // --- Process Gate In ---
+            {% for gate in active_gates %}
+            Pico::processPin({{ active_btns|length + loop.index0 }}, val, send);
+            if (send) {
+                hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
+            }
+            {% endfor %}
+
+            // --- Process Knobs ---
+
+            {% for knob in active_knobs -%}
+            if (Pico::knobChanged({{ loop.index0 }}, v)) {
+                hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+            }
+            {% endfor %}
         }
-        {% endfor %}
-        }
-        
-        } 
-        return 0; 
-    }
+    } 
+    return 0;
+}
