@@ -22,6 +22,8 @@ namespace Pico {
         uint32_t all_pins = gpio_get_all(); 
         
         for (int i = 0; i < n_btn; i++) {
+            if (btns[i].mode == GATE_OUT) continue; 
+
             bool r = (all_pins & btns[i].mask) == 0;
             
             if (btns[i].mode == GATE_IN) {
@@ -30,7 +32,7 @@ namespace Pico {
                 if (r != btns[i].raw_prev) {
                     btns[i].last_time = now;
                     btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {  // debounce
+                } else if ((now - btns[i].last_time) > 20) {   // debounce ms
                     btns[i].state.store(r, std::memory_order_relaxed);
                 }
             }
@@ -44,26 +46,33 @@ namespace Pico {
         }
     }
    
-    void addPin(int index, uint32_t pin, ButtonMode mode) {
-        gpio_init(pin);
-        gpio_set_dir(pin, GPIO_IN);
-        gpio_pull_up(pin); 
+    void addPin(int index, uint32_t pin, PinMode mode) {
+            gpio_init(pin);
+            btns[index].pin = pin;
+            btns[index].mode = mode;
+            btns[index].mask = (1u << pin);
 
-        btns[index].pin = pin;
-        btns[index].mask = (1u << pin); 
-        btns[index].mode = mode;         
-        bool physical_now = gpio_get(pin);
-        bool is_pressed = !physical_now;
-        btns[index].state.store(is_pressed, std::memory_order_relaxed);
-        btns[index].last = is_pressed;
-        btns[index].raw_prev = is_pressed;
+            if (mode == GATE_OUT) {
+                gpio_set_dir(pin, GPIO_OUT);
+                gpio_put(pin, 0);
+                btns[index].state.store(false, std::memory_order_relaxed);
+                btns[index].last = false;
+            } else {
+                gpio_set_dir(pin, GPIO_IN);
+                gpio_pull_up(pin);
+                
+                bool is_pressed = !gpio_get(pin);
+                btns[index].state.store(is_pressed, std::memory_order_relaxed);
+                btns[index].last = is_pressed;
+                btns[index].raw_prev = is_pressed;
+            }
 
-        btns[index].last_time = 0;
-        btns[index].toggle_state = false; 
-        btns[index].reset_at = 0;         
-        
-        if (index >= n_btn) n_btn = index + 1;
-    }
+            btns[index].last_time = 0;
+            btns[index].toggle_state = false;
+            btns[index].reset_at = 0;
+
+            if (index >= n_btn) n_btn = index + 1;
+        }
 
     void addKnob(int index, uint32_t pin) {
         if (index == 0) adc_init();
@@ -138,24 +147,23 @@ namespace Pico {
 
     void processPin(int i, float &outVal, bool &shouldSend) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        bool is_down = btns[i].state.load(std::memory_order_relaxed);
         bool s;
         shouldSend = false;
 
         switch (btns[i].mode) {
             case BANG:
-            if (buttonPressed(i)) {
-                outVal = 1.0f;
-                shouldSend = true;
-                btns[i].reset_at = now + 10; // bang button reset ms
-            } 
-            
-            if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                btns[i].reset_at = 0; 
-                outVal = 0.0f;
-                shouldSend = true;    
-            }
-            break;
+                if (buttonPressed(i)) {
+                    outVal = 1.0f;
+                    shouldSend = true;
+                    btns[i].reset_at = now + 10;  // reset after ms
+                } 
+                
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    btns[i].reset_at = 0; 
+                    outVal = 0.0f;
+                    shouldSend = true;    
+                }
+                break;
 
             case TOGGLE:
                 if (buttonToggled(i, s)) {
@@ -165,16 +173,18 @@ namespace Pico {
                 break;
 
             case SWITCH:
+            case GATE_IN:
                 if (buttonChanged(i, s)) {
                     outVal = s ? 1.0f : 0.0f;
                     shouldSend = true;
                 }
                 break;
 
-            case GATE_IN:
+            case GATE_OUT:
                 if (buttonChanged(i, s)) {
-                outVal = s ? 1.0f : 0.0f;
-                shouldSend = true;
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                    gpio_put(btns[i].pin, s); 
                 }
                 break;
         }
