@@ -236,7 +236,7 @@ namespace Pico {
     }
 
 
-    bool encoderChanged(int index, float &val) {
+    bool processEnc(int index, float &val) {
         int current_count = encoders[index].value.load(std::memory_order_relaxed);
         int diff = current_count - encoders[index].last_sent_count;
 
@@ -295,7 +295,7 @@ namespace Pico {
     }
 
 
-    bool knobChanged(int i, float& outVal) {
+    bool processKnob(int i, float& outVal) {
         float v = knobs[i].value.load(std::memory_order_relaxed);
         if (std::abs(v - knobs[i].last_val) > 0.005f) {
             knobs[i].last_val = v;

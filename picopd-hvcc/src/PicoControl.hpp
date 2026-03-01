@@ -73,9 +73,9 @@ namespace Pico {
     void updateLed(int index, float val); 
     void updateGate(int index, float val);
     void processPin(int i, float &outVal, bool &shouldSend);
-    bool knobChanged(int i, float& outVal);
+    bool processKnob(int i, float& outVal);
+    bool processEnc(int index, float &val);
     bool buttonChanged(int i, bool& outState);
-    bool encoderChanged(int index, float &val);
     bool buttonPressed(int i);
     bool buttonReleased(int i);
     bool buttonToggled(int i, bool& outState);
