@@ -7,19 +7,19 @@
 
 namespace Pico {
 
+    std::atomic<float> led_vals[12];
+
     Button btns[12];
     Led leds[12];
     Knob knobs[4];
     Encoder encoders[4];
-
-    std::atomic<float> led_vals[12];
 
     int n_btn = 0;
     int n_knob = 0;
     int n_led = 0;
     int n_encoder = 0; 
 
-  
+
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
         
@@ -73,12 +73,12 @@ namespace Pico {
         }
     }
    
+
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
         gpio_init(pin);
         btns[index].pin = pin;
         btns[index].mode = mode;
         btns[index].mask = (1u << pin);
-        
         btns[index].pulse_duration = duration;
 
         if (mode == GATE_OUT) {
@@ -86,6 +86,7 @@ namespace Pico {
             gpio_put(pin, 0);
             btns[index].state.store(false, std::memory_order_relaxed);
             btns[index].last = false;
+            
         } else {
             gpio_set_dir(pin, GPIO_IN);
             gpio_pull_up(pin);
@@ -103,6 +104,7 @@ namespace Pico {
         if (index >= n_btn) n_btn = index + 1;
     }
 
+
     void addKnob(int index, uint32_t pin) {
         if (index == 0) adc_init();
         adc_gpio_init(pin);
@@ -113,31 +115,34 @@ namespace Pico {
         if (index >= n_knob) n_knob = index + 1;
     }
 
+
     void addCV(int index, uint32_t pin) {
         addKnob(index, pin); 
         knobs[index].coeff = 1.0f; 
     }
 
+
     void addEncoder(int index, uint32_t pinA, uint32_t pinB) {
-    gpio_init(pinA);
-    gpio_set_dir(pinA, GPIO_IN);
-    gpio_pull_up(pinA);
+        gpio_init(pinA);
+        gpio_set_dir(pinA, GPIO_IN);
+        gpio_pull_up(pinA);
 
-    gpio_init(pinB);
-    gpio_set_dir(pinB, GPIO_IN);
-    gpio_pull_up(pinB);
+        gpio_init(pinB);
+        gpio_set_dir(pinB, GPIO_IN);
+        gpio_pull_up(pinB);
 
-    encoders[index].pinA = pinA;
-    encoders[index].pinB = pinB;
-    
-    encoders[index].last_clk = gpio_get(pinA);
-    encoders[index].last_dt  = gpio_get(pinB);
-    
-    encoders[index].value.store(0, std::memory_order_relaxed);
-    encoders[index].last_sent_count = 0;
+        encoders[index].pinA = pinA;
+        encoders[index].pinB = pinB;
+        
+        encoders[index].last_clk = gpio_get(pinA);
+        encoders[index].last_dt  = gpio_get(pinB);
+        
+        encoders[index].value.store(0, std::memory_order_relaxed);
+        encoders[index].last_sent_count = 0;
 
-    if (index >= n_encoder) n_encoder = index + 1;
-}
+        if (index >= n_encoder) n_encoder = index + 1;
+    }
+
 
     void addLed(int index, uint32_t pin) {
         gpio_set_function(pin, GPIO_FUNC_PWM);
@@ -151,10 +156,12 @@ namespace Pico {
         if (index >= n_led) n_led = index + 1;
     }
 
+
     void __not_in_flash_func(setLedHardware)(int index, float value) {
         uint16_t level = (uint16_t)(value * value * 255.0f);
         pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
     }
+
 
     void updateLed(int index, float val) {
         if (index < 12) {
@@ -163,32 +170,33 @@ namespace Pico {
         }
     }
 
+
    void updateGate(int index, float val) {
-    if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
-        int state = (val > 0.5f) ? 1 : 0;
-         
-        uint32_t duration = btns[index].pulse_duration; 
+        if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
+            int state = (val > 0.5f) ? 1 : 0;
+            
+            uint32_t duration = btns[index].pulse_duration; 
 
-        switch (state) {
-            case 1:  // Trigger
-                gpio_put(btns[index].pin, 1);
-                btns[index].state.store(true, std::memory_order_relaxed);
-                
-                if (duration > 0) {
-                    uint32_t now = to_ms_since_boot(get_absolute_time());
-                    btns[index].reset_at = now + duration;
-                }
-                break;
-
+            switch (state) {
+                case 1:  // Trigger
+                    gpio_put(btns[index].pin, 1);
+                    btns[index].state.store(true, std::memory_order_relaxed);
+                    
+                    if (duration > 0) {
+                        uint32_t now = to_ms_since_boot(get_absolute_time());
+                        btns[index].reset_at = now + duration;
+                    }
+                    
+                    break;
             case 0:    // Gate
                 if (duration == 0) {
                     gpio_put(btns[index].pin, 0);
                     btns[index].state.store(false, std::memory_order_relaxed);
                 }
                 break;
+            }
         }
     }
-}
    
 
     bool buttonPressed(int i) {
@@ -201,6 +209,7 @@ namespace Pico {
         return false;
     }
 
+
     bool buttonToggled(int i, bool& outState) {
         bool s = btns[i].state.load(std::memory_order_relaxed);
         if (s && !btns[i].last) {
@@ -209,9 +218,11 @@ namespace Pico {
             outState = btns[i].toggle_state;
             return true;
         }
+
         if (!s) btns[i].last = false;
         return false;
     }
+
 
     bool buttonChanged(int i, bool& outState) {
         bool s = btns[i].state.load(std::memory_order_relaxed);
@@ -220,20 +231,24 @@ namespace Pico {
             outState = s;
             return true;
         }
+
         return false;
     }
 
- bool encoderChanged(int index, float &val) {
-    int current_count = encoders[index].value.load(std::memory_order_relaxed);
-    int diff = current_count - encoders[index].last_sent_count;
 
-    if (abs(diff) >= 1) {
-        val = (diff > 0) ? 1.0f : -1.0f;
-        encoders[index].last_sent_count = current_count;
-        return true;
+    bool encoderChanged(int index, float &val) {
+        int current_count = encoders[index].value.load(std::memory_order_relaxed);
+        int diff = current_count - encoders[index].last_sent_count;
+
+        if (abs(diff) >= 1) {
+            val = (diff > 0) ? 1.0f : -1.0f;
+            encoders[index].last_sent_count = current_count;
+            return true;
+        }
+        return false;
     }
-    return false;
-}
+
+
     void processPin(int i, float &outVal, bool &shouldSend) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
         bool s;
@@ -278,6 +293,7 @@ namespace Pico {
                 break;
         }
     }
+
 
     bool knobChanged(int i, float& outVal) {
         float v = knobs[i].value.load(std::memory_order_relaxed);
