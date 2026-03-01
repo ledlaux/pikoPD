@@ -17,7 +17,7 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - sample rate
     - led pins
     - adc pins (knob, cv_in)
-    - gate in/out pins
+    - gate in/out pins (gate or trigger mode)
     - button pins and type (bang, toggle, switch)
       
 - Copies extra C files for the build into project folder from `/src`
