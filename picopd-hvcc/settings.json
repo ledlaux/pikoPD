@@ -18,8 +18,8 @@
 
   "buttons": [
     { "name": "btn1", "pin": 12, "mode": "switch" },
-    { "name": "btn2", "pin": 13, "mode": "switch" },
-    { "name": "btn3", "pin": 14, "mode": "switch" }
+    { "name": "btn2", "pin": 13, "mode": "toggle" },
+    { "name": "btn3", "pin": 14, "mode": "bang" }
   ],
 
   "leds": [
