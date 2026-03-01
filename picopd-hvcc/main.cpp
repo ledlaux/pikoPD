@@ -40,24 +40,36 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
+{% set receives = {} %}
+{%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}{%- endfor -%}
 
-{% set active_btns = [] %}
-{%- for b in settings.buttons -%}
-    {%- for r in hv_manifest.receives if r.name == b.name -%}
-        {%- set _ = active_btns.append({'hash': r.hash, 'pin': b.pin, 'mode': b.mode}) -%}
-    {%- endfor -%}
+{%- set sends = {} -%}
+{%- for s in hv_manifest.sends -%}{%- set _ = sends.update({s.name: s.hash}) -%}{%- endfor -%}
+
+{%- set active_btns = [] -%}
+{%- for b in settings.buttons if b.name in receives -%}
+    {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': receives[b.name]}) -%}
 {%- endfor -%}
-{% set active_knobs = [] -%}
-{%- for k in settings.adc_pins -%}
-    {%- for r in hv_manifest.receives if r.name == k.name -%}
-        {%- set _ = active_knobs.append({'hash': r.hash, 'pin': k.pin}) -%}
-    {%- endfor -%}
+
+{%- set active_gates = [] -%}
+{%- for g in settings.gate_in if g.name in receives -%}
+    {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': receives[g.name]}) -%}
 {%- endfor -%}
-{% set active_leds = [] -%}
-{%- for l in settings.leds -%}
-    {%- for s in hv_manifest.sends if s.name == l.name -%}
-        {%- set _ = active_leds.append({'hash': s.hash, 'pin': l.pin}) -%}
-    {%- endfor -%}
+
+{%- set active_gate_outs = [] -%}
+{%- for go in settings.gate_out if go.name in sends -%}
+    {%- set dur = 15 if go.mode == "trigger" else 0 -%}
+    {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': sends[go.name], 'duration': dur}) -%}
+{%- endfor -%}
+
+{%- set active_knobs = [] -%}
+{%- for k in settings.adc_pins if k.name in receives -%}
+    {%- set _ = active_knobs.append({'hash': receives[k.name], 'pin': k.pin, 'type': k.type}) -%}
+{%- endfor -%}
+
+{%- set active_leds = [] -%}
+{%- for l in settings.leds if l.name in sends -%}
+    {%- set _ = active_leds.append({'hash': sends[l.name], 'pin': l.pin}) -%}
 {%- endfor -%}
 
 Heavy_{{ name }} pd_prog(SAMPLE_RATE);
@@ -178,6 +190,12 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             return;
         {% endfor %}
 
+        {% for gate_out in active_gate_outs %}
+        case {{ gate_out.hash }}: 
+            Pico::updateGate({{ active_btns|length + active_gates|length + loop.index0 }}, val);
+            return;
+        {% endfor %}
+
         default:
             heavyMidiOutHook(vc, name, hash, m);
             break;
@@ -236,48 +254,74 @@ int main() {
     tusb_init(); 
     cdc_stdio_lib_init();
 
-    multicore_launch_core1(core1_audio_entry);
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
-    {% for btn in active_btns -%}
-    Pico::addBtn({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
+    {% for btn in active_btns %}
+    Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
     {% endfor %}
-    {% for led in active_leds -%}
+
+    {% for gate in active_gates %}
+    Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, Pico::GATE_IN);
+    {% endfor %}
+
+    {% for gate_out in active_gate_outs %}
+    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, Pico::GATE_OUT, {{ gate_out.duration }});
+    {% endfor %}
+
+    {% for knob in active_knobs %}
+        {% if knob.type == 'cv_in' %}
+    Pico::addCV({{ loop.index0 }}, {{ knob.pin }});
+        {% else %}
+    Pico::addKnob({{ loop.index0 }}, {{ knob.pin }});
+        {% endif %}
+    {% endfor %}
+
+    {% for led in active_leds %}
     Pico::addLed({{ loop.index0 }}, {{ led.pin }});
     {% endfor %}
-    {% for knob in active_knobs -%}
-    Pico::addKnob({{ loop.index0 }}, {{ knob.pin }});
-    {% endfor %}
+
+    multicore_launch_core1(core1_audio_entry);
+
 
     uint32_t last_hw_tick = 0;
     uint32_t last_print_time = 0;
 
     while (true) {
         tud_task(); 
-        midi_task();
+        midi_task(); 
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         if (now != last_hw_tick) {
-    last_hw_tick = now;
-    Pico::update();
+            last_hw_tick = now;
+            Pico::update(now); 
 
-    float val; bool send;
-    float v;
+            float val; 
+            bool send;
+            float v;
 
-    {% for btn in active_btns %}
-    Pico::processButton({{ loop.index0 }}, val, send);
-    if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
-    {% endfor %}
+            {% for btn in active_btns %}
+            Pico::processPin({{ loop.index0 }}, val, send); 
+            if (send) { 
+                hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
+            }
+            {% endfor %}
 
-    {% for knob in active_knobs %}
-    if (Pico::knobChanged({{ loop.index0 }}, v)) {
-        hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
-    }
-    {% endfor %}
-}
+            {% for gate in active_gates %}
+            Pico::processPin({{ active_btns|length + loop.index0 }}, val, send);
+            if (send) {
+                hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
+            }
+            {% endfor %}
+
+            {% for knob in active_knobs -%}
+            if (Pico::knobChanged({{ loop.index0 }}, v)) {
+                hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
+            }
+            {% endfor %}
+        }
     } 
-    return 0; 
+    return 0;
 }

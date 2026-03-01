@@ -22,8 +22,9 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - voice count 
     - sample rate
     - led pins
-    - adc pins
-    - button pins and type (bang, toggle, switch)
+    - adc pins (knob, cv_in)
+    - gate in/out pins (gate or trigger mode)
+    - button pins and type (bang, toggle, switch)  
       
 - Copies extra C files for the build into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -32,16 +33,17 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 ## Updates
 
+- [x] serial console 
 - [x] led
 - [x] usb midi
-- [x] serial console 
 - [x] button
 - [x] adc
+- [x] cv in
+- [x] gate in
+- [x] gate out
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
-- [ ] cv in
-- [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
 - [ ] screen
@@ -95,6 +97,7 @@ optional arguments:
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
+
 
 
 

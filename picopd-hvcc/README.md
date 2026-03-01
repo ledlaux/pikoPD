@@ -16,7 +16,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
     - voice count 
     - sample rate
     - led pins
-    - adc pins
+    - adc pins (knob, cv_in)
+    - gate in/out pins (gate or trigger mode)
     - button pins and type (bang, toggle, switch)
       
 - Copies extra C files for the build into project folder from `/src`
@@ -26,16 +27,17 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 
 ## Updates
 
+- [x] serial console 
 - [x] led
 - [x] usb midi
-- [x] serial console 
 - [x] button
 - [x] adc
+- [x] cv in
+- [x] gate in
+- [x] gate out
 - [ ] encoder
 - [ ] joystic
 - [ ] sensors
-- [ ] cv in
-- [ ] gate in
 - [ ] midi clock
 - [ ] uart midi
 - [ ] screen
