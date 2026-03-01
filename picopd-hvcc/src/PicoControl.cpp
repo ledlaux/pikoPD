@@ -23,7 +23,7 @@ namespace Pico {
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
         
-        // --- 1. Buttons ---
+        // --- Buttons ---
         for (int i = 0; i < n_btn; i++) {
             if (btns[i].mode == GATE_OUT) {
                 if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
@@ -41,19 +41,18 @@ namespace Pico {
                 if (r != btns[i].raw_prev) {
                     btns[i].last_time = now;
                     btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {
+                } else if ((now - btns[i].last_time) > 20) {  // debounce 20 ms
                     btns[i].state.store(r, std::memory_order_relaxed);
                 }
             }
         }
 
-        // --- 2. Encoders (High Priority) ---
+        // --- Encoders ---
         for (int i = 0; i < n_encoder; i++) {
             bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
             bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
 
             if (clk != encoders[i].last_clk) {
-                // Trigger only on Rising Edge to prevent double-values
                 if (clk) { 
                     if (clk != dt) {
                         encoders[i].value.fetch_add(1, std::memory_order_relaxed);
@@ -65,12 +64,12 @@ namespace Pico {
             }
         }
 
-        // --- 3. Knobs ---
+        // --- Knobs ---
         for (int i = 0; i < n_knob; i++) {
             adc_select_input(knobs[i].adc_ch);
             float raw = (float)adc_read() / 4095.0f;
             float prev = knobs[i].value.load(std::memory_order_relaxed);
-            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed); 
+            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
         }
     }
    
@@ -120,7 +119,6 @@ namespace Pico {
     }
 
     void addEncoder(int index, uint32_t pinA, uint32_t pinB) {
-    // 1. Hardware Initialization
     gpio_init(pinA);
     gpio_set_dir(pinA, GPIO_IN);
     gpio_pull_up(pinA);
@@ -129,20 +127,15 @@ namespace Pico {
     gpio_set_dir(pinB, GPIO_IN);
     gpio_pull_up(pinB);
 
-    // 2. Store Pins
     encoders[index].pinA = pinA;
     encoders[index].pinB = pinB;
     
-    // 3. Capture Initial States (The "Idea" from the library)
-    // We store the current physical state so the first 'diff' isn't a lie
     encoders[index].last_clk = gpio_get(pinA);
     encoders[index].last_dt  = gpio_get(pinB);
     
-    // 4. Reset Counters
     encoders[index].value.store(0, std::memory_order_relaxed);
     encoders[index].last_sent_count = 0;
 
-    // 5. Update Global Encoder Count
     if (index >= n_encoder) n_encoder = index + 1;
 }
 
@@ -234,12 +227,8 @@ namespace Pico {
     int current_count = encoders[index].value.load(std::memory_order_relaxed);
     int diff = current_count - encoders[index].last_sent_count;
 
-    // Use 1 if your update() loop only triggers on the Rising Edge.
-    // Use 2 if your update() loop triggers on both edges of the CLK pin.
     if (abs(diff) >= 1) {
         val = (diff > 0) ? 1.0f : -1.0f;
-        
-        // Update tracker to match the threshold
         encoders[index].last_sent_count = current_count;
         return true;
     }
