@@ -76,6 +76,13 @@ namespace Pico {
         pwm_set_chan_level(leds[index].slice, leds[index].chan, (uint16_t)(value * 255.0f));
     }
 
+    void updateLed(int index, float val) {
+        if (index < 16) { // or use your n_led variable
+            led_vals[index].store(val);
+            setLedHardware(index, val);
+        }
+    }
+
 
     bool buttonChanged(int i, bool& outState) {
         bool s = btns[i].state.load();
@@ -134,7 +141,7 @@ void processButton(int i, float &outVal, bool &shouldSend) {
             } else if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
                 btns[i].reset_at = 0;
                 outVal = 0.0f;
-                shouldSend = false;   // If true it will trigger second time after reset 
+                shouldSend = false;
             }
             break;
 
