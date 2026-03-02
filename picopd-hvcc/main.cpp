@@ -216,7 +216,6 @@ int main() {
     tusb_init(); 
     cdc_stdio_lib_init();
 
-
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
