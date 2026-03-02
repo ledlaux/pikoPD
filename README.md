@@ -34,9 +34,18 @@ This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pic
 
 ## Default patch
 
-The PD patch in the folder is a simple synthesizer that uses the [notein] object and USB MIDI input.   
-Sending CC1 to the device on MIDI channel 1 will turn on the LED (check the pins in setup.json).   
-The [print] object sends values to the serial console (use the -s flag to enable the terminal console after flashing). 
+The Pure Data patch in the folder is a simple synthesizer that uses the [notein] object and USB MIDI input.   
+Sending CC1 to the device on MIDI channel 1 will turn on the LED (check the pins in setup.json). 
+
+There are two [print] objects that send normalized values (0.0–1.0) from PD to the serial console:
+
+**MIDI CC Input**  
+Receives MIDI CC1 and prints value
+
+**ADC Knob Input (GPIO26)**  
+Reads analog knob using a receiver object and prints its value
+
+Use the -s flag to enable loading of serial console in the terminal after flashing.
 
 It has been tested on macOS, so if something does not work as expected on your system, please open a GitHub issue.
 
@@ -109,6 +118,10 @@ optional arguments:
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
+
+
+
+
 
 
 
