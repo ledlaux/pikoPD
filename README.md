@@ -6,7 +6,7 @@ This repository contains examples of running **PD patches exported with the HVCC
 
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding ahead. You can support the project:  
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding ahead. You can support this project:  
 [![Buy Me a coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ledlaux)  
 
 
