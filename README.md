@@ -59,7 +59,9 @@ PD patch in the folder is a simple synthesizer which uses [notein] object and us
 1. HVCC supported vanilla pd objects should work.
 2. Added heavylib object support (hv.osc, hv.lfo and other).
 3. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.
-4. PD patch send and receive object names must corespond to the category and name set in the settings.json.  
+4. PD patch send and receive object names must corespond to the category and name set in the settings.json.
+5. If you change board type in settings.json remove project folder or rename it in the command to rebuild files.
+
 
 ### Sample loading
 
