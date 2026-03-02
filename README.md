@@ -26,14 +26,21 @@ This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pic
     - gate in/out pins (gate or trigger mode)
     - button pins and type (bang, toggle, switch)
       
-- Copies extra C files for the build into project folder from `/src`
+- Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
 - Check for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
-PD patch in the folder is a simple synthesizer which uses [notein] object and usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. [print] object sends values to serial console. 
 
-## Updates
+## Default patch
+
+The PD patch in the folder is a simple synthesizer that uses the [notein] object and USB MIDI input.   
+Sending CC1 to the device on MIDI channel 1 will turn on the LED (check the pins in setup.json).   
+The [print] object sends values to the serial console (use the -s flag to enable the terminal console after flashing). 
+
+It has been tested on macOS, so if something does not work as expected on your system, please open a GitHub issue.
+
+## Project Updates
 
 - [x] serial console 
 - [x] led
