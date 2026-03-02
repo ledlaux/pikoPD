@@ -11,7 +11,6 @@
 
 namespace Pico {
 
-
     std::atomic<float> led_vals[12];
 
     Button btns[12];
@@ -23,61 +22,6 @@ namespace Pico {
     int n_knob = 0;
     int n_led = 0;
     int n_encoder = 0; 
-
-
-    void update(uint32_t now) {
-        uint32_t all_pins = gpio_get_all(); 
-        
-        // --- Buttons ---
-        for (int i = 0; i < n_btn; i++) {
-            if (btns[i].mode == GATE_OUT) {
-                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                    gpio_put(btns[i].pin, 0);
-                    btns[i].state.store(false, std::memory_order_relaxed);
-                    btns[i].reset_at = 0; 
-                }
-                continue; 
-            }
-
-            bool r = (all_pins & btns[i].mask) == 0;
-            if (btns[i].mode == GATE_IN) {
-                btns[i].state.store(r, std::memory_order_relaxed);
-            } else {
-                if (r != btns[i].raw_prev) {
-                    btns[i].last_time = now;
-                    btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {  // debounce 20 ms
-                    btns[i].state.store(r, std::memory_order_relaxed);
-                }
-            }
-        }
-
-        // --- Encoders ---
-        for (int i = 0; i < n_encoder; i++) {
-            bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
-            bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
-
-            if (clk != encoders[i].last_clk) {
-                if (clk) { 
-                    if (clk != dt) {
-                        encoders[i].value.fetch_add(1, std::memory_order_relaxed);
-                    } else {
-                        encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
-                    }
-                }
-                encoders[i].last_clk = clk;
-            }
-        }
-
-        // --- Knobs ---
-        for (int i = 0; i < n_knob; i++) {
-            adc_select_input(knobs[i].adc_ch);
-            float raw = (float)adc_read() / 4095.0f;
-            float prev = knobs[i].value.load(std::memory_order_relaxed);
-            knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
-        }
-    }
-   
 
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
         gpio_init(pin);
@@ -160,6 +104,60 @@ namespace Pico {
         leds[index].chan = chan;
         if (index >= n_led) n_led = index + 1;
     }
+
+
+     void update(uint32_t now) {
+            uint32_t all_pins = gpio_get_all(); 
+            
+            // --- Buttons ---
+            for (int i = 0; i < n_btn; i++) {
+                if (btns[i].mode == GATE_OUT) {
+                    if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                        gpio_put(btns[i].pin, 0);
+                        btns[i].state.store(false, std::memory_order_relaxed);
+                        btns[i].reset_at = 0; 
+                    }
+                    continue; 
+                }
+    
+                bool r = (all_pins & btns[i].mask) == 0;
+                if (btns[i].mode == GATE_IN) {
+                    btns[i].state.store(r, std::memory_order_relaxed);
+                } else {
+                    if (r != btns[i].raw_prev) {
+                        btns[i].last_time = now;
+                        btns[i].raw_prev = r;
+                    } else if ((now - btns[i].last_time) > 20) {  // debounce 20 ms
+                        btns[i].state.store(r, std::memory_order_relaxed);
+                    }
+                }
+            }
+    
+            // --- Encoders ---
+            for (int i = 0; i < n_encoder; i++) {
+                bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
+                bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
+    
+                if (clk != encoders[i].last_clk) {
+                    if (clk) { 
+                        if (clk != dt) {
+                            encoders[i].value.fetch_add(1, std::memory_order_relaxed);
+                        } else {
+                            encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
+                        }
+                    }
+                    encoders[i].last_clk = clk;
+                }
+            }
+    
+            // --- Knobs ---
+            for (int i = 0; i < n_knob; i++) {
+                adc_select_input(knobs[i].adc_ch);
+                float raw = (float)adc_read() / 4095.0f;
+                float prev = knobs[i].value.load(std::memory_order_relaxed);
+                knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
+            }
+        }
 
 
     void __not_in_flash_func(setLedHardware)(int index, float value) {
