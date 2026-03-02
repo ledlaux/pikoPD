@@ -1,6 +1,6 @@
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept** and there is a significant amount of development ahead. You can support the project:  
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding ahead. You can support the project:  
 [![Buy Me a coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ledlaux)  
 
 
@@ -94,7 +94,5 @@ optional arguments:
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
-
-
 
 
