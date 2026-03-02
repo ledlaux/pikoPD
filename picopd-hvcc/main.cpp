@@ -305,7 +305,7 @@ int main() {
             {% endfor %}
 
             {% for knob in active_knobs -%}
-            if (Pico::knobChanged({{ loop.index0 }}, v)) {
+            if (Pico::processKnob({{ loop.index0 }}, v)) {
                 hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
             }
             {% endfor %}
