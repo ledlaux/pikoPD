@@ -8,9 +8,11 @@
 #X obj 49 29 ctlin 1 1;
 #X obj 49 94 print value;
 #X obj 171 8 r btn1 @hv_param 0 1;
-#X obj 338 29 r btn2 @hv_param 0 1;
-#X obj 171 54 s led1 @hv_param 0 1;
-#X obj 338 54 s led2 @hv_param 0 1;
+#X obj 330 8 r btn2 @hv_param 0 1;
+#X obj 171 36 s led1 @hv_param 0 1;
+#X obj 330 33 s led2 @hv_param 0 1;
+#X obj 488 8 r knob @hv.param 0 1;
+#X obj 488 36 print adc_gpio26;
 #X connect 0 0 4 0;
 #X connect 2 0 3 0;
 #X connect 3 0 0 0;
@@ -21,3 +23,4 @@
 #X connect 6 0 5 0;
 #X connect 8 0 10 0;
 #X connect 9 0 11 0;
+#X connect 12 0 13 0;
