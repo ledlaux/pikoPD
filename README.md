@@ -78,11 +78,12 @@ _float table -> const float table_
 
 ## Requirements
 
-- Python 3.10+  
+- Python 3.10+
+  - jinja2
 - [hvcc](https://github.com/enzienaudio/hvcc)  
-- Raspberry Pi Pico SDK
-- pico-extras library (put inside pico-sdk folder)
-- Wasted-Audio/heavylib 
+- [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
+- [pico-extras](https://github.com/raspberrypi/pico-extras) (put inside pico-sdk folder)
+- [Wasted-Audio/heavylib](https://github.com/Wasted-Audio/heavylib) 
 - [picotool](https://github.com/raspberrypi/picotool)  
 
 ## Usage
