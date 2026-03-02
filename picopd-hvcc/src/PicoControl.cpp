@@ -1,11 +1,16 @@
-#include "PicoControl.hpp"
+#include "PicoControl.h"
+#include "hardware/dma.h"
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
 #include "hardware/gpio.h"
+#include "pico/audio_i2s.h"
+#include "pico/multicore.h"
+#include "pico/audio_pwm.h"
 #include "pico/time.h"
 #include <cmath>
 
 namespace Pico {
+
 
     std::atomic<float> led_vals[12];
 
@@ -305,5 +310,122 @@ namespace Pico {
         return false;
     }
 
+
+    static AudioMode _mode;
+    static AudioProcessCallback _cb;
+    static int _srate, _bpin, _dpin, _bsize; 
+
+    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
+                    int sample_rate, uint data_pin, uint bclk_pin, int buffer_size) {
+        _mode = mode;
+        _cb = callback;
+        _srate = sample_rate;
+        _dpin = data_pin;
+        _bpin = bclk_pin;
+        _bsize = buffer_size;
+    }
+
+    void __not_in_flash_func(core1_audio_entry)() {
+    audio_format_t audio_format = {
+        .sample_freq   = (uint32_t)_srate,
+        .format        = AUDIO_BUFFER_FORMAT_PCM_S16,
+        .channel_count = (uint16_t)((_mode == I2S) ? 2 : 1)  // I2S stereo, PWM mono
+    };
+
+    audio_buffer_format_t producer_format = {
+        .format        = &audio_format,
+        .sample_stride = (uint16_t)(audio_format.channel_count * sizeof(int16_t))
+    };
+
+    float* heavy_buffer = new float[_bsize * audio_format.channel_count];
+    assert(heavy_buffer);
+
+    if (_mode == I2S) {
+        struct audio_i2s_config i2s_config = {
+            .data_pin       = (uint8_t)_dpin,
+            .clock_pin_base = (uint8_t)_bpin,
+            .dma_channel    = 0,
+            .pio_sm         = 0
+        };
+
+        struct audio_buffer_pool* ap = audio_new_producer_pool(&producer_format, 3, _bsize);
+        audio_i2s_setup(&audio_format, &i2s_config);
+        audio_i2s_connect(ap);
+        audio_i2s_set_enabled(true);
+
+        while (true) {
+            struct audio_buffer* buffer = take_audio_buffer(ap, true);
+            if (!buffer) continue;
+
+            if (_cb) {
+                int frames = buffer->max_sample_count;
+                _cb(heavy_buffer, frames);
+
+                int16_t* out = (int16_t*)buffer->buffer->bytes;
+                for (int i = 0; i < frames * 2; i++) {
+                    float v = heavy_buffer[i];
+                    if (v > 1.f) v = 1.f;
+                    if (v < -1.f) v = -1.f;
+                    out[i] = (int16_t)(v * 32767.f);
+                }
+            }
+
+            buffer->sample_count = buffer->max_sample_count;
+            give_audio_buffer(ap, buffer);
+        }
+    } 
+
+    else {
+
+        const uint pwm_pin = _dpin;
+        gpio_set_function(pwm_pin, GPIO_FUNC_PWM);
+        uint slice   = pwm_gpio_to_slice_num(pwm_pin);
+        uint channel = pwm_gpio_to_channel(pwm_pin);
+
+        const uint16_t wrap = 255;  
+        pwm_set_wrap(slice, wrap);
+        pwm_set_clkdiv(slice, 1.0f);
+        pwm_set_enabled(slice, true);
+
+        uint16_t* pwm_buffer = new uint16_t[_bsize];
+        assert(pwm_buffer);
+
+        int dma_chan = dma_claim_unused_channel(true);
+        dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
+        channel_config_set_transfer_data_size(&cfg, DMA_SIZE_16);
+        channel_config_set_read_increment(&cfg, true);
+        channel_config_set_write_increment(&cfg, false);
+
+        volatile uint16_t* pwm_cc_ptr = ((volatile uint16_t*)&pwm_hw->slice[slice].cc) + channel;
+
+        dma_channel_configure(
+        dma_chan,          
+        &cfg,              
+        pwm_cc_ptr,        
+        pwm_buffer,        
+        _bsize,           
+        true              
+    );
+
+        while (true) {
+            if (_cb) {
+                _cb(heavy_buffer, _bsize);
+
+                for (int i = 0; i < _bsize; i++) {
+                    float v = heavy_buffer[i];
+                    if (v > 1.f) v = 1.f;
+                    if (v < -1.f) v = -1.f;
+                    pwm_buffer[i] = (uint16_t)((v * 0.5f + 0.5f) * wrap);
+                }
+
+                dma_channel_set_read_addr(dma_chan, pwm_buffer, true);
+
+                while (dma_channel_is_busy(dma_chan)) {
+                tight_loop_contents();  
+               }
+            }
+        }
+    }       
+}
 
 }
