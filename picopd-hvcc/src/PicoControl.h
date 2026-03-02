@@ -7,18 +7,6 @@
 
 namespace Pico {
 
-
-   void __not_in_flash_func(core1_audio_entry)();
- 
-
-    enum AudioMode { I2S, PWM };
-    typedef void (*AudioProcessCallback)(float* buffer, int frames);
-
-    // Add these parameters to the setup
-    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
-                    int sample_rate, uint data_pin, uint bclk_pin, int buffer_size);
-    
-
     enum PinMode {
         BANG   = 0,
         SWITCH = 1,  
@@ -92,6 +80,15 @@ namespace Pico {
     bool buttonReleased(int i);
     bool buttonToggled(int i, bool& outState);
     void __not_in_flash_func(setLedHardware)(int index, float value);
+
+   void __not_in_flash_func(core1_audio_entry)();
+ 
+    enum AudioMode { I2S, PWM };
+    typedef void (*AudioProcessCallback)(float* buffer, int frames);
+
+    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
+                    int sample_rate, uint data_pin, uint bclk_pin, int buffer_size);
+    
 
 }
 
