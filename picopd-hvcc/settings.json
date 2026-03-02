@@ -2,13 +2,15 @@
   "name": "heavy",
   "pico_board": "pico2",
   "core_freq": "200000",
-  "i2s_data_pin": 9,
-  "i2s_bclk_pin": 10,
-  "sample_rate": 32000,
+  "audio_mode": "I2S",
+  "sample_rate": 48000,
   "max_voices": 3,
   "channel": 2,
-  "buffer_size": 64,
-  
+  "buffer_size": 32,
+  "i2s_data_pin": 9,
+  "i2s_bclk_pin": 10,
+  "pwm_pin_l": 2,
+  "pwm_pin_r": 3,
   "adc_pins": [
     { "name": "knob", "pin": 26, "type": "knob" },
     { "name": "pot", "pin": 27, "type": "knob" },
@@ -32,11 +34,11 @@
   ],
 
   "gate_out": [
-  { "name": "kick", "pin": 3, "mode": "trigger" },
-  { "name": "vca", "pin": 2, "mode": "gate" }
-],
-"encoders": [
-  { "name": "enc", "pin_a": 0, "pin_b": 1 }
-]
-  
+    { "name": "kick", "pin": 3, "mode": "trigger" },
+    { "name": "vca", "pin": 2, "mode": "gate" }
+  ],
+
+  "encoders": [
+    { "name": "enc", "pin_a": 4, "pin_b": 5 }
+  ]
 }
