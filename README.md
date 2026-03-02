@@ -1,9 +1,3 @@
-# PD examples for Raspberry Pi PICO  
-
-This repository contains examples of running **PD patches exported with the HVCC compiler from Plugdata** on Raspberry Pi Pico (RP2040, RP2350) boards using the Arduino IDE.
-
----
-
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
 This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding and testing ahead. You can support this project:  
@@ -118,9 +112,6 @@ optional arguments:
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 - Tutorial of how to load samples into the pd patch for the HVCC compiler  
   https://www.youtube.com/watch?v=0qgkYWsYdTo
-
-
-
 
 
 
