@@ -43,6 +43,7 @@ target_include_directories(heavy.elf PRIVATE
 target_link_libraries(heavy.elf
     pico_stdlib
     pico_audio_i2s
+    pico_audio_pwm
     tinyusb_device
     tinyusb_board
     hardware_clocks
