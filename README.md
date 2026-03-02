@@ -4,11 +4,13 @@ This repository contains examples of running **PD patches exported with the HVCC
 
 ---
 
-# PD → HVCC → Raspberry Pi Pico UF2 Generator (Proof of concept)
+# PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project will automate building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. 
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**.   
+It is currently a Proof of Concept. While the core logic is being established, there is a significant amount of development ahead.    
+If you find this concept promising, please consider joining the development or supporting the project:  
+[![Buy Me a coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/ledlaux)  
 
-Project is in very early stages. Patch in the folder is a simple synthesizer which uses [notein] object and usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. [print] object sends values to serial console. 
 
 ## Features
 
@@ -31,6 +33,8 @@ Project is in very early stages. Patch in the folder is a simple synthesizer whi
 - Builds firmware using **CMake** in a `build/` folder  
 - Check for device in BOOTSEL mode
 - Flashes UF2 firmware to Pico2 board and restarts device
+
+PD patch in the folder is a simple synthesizer which uses [notein] object and usb midi input. Send CC1 to device midi chanel 1 and it will turn on builtin LED. [print] object sends values to serial console. 
 
 ## Updates
 
