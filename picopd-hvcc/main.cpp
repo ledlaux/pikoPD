@@ -5,13 +5,8 @@
 #include "pico/audio_i2s.h"
 #include "pico/multicore.h"
 #include "cdc_stdio_lib.h"
-#include "PicoControl.hpp"
+#include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
-
-#define SAMPLE_RATE {{ settings.sample_rate }}
-#define I2S_DATA_PIN {{ settings.i2s_data_pin }}
-#define I2S_BCLK_PIN {{ settings.i2s_bclk_pin }}
-#define I2S_BUFFER   {{ settings.buffer_size }}
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
@@ -77,8 +72,7 @@
     {%- set _ = active_encoders.append({'a': e.pin_a, 'b': e.pin_b, 'hash': receives[e.name]}) -%}
 {%- endfor -%}
 
-Heavy_{{ name }} pd_prog(SAMPLE_RATE);
-
+Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     
@@ -208,48 +202,8 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 }
 
 
-void __not_in_flash_func(core1_audio_entry)() {
-    
-    static audio_format_t audio_format = {
-        .sample_freq = SAMPLE_RATE,
-        .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .channel_count = 2
-    };
-    
-    static audio_buffer_format_t producer_format = {
-        .format = &audio_format,
-        .sample_stride = 4 
-    };
-
-    static float heavy_buffer[I2S_BUFFER * 2]; 
-
-    struct audio_buffer_pool *ap = audio_new_producer_pool(&producer_format, 3, I2S_BUFFER);
-    
-    struct audio_i2s_config config = {
-        .data_pin = I2S_DATA_PIN,
-        .clock_pin_base = I2S_BCLK_PIN,
-        .dma_channel = 0,
-        .pio_sm = 0
-    };
-    
-    audio_i2s_setup(&audio_format, &config);
-    audio_i2s_connect(ap);
-    audio_i2s_set_enabled(true);
-
-    while (true) {
-        struct audio_buffer *buffer = take_audio_buffer(ap, true); 
-        if (buffer) {
-            pd_prog.processInlineInterleaved(heavy_buffer, heavy_buffer, buffer->max_sample_count);
-            
-            int16_t *smp = (int16_t *)buffer->buffer->bytes;
-            for (int i = 0; i < buffer->max_sample_count * 2; i++) {
-                smp[i] = (int16_t)(heavy_buffer[i] * 32767.0f);
-            }
-            
-            buffer->sample_count = buffer->max_sample_count;
-            give_audio_buffer(ap, buffer);
-        }
-    }
+void audioFunc(float* buffer, int frames) {
+    pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
 
 
@@ -291,7 +245,29 @@ int main() {
     Pico::addEncoder({{ loop.index0 }}, {{ enc.a }}, {{ enc.b }});
     {% endfor %}
 
-    multicore_launch_core1(core1_audio_entry);
+   {% if settings.audio_mode == "I2S" %}
+    // --- I2S Configuration ---
+    Pico::setupAudio(
+        Pico::I2S, 
+        audioFunc, 
+        {{ settings.sample_rate }}, 
+        {{ settings.i2s_data_pin }}, 
+        {{ settings.i2s_bclk_pin }}, 
+        {{ settings.buffer_size }}
+    );
+    {% else %}
+    // --- PWM Configuration ---
+    Pico::setupAudio(
+        Pico::PWM, 
+        audioFunc, 
+        {{ settings.sample_rate }}, 
+        {{ settings.pwm_pin_l }}, 
+        {{ settings.pwm_pin_r }}, 
+        {{ settings.buffer_size }}
+    );
+    {% endif %}
+
+    multicore_launch_core1(Pico::core1_audio_entry);
 
 
     uint32_t last_hw_tick = 0;
