@@ -19,7 +19,6 @@ This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pic
     - board (pico, pico_w, pico2)
     - core frequency
     - i2s pins
-    - voice count 
     - sample rate
     - led pins
     - adc pins (knob, cv_in)
