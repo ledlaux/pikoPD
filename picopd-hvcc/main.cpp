@@ -36,10 +36,12 @@
 #define MIDI_RT_RESET           0xFF
 
 {% set receives = {} %}
-{%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}{%- endfor -%}
+{%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
+{%- endfor -%}
 
 {%- set sends = {} -%}
-{%- for s in hv_manifest.sends -%}{%- set _ = sends.update({s.name: s.hash}) -%}{%- endfor -%}
+{%- for s in hv_manifest.sends -%}{%- set _ = sends.update({s.name: s.hash}) -%}
+{%- endfor -%}
 
 {%- set active_btns = [] -%}
 {%- for b in settings.buttons if b.name in receives -%}
@@ -73,6 +75,7 @@
 {%- endfor -%}
 
 Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
+
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     
@@ -256,6 +259,7 @@ int main() {
         {{ settings.buffer_size }}
     );
     {% else %}
+
     // --- PWM Configuration ---
     Pico::setupAudio(
         Pico::PWM, 
@@ -268,7 +272,6 @@ int main() {
     {% endif %}
 
     multicore_launch_core1(Pico::core1_audio_entry);
-
 
     uint32_t last_hw_tick = 0;
     uint32_t last_print_time = 0;
