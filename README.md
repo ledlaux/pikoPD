@@ -71,13 +71,16 @@ It has been tested on macOS, so if something does not work as expected on your s
 4. PD patch send and receive object names must corespond to the category and name set in the settings.json.
 5. If you change board type in settings.json remove project folder or rename it in the command to rebuild files.
 
-
 ### Sample loading
 
 After some tests sample array loading works with arduino and pico-sdk for pico boards. Pico stores float values into the ram, 
 to overcome limitation and load data to the flash we need to manually set tables to const in Heavy_patchname.cpp:
 
 _float table -> const float table_
+
+### What doesnt't work ###
+- Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
+- I have not yet managed to make any pd delay or reverb to work on this hardware.
 
 ## Requirements
 
