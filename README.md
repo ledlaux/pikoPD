@@ -78,7 +78,7 @@ to overcome limitation and load data to the flash we need to manually set tables
 
 _float table -> const float table_
 
-### What doesnt't work ###
+### What doesn't work ###
 - Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
 - I have not yet managed to make any pd delay or reverb to work on this hardware.
 
@@ -86,6 +86,7 @@ _float table -> const float table_
 
 - Python 3.10+
   - jinja2
+- arm-none-eabi toolchain
 - [hvcc](https://github.com/enzienaudio/hvcc)  
 - [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
 - [pico-extras](https://github.com/raspberrypi/pico-extras) (put inside pico-sdk folder)
