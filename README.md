@@ -78,7 +78,6 @@ _float table -> const float table_
 
 ### What doesn't work ###
 - Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
-- I have not yet managed to make any pd delay or reverb to work on this hardware.
 
 ## Requirements
 
