@@ -23,24 +23,32 @@ This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pic
 - Check for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
+  
+## Default Patch
 
-## Default patch
+This Pure Data patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
 
-The Pure Data patch in the folder is a simple synthesizer that uses the [notein] object and USB MIDI input.   
-Sending CC1 to the device on MIDI channel 1 will turn on the LED (check the pins in setup.json). 
+### LED Control
+- Sending MIDI CC1 on channel 1 controls LED brightness.  
 
-There are two [print] objects that send normalized values (0.0–1.0) from PD to the serial console:
+### Serial Output
+The patch includes three `[print]` objects that send normalized values (`0.0–1.0`) from PD to the serial console:
 
-**MIDI CC Input**  
-Receives MIDI CC1 and prints value
+1. MIDI CC Input – Receives MIDI CC1 and prints the value.  
+2. ADC Knob Input (GPIO26) – Reads the analog knob and prints its normalized value.  
+3. Encoder – Reads a rotary encoder and prints its incremental position.
 
-**ADC Knob Input (GPIO26)**  
-Reads analog knob using a receiver object and prints its value
+> Use the `-s` flag to enable the serial console loading in the terminal after flashing (works on mac only for now).
 
-Use the -s flag to enable loading of serial console in the terminal after flashing.
+### Notes
 
-It has been tested on macOS, so if something does not work as expected on your system, please open a GitHub issue.
-
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
+- You can rename them as needed; currently, there is no enforced naming convention.  
+- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, encoder, etc.).  
+- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
+- Tested on **macOS**.  
+- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
+  
 ## Project Updates
 
 - [x] serial console 
@@ -66,8 +74,6 @@ It has been tested on macOS, so if something does not work as expected on your s
 1. HVCC supported vanilla pd objects should work.
 2. Added heavylib object support (hv.osc, hv.lfo and other).
 3. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.
-4. PD patch send and receive object names must corespond to the category and name set in the settings.json.
-5. If you change board type in settings.json remove project folder or rename it in the command to rebuild files.
 
 ### Sample loading
 
