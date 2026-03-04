@@ -101,8 +101,7 @@ _float table -> const float table_
 │   ├── lib  
 │   │   └── heavylib  
 │   ├── patches  
-│   └── src  
-
+│   └── src
 
 ## Usage
 
