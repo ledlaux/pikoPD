@@ -1,6 +1,6 @@
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding and testing ahead. Future plan is to add also automated arduino-cli firmware builder and create docker container for the project.
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding and testing ahead. Future plan is to add also automated arduino project builder option using arduino-cli.
 
 ## Features
 
