@@ -23,10 +23,19 @@ This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pic
 - Check for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
+## Notes
+
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
+- You can rename them as needed; currently, there is no enforced naming convention.  
+- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
+- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
+- Tested on **macOS**.  
+- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
+
   
 ## Default Patch
 
-This Pure Data patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
+PD patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
 
 ### LED Control
 - Sending MIDI CC1 on channel 1 controls LED brightness.  
@@ -40,15 +49,12 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 
 > Use the `-s` flag to enable the serial console loading in the terminal after flashing (currently works only on mac).
 
-### Notes
 
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
-- You can rename them as needed; currently, there is no enforced naming convention.  
-- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
-- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
-- Tested on **macOS**.  
-- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-  
+## Patch 2  
+
+**Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay lines.
+
+
 ## Project Updates
 
 - [x] serial console 
