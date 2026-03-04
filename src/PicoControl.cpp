@@ -141,9 +141,9 @@ namespace Pico {
                 if (clk != encoders[i].last_clk) {
                     if (clk) { 
                         if (clk != dt) {
-                            encoders[i].value.fetch_add(1, std::memory_order_relaxed);
-                        } else {
                             encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
+                        } else {
+                            encoders[i].value.fetch_add(1, std::memory_order_relaxed);
                         }
                     }
                     encoders[i].last_clk = clk;
