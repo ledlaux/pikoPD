@@ -84,11 +84,14 @@ _float table -> const float table_
 - Python 3.10+
   - jinja2
 - arm-none-eabi toolchain
-- [hvcc]([https://github.com/enzienaudio/hvcc](https://github.com/Wasted-Audio/hvcc))  
-- [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
-- [pico-extras](https://github.com/raspberrypi/pico-extras) (put inside pico-sdk folder)
-- [Wasted-Audio/heavylib](https://github.com/Wasted-Audio/heavylib) 
-- [picotool](https://github.com/raspberrypi/picotool)  
+- Heavy compiler (hvcc)
+- Raspberry Pi Pico SDK
+- pico-extras
+- picotool
+
+## Setting up toolchain
+
+[Read manual]( https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
 
 ## Usage
 
