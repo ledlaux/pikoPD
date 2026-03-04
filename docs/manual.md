@@ -8,21 +8,23 @@
 ### arm-none-eabi-gcc toolchain ###
 
 Mac:
-
 ```bash
-brew install cmake  
+brew install cmake
+brew install git  
 xcode-select --install  
 brew install arm-none-eabi-gcc
 ```   
 
 Linux:  
 ```bash
-sudo apt install cmake python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
+sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
 ```  
 
 ### Heavy compiler (hvcc) ###
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
 git clone https://github.com/Wasted-Audio/hvcc.git  
 cd hvcc/  
 pip3 install -e .  
