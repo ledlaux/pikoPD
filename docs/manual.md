@@ -43,6 +43,8 @@ export PICO_SDK_PATH=/your_path/pico-sdk
 
 ### pico-extras ###
 
+Must be places inside the pico-sdk folder.
+
 ```bash
 cd pico-sdk  
 git clone https://github.com/raspberrypi/pico-extras.git  
@@ -70,6 +72,7 @@ sudo make install
 
 
 ## Hardware settings ##
+
 
 **Buttons**
 
