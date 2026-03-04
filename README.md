@@ -38,7 +38,7 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 2. ADC Knob Input (GPIO26) – Reads the analog knob and prints its normalized value.  
 3. Encoder – Reads a rotary encoder and prints its incremental position.
 
-> Use the `-s` flag to enable the serial console loading in the terminal after flashing (works on mac only for now).
+> Use the `-s` flag to enable the serial console loading in the terminal after flashing (currently works only on mac).
 
 ### Notes
 
