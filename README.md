@@ -93,7 +93,7 @@ _float table -> const float table_
 
 [Read manual]( https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
 
-├── pico-sdk
+├── pico-sdk 
 │   └── pico-extras  
 ├── picotool  
 ├── pikoPD  
