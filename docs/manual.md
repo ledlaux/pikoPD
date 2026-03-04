@@ -72,6 +72,21 @@ make -j8
 sudo make install
 ```
 
+## Usage
+
+Enter bootloader mode by holding device boot button
+
+```
+python3 pikopd.py patches/heavy.pd project_name 
+
+optional arguments:
+  -h, --help           Show help message and exit
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -v, --verbose        Enable verbose debug output
+```
+
 
 ## Hardware settings ##
 
