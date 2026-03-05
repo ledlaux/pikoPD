@@ -76,16 +76,17 @@
 
 {%- set active_joystick = [] -%}
 {%- for j in settings.joystick -%}
-    {%- set hash_x = receives[j.name + "_X"] -%}
-    {%- set hash_y = receives[j.name + "_Y"] -%}
+    {%- set hash_x = receives[j.name + "_x"] -%}
+    {%- set hash_y = receives[j.name + "_y"] -%}
     
     {%- if hash_x and hash_y -%}
         {%- set _ = active_joystick.append({
-            'x': j.joy_x, 
-            'y': j.joy_y, 
+            'id': loop.index0,
+            'x': j.joy_x,
+            'y': j.joy_y,
             'hash_x': hash_x,
             'hash_y': hash_y,
-            'midi_range': j.midi_range | default(false)
+            'midi_range': j.midi_range if j.midi_range is defined else false
         }) -%}
     {%- endif -%}
 {%- endfor -%}
@@ -263,8 +264,8 @@ int main() {
     Pico::addEncoder({{ loop.index0 }}, {{ enc.a }}, {{ enc.b }});
     {% endfor %}
 
-    {% for joy in active_joystick %}
-    Pico::addJoystick({{ loop.index0 }}, {{ joy.x }}, {{ joy.y }});
+    {% for joy in active_joystick -%}
+    Pico::addJoystick({{ joy.id }}, {{ joy.x }}, {{ joy.y }});
     {% endfor %}
 
    {% if settings.audio_mode == "I2S" %}
@@ -295,7 +296,7 @@ int main() {
     uint32_t last_hw_tick = 0;
     uint32_t last_print_time = 0;
 
-    float val, v, vx, vy; 
+    float val, v; 
     bool send;
 
     while (true) {
@@ -339,10 +340,13 @@ int main() {
             {% endfor %}
 
         {% for joy in active_joystick -%}
+        {
+            float vx = 0.0f; 
+            float vy = 0.0f;
             bool cX = false;
             bool cY = false;
 
-            if (Pico::processJoystick({{ loop.index0 }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
+            if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
                 
                 if (cX) {
                     hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_x }}, vx);
@@ -352,8 +356,11 @@ int main() {
                     hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_y }}, vy);
                 }
             }
-            {% endfor %}
         }
+        {% endfor %}
+        }
+
+
     } 
     return 0;
 }

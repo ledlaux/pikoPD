@@ -43,7 +43,7 @@
   ],
 
   "joystick": [ 
-    {"name": "joystick", "joy_x": 26, "joy_y": 27, "midi_range": false}
+    {"name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true}
   ]
 
 
