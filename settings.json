@@ -9,8 +9,8 @@
   "buffer_size": 32,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
-  "pwm_pin_l": 2,
-  "pwm_pin_r": 3,
+  "pwm_pin_l": 14,
+  "pwm_pin_r": 15,
   
   "adc_pins": [
     { "name": "knob", "pin": 26, "type": "knob" },
@@ -31,12 +31,12 @@
   ],
 
   "gate_in": [
-    { "name": "gate_in", "pin": 15 }
+    { "name": "gate_in", "pin": 16 }
   ],
 
   "gate_out": [
-    { "name": "kick", "pin": 3, "mode": "trigger" },
-    { "name": "vca", "pin": 2, "mode": "gate" }
+    { "name": "gate", "pin": 2, "mode": "gate" }
+    { "name": "trigger", "pin": 3, "mode": "trigger" },
   ],
 
   "encoders": [
