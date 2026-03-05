@@ -49,16 +49,16 @@ Check compiled binaries for RP2040 in the release section.
 ### Working state
 
 1. HVCC supported vanilla pd objects should work.
-2. Added heavylib object support (hv.osc, hv.lfo ...). Hv.reverb is not working yet.
+2. Added heavylib object support (hv.osc, hv.lfo ...).
 3. Getting the RP Pico serial console to work together with USB MIDI in the pico-sdk was tricky, but it now works with [print] objects in PD. It can get flooded with messages and crash the device, so use it moderately for debugging only. [print] objects are parsed automatically. You can also use the regular console if needed—just uncomment the print lines in the code.
 
 ## Notes
 
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
-- You can rename them as you wish. Currently, there is no enforced naming convention. 
-- You don't need to remove objects from settings.json, script adds objects which are present in the patch automatically. 
-- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
-- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  Also check for the correct `@hv_param` argument. 
+- You can rename sends and receives as you wish. Currently, there is no enforced naming convention. 
+- You don't need to remove objects from `settings.json`, script adds objects which are present in the patch automatically. 
+- Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
+- If you change the board from pico to pico2, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
@@ -71,6 +71,7 @@ _float table -> const float table_
 
 ### What doesn't work ###
 - Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
+- **Hv.reverb** is not working yet.
   
 ## Default Patch
 
