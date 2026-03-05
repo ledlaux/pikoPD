@@ -52,10 +52,24 @@ namespace Pico {
         std::atomic<int> value;
         };
 
+    struct Joystick {
+    uint8_t adcX;
+    uint8_t adcY;
+    uint16_t centerX = 2048;
+    uint16_t centerY = 2048;
+    float smoothX = 2048.0f;
+    float smoothY = 2048.0f;
+    std::atomic<int16_t> x;
+    std::atomic<int16_t> y;
+    float lastSentX = -1.0f;
+    float lastSentY = -1.0f;
+};
+
     extern Button btns[12];
     extern Knob knobs[4];
     extern Led leds[12];
     extern Encoder encoder[4];
+    extern Joystick joystick[2];
 
     extern std::atomic<float> led_vals[12];
     
@@ -63,11 +77,13 @@ namespace Pico {
     extern int n_knob;
     extern int n_led;
     extern int n_encoder;
+    extern int n_joystick;
 
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0);
     void addKnob(int index, uint32_t pin); 
     void addCV(int index, uint32_t pin);   
     void addEncoder(int index, uint32_t pinA, uint32_t pinB);
+    void addJoystick(int index, uint32_t pinX, uint32_t pinY);
     void addLed(int index, uint32_t pin);   
     void update(uint32_t now);
     void updateLed(int index, float val); 
@@ -75,6 +91,7 @@ namespace Pico {
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
     bool processEnc(int index, float &val);
+    bool processJoystick(int id, float &outX, float &outY, bool &cX, bool &cY, bool midi_range = false);
     bool buttonChanged(int i, bool& outState);
     bool buttonPressed(int i);
     bool buttonReleased(int i);
