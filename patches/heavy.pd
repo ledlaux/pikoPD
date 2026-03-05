@@ -24,10 +24,10 @@
 #X obj 49 274 hv.osc~ saw;
 #X obj 42 73 print cc1;
 #X text 413 294 Set encoder steps here;
-#X obj 567 27 r joystick_X @hv_param;
-#X obj 567 66 print joy_X;
-#X obj 729 27 r joystick_Y @hv_param;
-#X obj 729 66 print joy_Y;
+#X obj 567 27 r joy_x @hv_param;
+#X obj 729 27 r joy_y @hv_param;
+#X obj 567 66 print joy_x;
+#X obj 729 66 print joy_y;
 #X connect 1 0 2 0;
 #X connect 2 0 16 0;
 #X connect 3 0 0 0;
