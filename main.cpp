@@ -74,6 +74,22 @@
     {%- set _ = active_encoders.append({'a': e.pin_a, 'b': e.pin_b, 'hash': receives[e.name]}) -%}
 {%- endfor -%}
 
+{%- set active_joystick = [] -%}
+{%- for j in settings.joystick -%}
+    {%- set hash_x = receives[j.name + "_X"] -%}
+    {%- set hash_y = receives[j.name + "_Y"] -%}
+    
+    {%- if hash_x and hash_y -%}
+        {%- set _ = active_joystick.append({
+            'x': j.joy_x, 
+            'y': j.joy_y, 
+            'hash_x': hash_x,
+            'hash_y': hash_y,
+            'midi_range': j.midi_range | default(false)
+        }) -%}
+    {%- endif -%}
+{%- endfor -%}
+
 Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
 
 
@@ -247,6 +263,10 @@ int main() {
     Pico::addEncoder({{ loop.index0 }}, {{ enc.a }}, {{ enc.b }});
     {% endfor %}
 
+    {% for joy in active_joystick %}
+    Pico::addJoystick({{ loop.index0 }}, {{ joy.x }}, {{ joy.y }});
+    {% endfor %}
+
    {% if settings.audio_mode == "I2S" %}
     // --- I2S Configuration ---
     Pico::setupAudio(
@@ -274,6 +294,9 @@ int main() {
 
     uint32_t last_hw_tick = 0;
     uint32_t last_print_time = 0;
+
+    float val, v, vx, vy; 
+    bool send;
 
     while (true) {
         tud_task(); 
@@ -312,6 +335,22 @@ int main() {
             {% for enc in active_encoders -%}
             if (Pico::processEnc({{ loop.index0 }}, v)) {
                 hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
+            }
+            {% endfor %}
+
+        {% for joy in active_joystick -%}
+            bool cX = false;
+            bool cY = false;
+
+            if (Pico::processJoystick({{ loop.index0 }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
+                
+                if (cX) {
+                    hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_x }}, vx);
+                }
+
+                if (cY) {
+                    hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_y }}, vy);
+                }
             }
             {% endfor %}
         }
