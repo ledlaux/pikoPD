@@ -49,7 +49,7 @@ Check compiled binaries for RP2040 in the release section.
 ### Working state
 
 1. HVCC supported vanilla pd objects should work.
-2. Added heavylib object support (hv.osc, hv.lfo and other).
+2. Added heavylib object support (hv.osc, hv.lfo ...). Hv.reverb is not working yet.
 3. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.
 
 ## Notes
