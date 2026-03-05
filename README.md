@@ -56,7 +56,7 @@ Check compiled binaries for RP2040 in the release section.
 
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
 - You can rename them as needed; currently, there is no enforced naming convention. 
-- You don't need to remove objects from setting.json, script adds objects which are present in the patch automatically. 
+- You don't need to remove objects from settings.json, script adds objects which are present in the patch automatically. 
 - Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
 - If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
