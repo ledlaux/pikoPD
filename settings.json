@@ -11,6 +11,7 @@
   "i2s_bclk_pin": 10,
   "pwm_pin_l": 2,
   "pwm_pin_r": 3,
+  
   "adc_pins": [
     { "name": "knob", "pin": 26, "type": "knob" },
     { "name": "pot", "pin": 27, "type": "knob" },
