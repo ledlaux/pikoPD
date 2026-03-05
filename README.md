@@ -17,7 +17,7 @@ Check compiled binaries for RP2040 in the release section.
     - led pins
     - adc pins (knob, cv_in)
     - encoder pins
-    - gate in/out pins (gate or trigger mode)
+    - gate in/out pins (gate or trigger)
     - button pins and type (bang, toggle, switch)
     - joystic pins and range (regular or midi 1-127)
       
