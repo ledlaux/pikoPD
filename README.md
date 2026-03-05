@@ -38,13 +38,13 @@ Check compiled binaries for RP2040 in the release section.
 - [x] gate out
 - [x] encoder
 - [x] joystic
-- [ ] sensors
-- [ ] midi clock
-- [ ] uart midi
 - [ ] screen
+- [ ] sensors
 - [ ] pwm audio
-- [ ] bluetooth midi
+- [ ] uart midi
+- [ ] midi clock
 - [ ] usb audio
+- [ ] bluetooth midi
 
 ### Working state
 
