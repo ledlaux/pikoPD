@@ -19,6 +19,7 @@ Check compiled binaries for RP2040 in the release section.
     - encoder pins
     - gate in/out pins (gate or trigger mode)
     - button pins and type (bang, toggle, switch)
+    - joystic pins and range (regular or midi 1-127)
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -68,7 +69,7 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 - [x] gate in
 - [x] gate out
 - [x] encoder
-- [ ] joystic
+- [x] joystic
 - [ ] sensors
 - [ ] midi clock
 - [ ] uart midi
