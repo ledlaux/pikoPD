@@ -26,38 +26,6 @@ Check compiled binaries for RP2040 in the release section.
 - Check for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
-## Notes
-
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
-- You can rename them as needed; currently, there is no enforced naming convention.  
-- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
-- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
-- Tested on **macOS**.  
-- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-
-  
-## Default Patch
-
-PD patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
-
-### LED Control
-- Sending MIDI CC1 on channel 1 controls LED brightness.  
-
-### Serial Output
-The patch includes three `[print]` objects that send normalized values (`0.0–1.0`) from PD to the serial console:
-
-1. MIDI CC Input – Receives MIDI CC1 and prints the value.  
-2. ADC Knob Input (GPIO26) – Reads the analog knob and prints its normalized value.  
-3. Encoder – Reads a rotary encoder and prints its incremental position.
-
-> Use the `-s` flag to enable the serial console loading in the terminal after flashing (currently works only on mac).
-
-
-## Patch 2  
-
-**Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay lines.
-
-
 ## Project Updates
 
 - [x] serial console 
@@ -84,6 +52,16 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 2. Added heavylib object support (hv.osc, hv.lfo and other).
 3. Getting pico serial console to work together with the usb midi in pico-sdk was tricky, but now it works with [print] objects in PD.
 
+## Notes
+
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  
+- You can rename them as needed; currently, there is no enforced naming convention. 
+- You don't need to remove objects from setting.json, script adds objects which are present in the patch automatically. 
+- Make sure to verify the correct pin configuration in `settings.json` (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
+- If you change the board from pico to pico2 in `settings.json`, remove the project folder or rename it in the command to rebuild files.  
+- Tested on **macOS**.  
+- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
+
 ### Sample loading
 
 After some tests sample array loading works with arduino and pico-sdk for pico boards. Pico stores float values into the ram, 
@@ -93,6 +71,29 @@ _float table -> const float table_
 
 ### What doesn't work ###
 - Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
+  
+## Default Patch
+
+PD patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
+
+### LED Control
+- Sending MIDI CC1 on channel 1 controls LED brightness.  
+
+### Serial Output
+The patch includes three `[print]` objects that send normalized values (`0.0–1.0`) from PD to the serial console:
+
+1. MIDI CC Input – Receives MIDI CC1 and prints the value.  
+2. ADC Knob Input (GPIO26) – Reads the analog knob and prints its normalized value.  
+3. Encoder – Reads a rotary encoder and prints its incremental position.
+
+> Use the `-s` flag to enable the serial console loading in the terminal after flashing (currently works only on mac).
+
+
+## Patch 2  
+
+**Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay lines.
+
+
 
 ## Requirements
 
