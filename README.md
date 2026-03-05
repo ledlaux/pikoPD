@@ -23,7 +23,7 @@ Check compiled binaries for RP2040 in the release section.
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
-- Check for device in BOOTSEL mode
+- Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
 ## Project Updates
