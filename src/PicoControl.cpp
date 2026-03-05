@@ -17,11 +17,13 @@ namespace Pico {
     Led leds[12];
     Knob knobs[4];
     Encoder encoders[4];
+    Joystick joystick[2];
 
     int n_btn = 0;
     int n_knob = 0;
     int n_led = 0;
     int n_encoder = 0; 
+    int n_joystick = 0;
 
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
         gpio_init(pin);
@@ -106,6 +108,29 @@ namespace Pico {
     }
 
 
+    void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
+        if (n_knob == 0 && n_joystick == 0) adc_init();
+        
+        adc_gpio_init(pinX);
+        adc_gpio_init(pinY);
+        
+        joystick[index].adcX = pinX - 26;
+        joystick[index].adcY = pinY - 26;
+
+        adc_select_input(joystick[index].adcX);
+        joystick[index].centerX = adc_read();
+        adc_select_input(joystick[index].adcY);
+        joystick[index].centerY = adc_read();
+
+        joystick[index].smoothX = (float)joystick[index].centerX;
+        joystick[index].smoothY = (float)joystick[index].centerY;
+        joystick[index].x.store(0, std::memory_order_relaxed);
+        joystick[index].y.store(0, std::memory_order_relaxed);
+
+        if (index >= n_joystick) n_joystick = index + 1;
+    }
+
+
      void update(uint32_t now) {
             uint32_t all_pins = gpio_get_all(); 
             
@@ -157,8 +182,25 @@ namespace Pico {
                 float prev = knobs[i].value.load(std::memory_order_relaxed);
                 knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
             }
-        }
 
+            // --- Joystic ---    
+            for (int i = 0; i < n_joystick; i++) {
+            adc_select_input(joystick[i].adcX);
+            uint16_t rawX = adc_read();
+            adc_select_input(joystick[i].adcY);
+            uint16_t rawY = adc_read();
+
+            joystick[i].smoothX = 0.1f * rawX + 0.9f * joystick[i].smoothX;
+            joystick[i].smoothY = 0.1f * rawY + 0.9f * joystick[i].smoothY;
+
+            int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
+            int16_t dy = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothY;
+
+            joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
+            joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
+        }
+    }
+        
 
     void __not_in_flash_func(setLedHardware)(int index, float value) {
         uint16_t level = (uint16_t)(value * value * 255.0f);
@@ -308,6 +350,41 @@ namespace Pico {
         return false;
     }
 
+
+   bool processJoystick(int id, float &outX, float &outY, bool &cX, bool &cY, bool midi_range) {
+        if (id >= n_joystick) return false;
+
+        float newX = (float)joystick[id].x.load() / 2048.0f;
+        float newY = (float)joystick[id].y.load() / 2048.0f;
+
+        if (newX > 1.0f) newX = 1.0f; if (newX < -1.0f) newX = -1.0f;
+        if (newY > 1.0f) newY = 1.0f; if (newY < -1.0f) newY = -1.0f;
+
+        if (midi_range) {
+            float midiNormX = (newX + 1.0f) * 0.5f;
+            float midiNormY = (newY + 1.0f) * 0.5f;
+            newX = (float)((int)(midiNormX * 126.0f) + 1);
+            newY = (float)((int)(midiNormY * 126.0f) + 1);
+        }
+
+        float threshold = midi_range ? 2.0f : 0.05f; 
+
+        cX = (std::abs(newX - joystick[id].lastSentX) > threshold);
+        cY = (std::abs(newY - joystick[id].lastSentY) > threshold);
+
+        if (cX) { 
+            outX = newX; 
+            joystick[id].lastSentX = newX; 
+        }
+        if (cY) { 
+            outY = newY; 
+            joystick[id].lastSentY = newY; 
+        }
+
+        return (cX || cY);
+    }
+
+    
 
     static AudioMode _mode;
     static AudioProcessCallback _cb;
