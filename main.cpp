@@ -3,23 +3,26 @@
 #include "hardware/clocks.h"
 #include "pico/audio_i2s.h"
 #include "pico/multicore.h"
-#include "cdc_stdio_lib.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
 
+{% if settings.pico_board == 'pico_w' %}
+#include "pico/cyw43_arch.h"
+{% endif %}
 
 {% if settings.midi_mode == 'host' %}
-// #ifndef CFG_TUH_ENABLED
-// #define CFG_TUH_ENABLED 1
-// #endif
-// #ifndef CFG_TUH_MIDI
-// #define CFG_TUH_MIDI 1
-// #endif
-// #include "tusb.h"
-// #include "host/usbh.h"
-// #include "class/midi/midi_host.h"
+#ifndef CFG_TUH_ENABLED
+#define CFG_TUH_ENABLED 1
+#endif
+#ifndef CFG_TUH_MIDI
+#define CFG_TUH_MIDI 1
+#endif
+#include "tusb.h"
+#include "host/usbh.h"
+#include "class/midi/midi_host.h"
 {% else %}
 #include "tusb.h"
+#include "cdc_stdio_lib.h"
 {% endif %}
 
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -114,8 +117,8 @@
 
 Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
 
-void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2);
-
+static uint32_t midi_activity_timer = 0;
+#define FLASH_DURATION_MS 40
 
 {% if settings.midi_mode in ['uart', 'host'] %}
 #define MIDI_RB_SIZE 512
@@ -276,24 +279,33 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     {% endif %}
 }
 
+        
 void midi_task() {
-    // 1. USB Device 
     {% if settings.midi_mode == 'usb' %}
     if (tud_midi_available()) {
         uint8_t packet[4];
         while (tud_midi_packet_read(packet)) {
             handle_midi_message(packet[1], packet[2], packet[3]);
+
+            uint8_t status = packet[1];
+            uint8_t type = status & 0xF0;
+            uint8_t velocity = packet[3];
+
+            // Trigger LED timer only on Note On (0x90) with velocity > 0
+            if (type == 0x90 && velocity > 0) {
+                midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+            }
         }
     }
     {% endif %}
 
-    // 2. USB Host 
     {% if settings.midi_mode == 'host' %}
     uint8_t b;
-    while (rb_pop(&midi_rb, &b)) parse_raw_midi_byte(b);
+    while (rb_pop(&midi_rb, &b)) {
+        parse_raw_midi_byte(b);
+    }
     {% endif %}
 
-    // 3. Hardware UART 
     {% if settings.midi_mode == 'uart' %}
     while (uart_is_readable(uart0)) {
         uint8_t raw_byte = uart_getc(uart0);
@@ -302,6 +314,7 @@ void midi_task() {
     {% endif %}
 }
 
+        
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     bool handled = false;
 
@@ -341,16 +354,20 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 }
 
+
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
-
 
 
 int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true);
     stdio_init_all(); 
     cdc_stdio_lib_init();
+
+    {% if settings.pico_board == 'pico_w' %}
+    cyw43_arch_init();
+    {% endif %}
 
     {% if settings.midi_mode == 'uart' %}
     uart_init(uart0, 31250);
@@ -411,12 +428,18 @@ int main() {
     bool send;
 
     while (true) {
+
         {% if settings.midi_mode == 'usb' %}
         tud_task(); 
         {% endif %}
-
         {% if settings.midi_mode == 'host' %}
         tuh_task(); 
+        {% endif %}
+
+        bool is_active = (to_ms_since_boot(get_absolute_time()) < midi_activity_timer);
+
+        {% if settings.pico_board == 'pico_w' %}
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, is_active); 
         {% endif %}
 
         midi_task(); 
