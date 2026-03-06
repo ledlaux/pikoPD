@@ -10,7 +10,7 @@ Check compiled binaries for RP2040 in the release section.
 - Uses main.cpp as a template
 - Set in `settings.json`:
   
-    - board (pico, pico_w, pico2)
+    - board (pico, zero, pico_w, pico2)
     - core frequency
     - sample rate
     - i2s pins
