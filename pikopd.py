@@ -246,11 +246,14 @@ class PicoUF2Generator:
 
         sdk = os.environ.get("PICO_SDK_PATH")
         board = settings.get("pico_board", "pico")
+        sdk_target = "pico" if board == "zero" else board
 
         if board == "pico2":
             tool = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
-        elif board in ["pico", "pico_w"]:
+        elif board in ["pico", "pico_w", "zero"]:
             tool = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
+            if board == "zero":
+               cmake_board_name = "pico"
         else:
             raise ValueError(f"Unsupported board: {board}")
 
@@ -262,7 +265,7 @@ class PicoUF2Generator:
                     "cmake",
                     "-G", "Unix Makefiles",
                     f"-DPICO_SDK_PATH={sdk}",
-                    f"-DPICO_BOARD={board}",
+                    f"-DPICO_BOARD={sdk_target}",
                     f"-DCMAKE_TOOLCHAIN_FILE={tool}",
                     self.project_root, 
                 ],
