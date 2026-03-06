@@ -117,6 +117,45 @@
 
 Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
 
+
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+    
+    uint8_t type = status & 0xF0;
+    uint8_t chan = status & 0x0F;
+
+    switch (type) {
+        case 0x90: 
+            if (data2 > 0) {
+            //  printf("[MIDI IN] Note On: %d | Vel: %d | Chan: %d\n", data1, data2, chan);
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
+                break;
+            }
+            [[fallthrough]]; 
+
+        case 0x80: 
+        //  printf("[MIDI IN] Note Off: %d | Chan: %d\n", data1, chan);
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
+            break;
+
+        case 0xB0: 
+        //  printf("[MIDI IN] CC: %d | Val: %d | Chan: %d\n", data1, data2, chan);
+            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+            break;
+
+        case 0xE0: 
+            {
+                int bend = (data2 << 7) | data1;
+        //      printf("[MIDI IN] Bend: %d | Chan: %d\n", bend, chan);
+                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
+            }
+            break;
+
+        default:
+        //    printf("[MIDI IN] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
+            break;
+    }
+}
+
 static uint32_t midi_activity_timer = 0;
 #define FLASH_DURATION_MS 40
 
@@ -157,10 +196,20 @@ void parse_raw_midi_byte(uint8_t byte) {
 
     if (idx != 0 && idx == expected) {
         handle_midi_message(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+
+        // Flash LED for Note On events
+        uint8_t status_type = msg[0] & 0xF0;
+        uint8_t velocity = (expected == 3) ? msg[2] : 0;
+
+        if (status_type == 0x90 && velocity > 0) {
+            midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+        }
+
         idx = 1; 
     }
 }
 {% endif %}
+
 
 {% if settings.midi_mode == 'host' %}
 void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t xferred_bytes) {
@@ -172,43 +221,8 @@ void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t xferred_bytes) {
 {% endif %}
 
 
-void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-    
-    uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;
 
-    switch (type) {
-        case 0x90: 
-            if (data2 > 0) {
-            //  printf("[MIDI IN] Note On: %d | Vel: %d | Chan: %d\n", data1, data2, chan);
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
-                break;
-            }
-            [[fallthrough]]; 
 
-        case 0x80: 
-        //  printf("[MIDI IN] Note Off: %d | Chan: %d\n", data1, chan);
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
-            break;
-
-        case 0xB0: 
-        //  printf("[MIDI IN] CC: %d | Val: %d | Chan: %d\n", data1, data2, chan);
-            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
-            break;
-
-        case 0xE0: 
-            {
-                int bend = (data2 << 7) | data1;
-        //      printf("[MIDI IN] Bend: %d | Chan: %d\n", bend, chan);
-                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
-            }
-            break;
-
-        default:
-        //    printf("[MIDI IN] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
-            break;
-    }
-}
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
@@ -279,7 +293,6 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     {% endif %}
 }
 
-        
 void midi_task() {
     {% if settings.midi_mode == 'usb' %}
     if (tud_midi_available()) {
@@ -314,7 +327,6 @@ void midi_task() {
     {% endif %}
 }
 
-        
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     bool handled = false;
 
@@ -354,10 +366,10 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 }
 
-
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
+
 
 
 int main() {
