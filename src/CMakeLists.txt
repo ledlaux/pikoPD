@@ -50,6 +50,7 @@ target_link_libraries(heavy.elf
     hardware_adc
     hardware_pwm
     pico_multicore
+    pico_cyw43_arch_none
 )
 
 set(CMAKE_CXX_STANDARD 17)
