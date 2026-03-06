@@ -69,6 +69,8 @@ to overcome limitation and load data to the flash we need to manually set tables
 
 _float table -> const float table_
 
+Then run command with -x flag to skip file rebuilding. 
+
 ### What doesn't work ###
 - Raspberry PICO boards doesn't have adc to read audio input so [adc] object will not work.
 - **Hv.reverb** is not working yet.
