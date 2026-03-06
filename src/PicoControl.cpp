@@ -8,7 +8,7 @@
 #include "pico/audio_pwm.h"
 #include "pico/time.h"
 #include "hardware/pio.h"
- #include "ws2812.pio.h" 
+#include "ws2812.pio.h" 
 #include <cmath>
 
 
@@ -238,10 +238,8 @@ namespace Pico {
     void updateRGB(int index, float hue, float val) {
         if (index >= 12) return;
 
-        // 1. Store the intensity state
         led_vals[index].store(val, std::memory_order_relaxed);
-
-        // 2. HSV to RGB Math (formerly set_led_from_pd logic)
+     
         float r, g, b;
         float h = hue * 6.0f;
         int i = (int)h;
@@ -258,7 +256,6 @@ namespace Pico {
             default: r = 0.0f; g = 0.0f; b = 0.0f; break;
         }
 
-        // 3. Apply Gamma and convert to 32-bit GRB
         float gamma = val * val;
         uint32_t color = urgb_u32(
             (uint8_t)(r * gamma * 255.0f), 
@@ -266,7 +263,6 @@ namespace Pico {
             (uint8_t)(b * gamma * 255.0f)
         );
 
-        // 4. Send directly to hardware
         set_rgb_color(color);
     }
 
