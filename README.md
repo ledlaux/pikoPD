@@ -14,13 +14,13 @@ Check compiled binaries for RP2040 in the release section.
     - core frequency
     - sample rate
     - i2s pins
-    - led pins and type (pwm, rgb)
+    - led (pwm, rgb)
     - adc pins (knob, cv_in)
-    - encoder pins
-    - gate in/out pins (gate or trigger)
-    - button pins and type (bang, toggle, switch)
-    - joystic pins and range (regular or midi 1-127)
-    - midi mode (uart, usb)
+    - rotary encoder 
+    - gate in/out (gate or trigger)
+    - button (bang, toggle, switch)
+    - joystic and range (regular or midi 1-127)
+    - midi (uart, usb)
       - uart (pins tx 0, rx 1 )
       
 - Copies hardware config files into project folder from `/src`
