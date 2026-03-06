@@ -56,7 +56,8 @@
 {%- set active_gate_outs = [] -%}
 {%- for go in settings.gate_out if go.name in sends -%}
     {%- set dur = 15 if go.mode == "trigger" else 0 -%}
-    {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': sends[go.name], 'duration': dur}) -%}
+    {%- set idx = active_btns|length + active_gates|length + loop.index0 -%}
+    {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': sends[go.name], 'duration': dur, 'index': idx}) -%}
 {%- endfor -%}
 
 {%- set active_knobs = [] -%}
@@ -210,8 +211,8 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         {% endfor %}
 
         {% for gate_out in active_gate_outs %}
-        case {{ gate_out.hash }}: 
-            Pico::updateGate({{ active_btns|length + active_gates|length + loop.index0 }}, val);
+        case {{ gate_out.hash }}:
+            Pico::updateGate({{ gate_out.index }}, val);
             return;
         {% endfor %}
 
@@ -268,8 +269,9 @@ int main() {
     Pico::addJoystick({{ joy.id }}, {{ joy.x }}, {{ joy.y }});
     {% endfor %}
 
+   // --- I2S Configuration ---
    {% if settings.audio_mode == "I2S" %}
-    // --- I2S Configuration ---
+   
     Pico::setupAudio(
         Pico::I2S, 
         audioFunc, 
@@ -280,16 +282,16 @@ int main() {
     );
     {% else %}
 
-    // --- PWM Configuration ---
-    Pico::setupAudio(
-        Pico::PWM, 
-        audioFunc, 
-        {{ settings.sample_rate }}, 
-        {{ settings.pwm_pin_l }}, 
-        {{ settings.pwm_pin_r }}, 
-        {{ settings.buffer_size }}
-    );
-    {% endif %}
+    // // --- PWM Configuration ---
+    // Pico::setupAudio(
+    //     Pico::PWM, 
+    //     audioFunc, 
+    //     {{ settings.sample_rate }}, 
+    //     {{ settings.pwm_pin_l }}, 
+    //     {{ settings.pwm_pin_r }}, 
+    //     {{ settings.buffer_size }}
+    // );
+    // {% endif %}
 
     multicore_launch_core1(Pico::core1_audio_entry);
 
