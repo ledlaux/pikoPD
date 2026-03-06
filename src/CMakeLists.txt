@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(heavy C CXX ASM)
+project(pikopd C CXX ASM)
 
 add_compile_definitions(HV_BARE_METAL)
 
@@ -31,16 +31,18 @@ file(GLOB HVCC_FILES CONFIGURE_DEPENDS
 
 set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES})
 
-add_executable(heavy.elf ${ALL_SOURCES})
+add_executable(pikopd.elf ${ALL_SOURCES})
 
-target_include_directories(heavy.elf PRIVATE
+target_include_directories(pikopd.elf PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/src"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc"
     "${PICO_SDK_PATH}/lib/tinyusb/src"
     "${PICO_EXTRAS_PATH}/tinyusb"
 )
 
-target_link_libraries(heavy.elf
+pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+
+target_link_libraries(pikopd.elf
     pico_stdlib
     pico_audio_i2s
     pico_audio_pwm
@@ -56,15 +58,15 @@ target_link_libraries(heavy.elf
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-target_compile_options(heavy.elf PRIVATE -O3 -ffast-math)
-target_compile_definitions(heavy.elf PRIVATE
+target_compile_options(pikopd.elf PRIVATE -O3 -ffast-math)
+target_compile_definitions(pikopd.elf PRIVATE
     CFG_TUSB_MCU=OPT_MCU_RP2040
     CFG_TUSB_RHPORT0_MODE=OPT_MODE_DEVICE
     HV_UNIX=1
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
-pico_enable_stdio_usb(heavy.elf 0)
-pico_enable_stdio_uart(heavy.elf 0)
+pico_enable_stdio_usb(pikopd.elf 0)
+pico_enable_stdio_uart(pikopd.elf 0)
 
-pico_add_extra_outputs(heavy.elf)
+pico_add_extra_outputs(pikopd.elf)

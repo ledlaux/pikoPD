@@ -7,7 +7,10 @@
 #include "pico/multicore.h"
 #include "pico/audio_pwm.h"
 #include "pico/time.h"
+#include "hardware/pio.h"
+ #include "ws2812.pio.h" 
 #include <cmath>
+
 
 namespace Pico {
 
@@ -101,9 +104,23 @@ namespace Pico {
         uint chan = pwm_gpio_to_channel(pin);
         pwm_set_wrap(slice, 255);
         pwm_set_enabled(slice, true);
+        
         leds[index].pin = pin;
         leds[index].slice = slice;
         leds[index].chan = chan;
+        leds[index].is_rgb = false;
+        
+        if (index >= n_led) n_led = index + 1;
+    }
+
+    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
+        init_neopixel(); 
+        leds[index].pin = pin;
+        leds[index].is_rgb = true;
+        leds[index].r = r;
+        leds[index].g = g;
+        leds[index].b = b;
+
         if (index >= n_led) n_led = index + 1;
     }
 
@@ -201,12 +218,71 @@ namespace Pico {
         }
     }
         
+    void init_neopixel() {
+        PIO pio = pio1;
+        int sm = 0;
+        uint offset = pio_add_program(pio, &ws2812_program);
+        
+        ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+        }
 
-    void __not_in_flash_func(setLedHardware)(int index, float value) {
-        uint16_t level = (uint16_t)(value * value * 255.0f);
-        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
+        uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
+            return ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b);
+        }
+
+
+    void set_rgb_color(uint32_t pixel_grb) {
+    pio_sm_put_blocking(pio1, 0, pixel_grb << 8u);
+}
+
+    void updateRGB(int index, float hue, float val) {
+        if (index >= 12) return;
+
+        // 1. Store the intensity state
+        led_vals[index].store(val, std::memory_order_relaxed);
+
+        // 2. HSV to RGB Math (formerly set_led_from_pd logic)
+        float r, g, b;
+        float h = hue * 6.0f;
+        int i = (int)h;
+        float f = h - i;
+        float q = 1.0f - f;
+
+        switch (i % 6) {
+            case 0: r = 1.0f; g = f;    b = 0.0f; break;
+            case 1: r = q;    g = 1.0f; b = 0.0f; break;
+            case 2: r = 0.0f; g = 1.0f; b = f;    break;
+            case 3: r = 0.0f; g = q;    b = 1.0f; break;
+            case 4: r = f;    g = 0.0f; b = 1.0f; break;
+            case 5: r = 1.0f; g = 0.0f; b = q;    break;
+            default: r = 0.0f; g = 0.0f; b = 0.0f; break;
+        }
+
+        // 3. Apply Gamma and convert to 32-bit GRB
+        float gamma = val * val;
+        uint32_t color = urgb_u32(
+            (uint8_t)(r * gamma * 255.0f), 
+            (uint8_t)(g * gamma * 255.0f), 
+            (uint8_t)(b * gamma * 255.0f)
+        );
+
+        // 4. Send directly to hardware
+        set_rgb_color(color);
     }
 
+    void __not_in_flash_func(setLedHardware)(int index, float value) {
+        float gamma = value * value;
+
+        if (leds[index].is_rgb) {
+            uint8_t outR = (uint8_t)(leds[index].r * gamma);
+            uint8_t outG = (uint8_t)(leds[index].g * gamma);
+            uint8_t outB = (uint8_t)(leds[index].b * gamma);
+            set_rgb_led(urgb_u32(outR, outG, outB));
+        } else {
+            uint16_t level = (uint16_t)(gamma * 255.0f);
+            pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
+        }
+    }
 
     void updateLed(int index, float val) {
         if (index < 12) {
@@ -214,6 +290,8 @@ namespace Pico {
             setLedHardware(index, val);
         }
     }
+
+    
 
 
    void updateGate(int index, float val) {
@@ -384,7 +462,6 @@ namespace Pico {
         return (cX || cY);
     }
 
-    
 
     static AudioMode _mode;
     static AudioProcessCallback _cb;

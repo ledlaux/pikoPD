@@ -40,6 +40,8 @@ namespace Pico {
         uint32_t pin;
         uint slice;
         uint chan;
+        bool is_rgb; 
+        uint8_t r, g, b;
     };
 
     struct Encoder {
@@ -47,23 +49,22 @@ namespace Pico {
         uint32_t pinB;
         bool last_clk;      
         bool last_dt;      
-       // int8_t lastState;
         int last_sent_count;      
         std::atomic<int> value;
         };
 
     struct Joystick {
-    uint8_t adcX;
-    uint8_t adcY;
-    uint16_t centerX = 2048;
-    uint16_t centerY = 2048;
-    float smoothX = 2048.0f;
-    float smoothY = 2048.0f;
-    std::atomic<int16_t> x;
-    std::atomic<int16_t> y;
-    float lastSentX = -1.0f;
-    float lastSentY = -1.0f;
-};
+        uint8_t adcX;
+        uint8_t adcY;
+        uint16_t centerX = 2048;
+        uint16_t centerY = 2048;
+        float smoothX = 2048.0f;
+        float smoothY = 2048.0f;
+        std::atomic<int16_t> x;
+        std::atomic<int16_t> y;
+        float lastSentX = -1.0f;
+        float lastSentY = -1.0f;
+    };
 
     extern Button btns[12];
     extern Knob knobs[4];
@@ -84,9 +85,8 @@ namespace Pico {
     void addCV(int index, uint32_t pin);   
     void addEncoder(int index, uint32_t pinA, uint32_t pinB);
     void addJoystick(int index, uint32_t pinX, uint32_t pinY);
-    void addLed(int index, uint32_t pin);   
-    void update(uint32_t now);
-    void updateLed(int index, float val); 
+    void addLed(int index, uint32_t pin);
+    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    void updateLed(int index, float val); 
     void updateGate(int index, float val);
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
@@ -97,6 +97,12 @@ namespace Pico {
     bool buttonReleased(int i);
     bool buttonToggled(int i, bool& outState);
     void __not_in_flash_func(setLedHardware)(int index, float value);
+    void init_neopixel();
+    void set_rgb_led(uint32_t color);
+    uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b);
+    void set_rgb_color(float hue, float intensity);
+    void updateRGB(int index, float hue, float intensity);
+    void update(uint32_t now);
 
     enum AudioMode { I2S, PWM };
     typedef void (*AudioProcessCallback)(float* buffer, int frames);

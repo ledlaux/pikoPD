@@ -1,6 +1,6 @@
 {
   "name": "heavy",
-  "pico_board": "pico2",
+  "pico_board": "pico_w",
   "core_freq": "240000",
   "audio_mode": "I2S",
   "sample_rate": 48000,
@@ -9,7 +9,7 @@
   "buffer_size": 32,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
-  "midi_mode": "uart",
+  "midi_mode": "usb",
 
   
   "adc_pins": [
@@ -26,9 +26,17 @@
   ],
 
   "leds": [
-    { "name": "led1", "pin": 24 },
-    { "name": "led2", "pin": 25 }
-  ],
+    { 
+      "name": "led1", 
+      "pin": 16, 
+      "is_rgb": true 
+    },
+    { 
+      "name": "led2", 
+      "pin": 25, 
+       "is_rgb": false 
+    }
+],
 
   "gate_in": [
     { "name": "gate_in", "pin": 15 }
