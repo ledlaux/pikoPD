@@ -22,7 +22,6 @@ Check compiled binaries for RP2040 in the release section.
     - joystic pins and range (regular or midi 1-127)
     - midi mode (uart, usb)
       - uart (pins tx 0, rx 1 )
-    - pwm audio
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
