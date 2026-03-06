@@ -349,9 +349,8 @@ void audioFunc(float* buffer, int frames) {
 
 int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true);
-    {% if settings.use_usb_cdc %}
-    stdio_usb_init(); 
-    {% endif %}
+    stdio_init_all(); 
+    cdc_stdio_lib_init();
 
     {% if settings.midi_mode == 'uart' %}
     uart_init(uart0, 31250);
