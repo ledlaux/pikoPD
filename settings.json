@@ -35,8 +35,8 @@
   ],
 
   "gate_out": [
-    { "name": "gate", "pin": 2, "mode": "gate" }
-    { "name": "trigger", "pin": 3, "mode": "trigger" },
+    { "name": "gate", "pin": 2, "mode": "gate" },
+    { "name": "trigger", "pin": 3, "mode": "trigger" }
   ],
 
   "encoders": [
