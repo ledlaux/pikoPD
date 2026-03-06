@@ -64,8 +64,7 @@ Check compiled binaries for RP2040 in the release section.
 
 ### Sample loading
 
-After some tests sample array loading works with arduino and pico-sdk for pico boards. Pico stores float values into the ram, 
-to overcome limitation and load data to the flash we need to manually set tables to const in Heavy_patchname.cpp:
+Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
 
 _float table -> const float table_
 
