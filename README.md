@@ -55,9 +55,10 @@ Check compiled binaries for RP2040 in the release section.
 ## Notes
 
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  Also check for the correct `@hv_param` argument. 
-- You can rename sends and receives as you wish. Currently, there is no enforced naming convention. 
+- You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
+- To save resources remove unused send and receive objects from the patch.
 - You don't need to remove objects from `settings.json`, script adds objects which are present in the patch automatically. 
-- Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).  
+- Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.). 
 - If you change the board from pico to pico2, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
