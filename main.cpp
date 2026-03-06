@@ -10,6 +10,7 @@
 #include "pico/cyw43_arch.h"
 {% endif %}
 
+
 {% if settings.midi_mode == 'host' %}
 #ifndef CFG_TUH_ENABLED
 #define CFG_TUH_ENABLED 1
@@ -160,7 +161,7 @@ static uint32_t midi_activity_timer = 0;
 #define FLASH_DURATION_MS 40
 
 {% if settings.midi_mode in ['uart', 'host'] %}
-#define MIDI_RB_SIZE 512
+#define MIDI_RB_SIZE 1024
 typedef struct {
     volatile uint16_t head, tail;
     uint8_t data[MIDI_RB_SIZE];
@@ -293,8 +294,10 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     {% endif %}
 }
 
+
 void midi_task() {
     {% if settings.midi_mode == 'usb' %}
+    tud_task(); 
     if (tud_midi_available()) {
         uint8_t packet[4];
         while (tud_midi_packet_read(packet)) {
@@ -304,7 +307,6 @@ void midi_task() {
             uint8_t type = status & 0xF0;
             uint8_t velocity = packet[3];
 
-            // Trigger LED timer only on Note On (0x90) with velocity > 0
             if (type == 0x90 && velocity > 0) {
                 midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
             }
@@ -313,6 +315,7 @@ void midi_task() {
     {% endif %}
 
     {% if settings.midi_mode == 'host' %}
+    tuh_task();
     uint8_t b;
     while (rb_pop(&midi_rb, &b)) {
         parse_raw_midi_byte(b);
@@ -320,9 +323,9 @@ void midi_task() {
     {% endif %}
 
     {% if settings.midi_mode == 'uart' %}
-    while (uart_is_readable(uart0)) {
-        uint8_t raw_byte = uart_getc(uart0);
-        parse_raw_midi_byte(raw_byte);
+    uint8_t b;
+    while (rb_pop(&midi_rb, &b)) {
+        parse_raw_midi_byte(b);
     }
     {% endif %}
 }
@@ -366,10 +369,20 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 }
 
+
+{% if settings.midi_mode == 'uart' %}
+void on_uart_rx() {
+    while (uart_is_readable(uart0)) {
+        uint8_t ch = uart_getc(uart0);
+        rb_push(&midi_rb, ch); 
+    }
+}
+{% endif %}
+
+
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
-
 
 
 int main() {
@@ -385,7 +398,10 @@ int main() {
     uart_init(uart0, 31250);
     uart_set_fifo_enabled(uart0, true); 
     gpio_set_function(0, GPIO_FUNC_UART); 
-    gpio_set_function(1, GPIO_FUNC_UART); 
+    gpio_set_function(1, GPIO_FUNC_UART);
+    irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
+    irq_set_enabled(UART0_IRQ, true);
+    uart_set_irq_enables(uart0, true, false); 
     {% endif %}
 
     {% if settings.midi_mode in ['usb', 'host'] %}
@@ -448,18 +464,18 @@ int main() {
         tuh_task(); 
         {% endif %}
 
-        bool is_active = (to_ms_since_boot(get_absolute_time()) < midi_activity_timer);
-
-        {% if settings.pico_board == 'pico_w' %}
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, is_active); 
-        {% endif %}
-
         midi_task(); 
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         if (now != last_hw_tick) {
             last_hw_tick = now;
+
+            bool is_active = (now < midi_activity_timer);
+            {% if settings.pico_board == 'pico_w' %}
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, is_active); 
+            {% endif %}
+
             Pico::update(now); 
 
             {% for btn in active_btns %}
