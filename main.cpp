@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "tusb.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/audio_i2s.h"
@@ -7,6 +6,21 @@
 #include "cdc_stdio_lib.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
+
+
+{% if settings.midi_mode == 'host' %}
+// #ifndef CFG_TUH_ENABLED
+// #define CFG_TUH_ENABLED 1
+// #endif
+// #ifndef CFG_TUH_MIDI
+// #define CFG_TUH_MIDI 1
+// #endif
+// #include "tusb.h"
+// #include "host/usbh.h"
+// #include "class/midi/midi_host.h"
+{% else %}
+#include "tusb.h"
+{% endif %}
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
@@ -54,10 +68,16 @@
 {%- endfor -%}
 
 {%- set active_gate_outs = [] -%}
+{%- set gate_base_index = active_btns|length + active_gates|length -%}
 {%- for go in settings.gate_out if go.name in sends -%}
     {%- set dur = 15 if go.mode == "trigger" else 0 -%}
-    {%- set idx = active_btns|length + active_gates|length + loop.index0 -%}
-    {%- set _ = active_gate_outs.append({'pin': go.pin, 'hash': sends[go.name], 'duration': dur, 'index': idx}) -%}
+    {%- set index = gate_base_index + loop.index0 -%}
+    {%- set _ = active_gate_outs.append({
+        'pin': go.pin,
+        'hash': sends[go.name],
+        'duration': dur,
+        'index': index   
+    }) -%}
 {%- endfor -%}
 
 {%- set active_knobs = [] -%}
@@ -93,6 +113,60 @@
 {%- endfor -%}
 
 Heavy_{{ name }} pd_prog( {{ settings.sample_rate }} );
+
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2);
+
+
+{% if settings.midi_mode in ['uart', 'host'] %}
+#define MIDI_RB_SIZE 512
+typedef struct {
+    volatile uint16_t head, tail;
+    uint8_t data[MIDI_RB_SIZE];
+} midi_ring_t;
+static midi_ring_t midi_rb = {0};
+
+static inline void rb_push(midi_ring_t *rb, uint8_t b) {
+    uint16_t next = (rb->head + 1) % MIDI_RB_SIZE;
+    if (next != rb->tail) { rb->data[rb->head] = b; rb->head = next; }
+}
+
+static inline int rb_pop(midi_ring_t *rb, uint8_t *b) {
+    if (rb->head == rb->tail) return 0;
+    *b = rb->data[rb->tail]; rb->tail = (rb->tail + 1) % MIDI_RB_SIZE;
+    return 1;
+}
+
+void parse_raw_midi_byte(uint8_t byte) {
+    static uint8_t msg[3];
+    static int idx = 0;
+    static int expected = 0;
+    
+    if (byte & 0x80) { 
+        msg[0] = byte; 
+        idx = 1;
+        uint8_t type = byte & 0xF0;
+        
+        expected = (type == 0xC0 || type == 0xD0) ? 2 : 3;
+    } 
+    else if (idx > 0 && idx < 3) { 
+        msg[idx++] = byte;
+    }
+
+    if (idx != 0 && idx == expected) {
+        handle_midi_message(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+        idx = 1; 
+    }
+}
+{% endif %}
+
+{% if settings.midi_mode == 'host' %}
+void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t xferred_bytes) {
+    uint8_t buf[64]; uint8_t cable; uint32_t n;
+    while ((n = tuh_midi_stream_read(dev_idx, &cable, buf, sizeof(buf))) > 0) {
+        for (uint32_t i = 0; i < n; i++) rb_push(&midi_rb, buf[i]);
+    }
+}
+{% endif %}
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
@@ -135,55 +209,98 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
-    
-    uint8_t packet[4] = {0};
+    uint8_t packet[4] = {0}; 
+    uint8_t raw[3] = {0};    
+    int raw_len = 0;
     
     switch (receiverHash) {
         case HV_NOTEOUT_HASH: {
             int note = (int)msg_getFloat(m, 0);
             int vel = (int)msg_getFloat(m, 1);
+            bool isNoteOn = (vel > 0);
 
-            if (vel > 0) {
-             // printf("[MIDI OUT] Note On: %d | Vel: %d\n", note, vel);
-                packet[0] = 0x09; 
-                packet[1] = 0x90; 
-            } else {
-            //  printf("[MIDI OUT] Note Off: %d\n", note);
-                packet[0] = 0x08; 
-                packet[1] = 0x80; 
-            }
-            packet[2] = (uint8_t)note;
-            packet[3] = (uint8_t)vel;
+            // Raw bytes
+            raw[0] = isNoteOn ? 0x90 : 0x80;
+            raw[1] = (uint8_t)note;
+            raw[2] = (uint8_t)vel;
+            raw_len = 3;
+
+            // USB Packet
+            packet[0] = isNoteOn ? 0x09 : 0x08; 
+            packet[1] = raw[0];
+            packet[2] = raw[1];
+            packet[3] = raw[2];
             break;
         }
 
         case HV_CTL_OUT_HASH: {
-            int ccNum = (int)msg_getFloat(m, 0);
-            int ccVal = (int)msg_getFloat(m, 1);
-        //  printf("[MIDI OUT] CC: %d | Val: %d\n", ccNum, ccVal);
+            uint8_t ccNum = (uint8_t)msg_getFloat(m, 0);
+            uint8_t ccVal = (uint8_t)msg_getFloat(m, 1);
+
+            // Raw bytes
+            raw[0] = 0xB0;
+            raw[1] = ccNum;
+            raw[2] = ccVal;
+            raw_len = 3;
+
+            // USB Packet
             packet[0] = 0x0B; 
-            packet[1] = 0xB0; 
-            packet[2] = (uint8_t)ccNum;
-            packet[3] = (uint8_t)ccVal;
+            packet[1] = raw[0];
+            packet[2] = raw[1];
+            packet[3] = raw[2];
             break;
         }
+
         default:
             return; 
     }
+
+    {% if settings.midi_usb_device %}
     if (tud_midi_mounted() && packet[0] != 0) {
         tud_midi_packet_write(packet);
     }
-}
+    {% endif %}
 
+    {% if settings.midi_uart %}
+    if (raw_len > 0) {
+        for (int i = 0; i < raw_len; i++) {
+            uart_putc(uart0, raw[i]);
+        }
+    }
+    {% endif %}
+
+    {% if settings.midi_host %}
+    if (raw_len > 0) {
+        tuh_midi_stream_write(1, 0, raw, raw_len);
+    }
+    {% endif %}
+}
 
 void midi_task() {
-    if (!tud_midi_available()) return;
-    uint8_t packet[4];
-    while (tud_midi_packet_read(packet)) {
-        handle_midi_message(packet[1], packet[2], packet[3]);
+    // 1. USB Device 
+    {% if settings.midi_mode == 'usb' %}
+    if (tud_midi_available()) {
+        uint8_t packet[4];
+        while (tud_midi_packet_read(packet)) {
+            handle_midi_message(packet[1], packet[2], packet[3]);
+        }
     }
-}
+    {% endif %}
 
+    // 2. USB Host 
+    {% if settings.midi_mode == 'host' %}
+    uint8_t b;
+    while (rb_pop(&midi_rb, &b)) parse_raw_midi_byte(b);
+    {% endif %}
+
+    // 3. Hardware UART 
+    {% if settings.midi_mode == 'uart' %}
+    while (uart_is_readable(uart0)) {
+        uint8_t raw_byte = uart_getc(uart0);
+        parse_raw_midi_byte(raw_byte);
+    }
+    {% endif %}
+}
 
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     bool handled = false;
@@ -203,6 +320,8 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
     float val = hv_msg_getFloat(m, 0);
 
+  //  printf("PD Message -> Name: %s | Hash: 0x%08X | Val: %f\n", name, hash, val);
+
     switch (hash) {
         {% for led in active_leds %}
         case {{ led.hash }}: 
@@ -211,8 +330,8 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         {% endfor %}
 
         {% for gate_out in active_gate_outs %}
-        case {{ gate_out.hash }}:
-            Pico::updateGate({{ gate_out.index }}, val);
+        case {{ gate_out.hash }}: 
+            Pico::updateGate({{ active_btns|length + active_gates|length + loop.index0 }}, val);
             return;
         {% endfor %}
 
@@ -222,17 +341,28 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 }
 
-
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
 
 
+
 int main() {
     set_sys_clock_khz({{ settings.core_freq }}, true);
-    stdio_init_all(); 
+    {% if settings.use_usb_cdc %}
+    stdio_usb_init(); 
+    {% endif %}
+
+    {% if settings.midi_mode == 'uart' %}
+    uart_init(uart0, 31250);
+    uart_set_fifo_enabled(uart0, true); 
+    gpio_set_function(0, GPIO_FUNC_UART); 
+    gpio_set_function(1, GPIO_FUNC_UART); 
+    {% endif %}
+
+    {% if settings.midi_mode in ['usb', 'host'] %}
     tusb_init(); 
-    cdc_stdio_lib_init();
+    {% endif %}
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
@@ -269,40 +399,27 @@ int main() {
     Pico::addJoystick({{ joy.id }}, {{ joy.x }}, {{ joy.y }});
     {% endfor %}
 
-   // --- I2S Configuration ---
-   {% if settings.audio_mode == "I2S" %}
-   
-    Pico::setupAudio(
-        Pico::I2S, 
-        audioFunc, 
-        {{ settings.sample_rate }}, 
-        {{ settings.i2s_data_pin }}, 
-        {{ settings.i2s_bclk_pin }}, 
-        {{ settings.buffer_size }}
-    );
+    {% if settings.audio_mode == "I2S" %}
+    Pico::setupAudio(Pico::I2S, audioFunc, {{ settings.sample_rate }}, {{ settings.i2s_data_pin }}, {{ settings.i2s_bclk_pin }}, {{ settings.buffer_size }});
     {% else %}
-
-    // // --- PWM Configuration ---
-    // Pico::setupAudio(
-    //     Pico::PWM, 
-    //     audioFunc, 
-    //     {{ settings.sample_rate }}, 
-    //     {{ settings.pwm_pin_l }}, 
-    //     {{ settings.pwm_pin_r }}, 
-    //     {{ settings.buffer_size }}
-    // );
-    // {% endif %}
+    Pico::setupAudio(Pico::PWM, audioFunc, {{ settings.sample_rate }}, {{ settings.pwm_pin_l }}, {{ settings.pwm_pin_r }}, {{ settings.buffer_size }});
+    {% endif %}
 
     multicore_launch_core1(Pico::core1_audio_entry);
 
     uint32_t last_hw_tick = 0;
-    uint32_t last_print_time = 0;
-
     float val, v; 
     bool send;
 
     while (true) {
+        {% if settings.midi_mode == 'usb' %}
         tud_task(); 
+        {% endif %}
+
+        {% if settings.midi_mode == 'host' %}
+        tuh_task(); 
+        {% endif %}
+
         midi_task(); 
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
@@ -311,58 +428,35 @@ int main() {
             last_hw_tick = now;
             Pico::update(now); 
 
-            float val; 
-            bool send;
-            float v;
-
             {% for btn in active_btns %}
             Pico::processPin({{ loop.index0 }}, val, send); 
-            if (send) { 
-                hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
-            }
+            if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
             {% endfor %}
 
             {% for gate in active_gates %}
             Pico::processPin({{ active_btns|length + loop.index0 }}, val, send);
-            if (send) {
-                hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
-            }
+            if (send) hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
             {% endfor %}
 
             {% for knob in active_knobs -%}
-            if (Pico::processKnob({{ loop.index0 }}, v)) {
-                hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
-            }
+            if (Pico::processKnob({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
             {% endfor %}
 
             {% for enc in active_encoders -%}
-            if (Pico::processEnc({{ loop.index0 }}, v)) {
-                hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
-            }
+            if (Pico::processEnc({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             {% endfor %}
 
-        {% for joy in active_joystick -%}
-        {
-            float vx = 0.0f; 
-            float vy = 0.0f;
-            bool cX = false;
-            bool cY = false;
-
-            if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
-                
-                if (cX) {
-                    hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_x }}, vx);
-                }
-
-                if (cY) {
-                    hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_y }}, vy);
+            {% for joy in active_joystick -%}
+            {
+                float vx = 0.0f, vy = 0.0f;
+                bool cX = false, cY = false;
+                if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
+                    if (cX) hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_x }}, vx);
+                    if (cY) hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_y }}, vy);
                 }
             }
+            {% endfor %}
         }
-        {% endfor %}
-        }
-
-
     } 
     return 0;
 }
