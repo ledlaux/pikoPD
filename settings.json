@@ -9,8 +9,8 @@
   "buffer_size": 32,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
-  "pwm_pin_l": 14,
-  "pwm_pin_r": 15,
+  "midi_mode": "uart",
+
   
   "adc_pins": [
     { "name": "knob", "pin": 26, "type": "knob" },
@@ -20,8 +20,8 @@
   ],
 
   "buttons": [
-    { "name": "btn1", "pin": 1, "mode": "switch" },
-    { "name": "btn2", "pin": 13, "mode": "toggle" },
+    { "name": "btn1", "pin": 23, "mode": "switch" },
+    { "name": "btn2", "pin": 11, "mode": "switch" },
     { "name": "btn3", "pin": 14, "mode": "bang" }
   ],
 
@@ -31,21 +31,20 @@
   ],
 
   "gate_in": [
-    { "name": "gate_in", "pin": 16 }
+    { "name": "gate_in", "pin": 15 }
   ],
 
   "gate_out": [
-    { "name": "gate", "pin": 2, "mode": "gate" },
+    { "name": "gate", "pin": 2, "mode": "gate" }
     { "name": "trigger", "pin": 3, "mode": "trigger" }
   ],
 
   "encoders": [
-    { "name": "enc", "pin_a": 4, "pin_b": 5 }
+    { "name": "enc", "pin_a": 5, "pin_b": 6 }
   ],
 
   "joystick": [ 
     {"name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true}
   ]
-
 
 }
