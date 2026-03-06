@@ -10,17 +10,18 @@ Check compiled binaries for RP2040 in the release section.
 - Uses main.cpp as a template
 - Set in `settings.json`:
   
-    - board (pico, zero, pico_w, pico2)
+    - board (pico, pico_w, zero, pico2)
     - core frequency
     - sample rate
     - i2s pins
-    - led pins
+    - led pins and type (pwm, rgb)
     - adc pins (knob, cv_in)
     - encoder pins
     - gate in/out pins (gate or trigger)
     - button pins and type (bang, toggle, switch)
     - joystic pins and range (regular or midi 1-127)
-    - midi mode (uart, usb, host)
+    - midi mode (uart, usb)
+      - uart (pins tx 0, rx 1 )
     - pwm audio
       
 - Copies hardware config files into project folder from `/src`
