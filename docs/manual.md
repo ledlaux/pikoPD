@@ -97,3 +97,28 @@ TOGGLE:	Latch (On/Off)
 SWITCH:	Press & Release (Momentary)  
 BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
+**Leds**
+
+PikoPD boards support three LED modes.
+
+- **pd** – Maps a Pure Data `[send]` object directly to the LED.
+- **status** – LED turns on when the board is powered and working correctly.
+- **midi** – LED blinks in response to incoming MIDI messages.
+
+```json
+"leds": [
+  { "name": "led1", "pin": 25, "mode": "pd" },
+  { "name": "status", "pin": 24, "mode": "status" },
+  { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
+]
+```
+
+**Builtin LED pins**
+| Board     | Pin | Notes                             |
+| --------- | --- | --------------------------------- |
+| Pico      | 25  | Single-color LED                  |
+| Pico W    | 25  | Single-color LED                  |
+| Pico 2    | 25  | Single-color LED                  |
+| Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
+
+Code supports up to 12 led connection.
