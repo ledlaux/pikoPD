@@ -86,7 +86,8 @@ namespace Pico {
     void addEncoder(int index, uint32_t pinA, uint32_t pinB);
     void addJoystick(int index, uint32_t pinX, uint32_t pinY);
     void addLed(int index, uint32_t pin);
-    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    void updateLed(int index, float val); 
+    void updateLed(int index, float val); 
+
     void updateGate(int index, float val);
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
@@ -97,11 +98,13 @@ namespace Pico {
     bool buttonReleased(int i);
     bool buttonToggled(int i, bool& outState);
     void __not_in_flash_func(setLedHardware)(int index, float value);
+#ifdef PICO_ZERO
     void init_neopixel();
+    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    
     void set_rgb_led(uint32_t color);
     uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b);
-    void set_rgb_color(float hue, float intensity);
     void updateRGB(int index, float hue, float intensity);
+#endif
     void update(uint32_t now);
 
     enum AudioMode { I2S, PWM };

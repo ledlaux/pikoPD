@@ -40,9 +40,18 @@ target_include_directories(pikopd.elf PRIVATE
     "${PICO_EXTRAS_PATH}/tinyusb"
 )
 
-pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+if(PICO_ZERO_BOARD)
+    add_compile_definitions(PICO_ZERO=1)
+    pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+endif()
 
-target_link_libraries(pikopd.elf
+
+if("${PICO_BOARD}" STREQUAL "pico_w")
+    target_link_libraries(pikopd.elf PRIVATE pico_cyw43_arch_none)
+    add_compile_definitions(PICO_W=1)
+endif()
+
+target_link_libraries(pikopd.elf PRIVATE
     pico_stdlib
     pico_audio_i2s
     pico_audio_pwm
@@ -52,7 +61,6 @@ target_link_libraries(pikopd.elf
     hardware_adc
     hardware_pwm
     pico_multicore
-    pico_cyw43_arch_none
 )
 
 set(CMAKE_CXX_STANDARD 17)

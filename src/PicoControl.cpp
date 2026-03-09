@@ -8,9 +8,11 @@
 #include "pico/audio_pwm.h"
 #include "pico/time.h"
 #include "hardware/pio.h"
-#include "ws2812.pio.h" 
 #include <cmath>
 
+#ifdef PICO_ZERO
+#include "ws2812.pio.h" 
+#endif
 
 namespace Pico {
 
@@ -60,7 +62,12 @@ namespace Pico {
 
 
     void addKnob(int index, uint32_t pin) {
-        if (index == 0) adc_init();
+        static bool adc_initialized = false;
+        if (!adc_initialized) {
+            adc_init();
+            adc_initialized = true;
+        }
+
         adc_gpio_init(pin);
         knobs[index].adc_ch = pin - 26;
         knobs[index].value.store(0.0f, std::memory_order_relaxed);
@@ -113,17 +120,6 @@ namespace Pico {
         if (index >= n_led) n_led = index + 1;
     }
 
-    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
-        init_neopixel(); 
-        leds[index].pin = pin;
-        leds[index].is_rgb = true;
-        leds[index].r = r;
-        leds[index].g = g;
-        leds[index].b = b;
-
-        if (index >= n_led) n_led = index + 1;
-    }
-
 
     void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
         if (n_knob == 0 && n_joystick == 0) adc_init();
@@ -148,23 +144,23 @@ namespace Pico {
     }
 
 
-     void update(uint32_t now) {
-            uint32_t all_pins = gpio_get_all(); 
+    void update(uint32_t now) {
+        uint32_t all_pins = gpio_get_all(); 
             
-            // --- Buttons ---
-            for (int i = 0; i < n_btn; i++) {
-                if (btns[i].mode == GATE_OUT) {
-                    if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                        gpio_put(btns[i].pin, 0);
-                        btns[i].state.store(false, std::memory_order_relaxed);
-                        btns[i].reset_at = 0; 
-                    }
-                    continue; 
+        // --- Buttons ---
+        for (int i = 0; i < n_btn; i++) {
+            if (btns[i].mode == GATE_OUT) {
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    gpio_put(btns[i].pin, 0);
+                    btns[i].state.store(false, std::memory_order_relaxed);
+                    btns[i].reset_at = 0; 
                 }
+                continue; 
+            }
     
-                bool r = (all_pins & btns[i].mask) == 0;
-                if (btns[i].mode == GATE_IN) {
-                    btns[i].state.store(r, std::memory_order_relaxed);
+            bool r = (all_pins & btns[i].mask) == 0;
+            if (btns[i].mode == GATE_IN) {
+                btns[i].state.store(r, std::memory_order_relaxed);
                 } else {
                     if (r != btns[i].raw_prev) {
                         btns[i].last_time = now;
@@ -173,74 +169,96 @@ namespace Pico {
                         btns[i].state.store(r, std::memory_order_relaxed);
                     }
                 }
-            }
+        }
     
-            // --- Encoders ---
-            for (int i = 0; i < n_encoder; i++) {
-                bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
-                bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
+        // --- Encoders ---
+        for (int i = 0; i < n_encoder; i++) {
+            bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
+            bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
     
-                if (clk != encoders[i].last_clk) {
-                    if (clk) { 
-                        if (clk != dt) {
-                            encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
-                        } else {
-                            encoders[i].value.fetch_add(1, std::memory_order_relaxed);
-                        }
+            if (clk != encoders[i].last_clk) {
+                if (clk) { 
+                    if (clk != dt) {
+                        encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
+                    } else {
+                        encoders[i].value.fetch_add(1, std::memory_order_relaxed);
                     }
-                    encoders[i].last_clk = clk;
                 }
+                encoders[i].last_clk = clk;
             }
+        }
     
-            // --- Knobs ---
-            for (int i = 0; i < n_knob; i++) {
-                adc_select_input(knobs[i].adc_ch);
-                float raw = (float)adc_read() / 4095.0f;
-                float prev = knobs[i].value.load(std::memory_order_relaxed);
-                knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
+        // --- Knobs ---
+        for (int i = 0; i < n_knob; i++) {
+            adc_select_input(knobs[i].adc_ch);
+            float raw = (float)adc_read() / 4095.0f;
+            float prev = knobs[i].value.load(std::memory_order_relaxed);
+            
+            if (fabsf(raw - prev) > 0.001f) {
+                float next_val = prev + (raw - prev) * knobs[i].coeff;
+                knobs[i].value.store(next_val, std::memory_order_relaxed);
             }
+        }
 
-            // --- Joystic ---    
-            for (int i = 0; i < n_joystick; i++) {
+        // --- Joystic ---
+        for (int i = 0; i < n_joystick; i++) {
             adc_select_input(joystick[i].adcX);
-            uint16_t rawX = adc_read();
+            float rawX = (float)adc_read();
             adc_select_input(joystick[i].adcY);
-            uint16_t rawY = adc_read();
+            float rawY = (float)adc_read();
 
-            joystick[i].smoothX = 0.1f * rawX + 0.9f * joystick[i].smoothX;
-            joystick[i].smoothY = 0.1f * rawY + 0.9f * joystick[i].smoothY;
+            if (fabsf(rawX - joystick[i].smoothX) > 1.0f) {
+                joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f; 
+            }
+            if (fabsf(rawY - joystick[i].smoothY) > 1.0f) {
+                joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
+            }
 
             int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
-            int16_t dy = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothY;
+            int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
 
             joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
             joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
         }
-    }
-        
+    }   
+
+#ifdef PICO_ZERO
     void init_neopixel() {
+        static bool initialized = false;
+        if (initialized) return;
+
         PIO pio = pio1;
         int sm = 0;
+        if (!pio_can_add_program(pio, &ws2812_program)) return;
+            
         uint offset = pio_add_program(pio, &ws2812_program);
-        
         ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+            
+        initialized = true;
         }
 
-        uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
-            return ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b);
-        }
+
+    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
+        init_neopixel(); 
+        leds[index].pin = pin;
+        leds[index].is_rgb = true;
+        leds[index].r = r;
+        leds[index].g = g;
+        leds[index].b = b;
+
+        if (index >= n_led) n_led = index + 1;
+    }
 
 
     void set_rgb_color(uint32_t pixel_grb) {
-    pio_sm_put_blocking(pio1, 0, pixel_grb << 8u);
-}
+        pio_sm_put_blocking(pio1, 0, pixel_grb); 
+    }
 
-    void updateRGB(int index, float hue, float val) {
+
+    void updateRGB(int index, float hue, float intensity) {
         if (index >= 12) return;
 
-        led_vals[index].store(val, std::memory_order_relaxed);
-     
-        float r, g, b;
+        float r = 0, g = 0, b = 0;
         float h = hue * 6.0f;
         int i = (int)h;
         float f = h - i;
@@ -253,32 +271,34 @@ namespace Pico {
             case 3: r = 0.0f; g = q;    b = 1.0f; break;
             case 4: r = f;    g = 0.0f; b = 1.0f; break;
             case 5: r = 1.0f; g = 0.0f; b = q;    break;
-            default: r = 0.0f; g = 0.0f; b = 0.0f; break;
         }
 
-        float gamma = val * val;
-        uint32_t color = urgb_u32(
-            (uint8_t)(r * gamma * 255.0f), 
-            (uint8_t)(g * gamma * 255.0f), 
-            (uint8_t)(b * gamma * 255.0f)
-        );
+        float gamma = intensity * intensity;
+        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
+        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
+        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
 
-        set_rgb_color(color);
+        uint32_t color = ((uint32_t)(uG) << 16) | 
+                        ((uint32_t)(uR) << 8)  | 
+                        ((uint32_t)(uB));
+
+        static uint32_t last_sent_color = 0;
+        if (color != last_sent_color) {
+            pio_sm_put_blocking(pio1, 0, color);
+            last_sent_color = color;
+        }
     }
+
+#endif
 
     void __not_in_flash_func(setLedHardware)(int index, float value) {
+        if (index >= 12) return;
         float gamma = value * value;
-
-        if (leds[index].is_rgb) {
-            uint8_t outR = (uint8_t)(leds[index].r * gamma);
-            uint8_t outG = (uint8_t)(leds[index].g * gamma);
-            uint8_t outB = (uint8_t)(leds[index].b * gamma);
-            set_rgb_led(urgb_u32(outR, outG, outB));
-        } else {
-            uint16_t level = (uint16_t)(gamma * 255.0f);
-            pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
-        }
+        if (leds[index].is_rgb) return; 
+        uint16_t level = (uint16_t)(gamma * 255.0f);
+        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
     }
+
 
     void updateLed(int index, float val) {
         if (index < 12) {
@@ -286,8 +306,6 @@ namespace Pico {
             setLedHardware(index, val);
         }
     }
-
-    
 
 
    void updateGate(int index, float val) {
@@ -472,6 +490,7 @@ namespace Pico {
         _bpin = bclk_pin;
         _bsize = buffer_size;
     }
+
 
     void __not_in_flash_func(core1_audio_entry)() {
     audio_format_t audio_format = {
