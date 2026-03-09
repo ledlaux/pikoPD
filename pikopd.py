@@ -3,34 +3,34 @@ import os, json, shutil, subprocess, jinja2, argparse, time, glob, sys
 
 
 class PicoUF2Generator:
-    def __init__(self, pd_path, project_root, src_dir, verbose=False):
+    def __init__(self, pd_path, project_root, src_dir=None, verbose=False):
         self.pd_path = os.path.abspath(pd_path)
         self.project_root = os.path.abspath(project_root)
-        self.src_dir = os.path.abspath(src_dir)
         self.verbose = verbose
 
-        self.patch_name = os.path.splitext(
-            os.path.basename(self.pd_path)
-        )[0]
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        self.templates = os.path.join(script_dir, "templates")
+
+        if src_dir is None:
+            self.src_dir = os.path.join(script_dir, "src")
+        else:
+            self.src_dir = os.path.abspath(src_dir)
+
+        self.c_dir = os.path.join(self.project_root, "src")
+
+        self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
 
         self.hvcc_dir = os.path.join(self.project_root, "hvcc")
         self.build_dir = os.path.join(self.project_root, "build")
-        self.c_dir = os.path.join(self.project_root, "src")
 
-        self.ir_json = os.path.join(
-            self.hvcc_dir,
-            f"{self.patch_name}.heavy.ir.json"
-        )
-
-        self.manifest_out = os.path.join(
-        self.hvcc_dir,  
-        f"{self.patch_name}_manifest.json"
-        )
+        self.ir_json = os.path.join(self.hvcc_dir, f"{self.patch_name}.heavy.ir.json")
+        self.manifest_out = os.path.join(self.hvcc_dir, f"{self.patch_name}_manifest.json")
 
         self.hv_lib_path = os.path.abspath(
             os.path.join(self.project_root, "../lib", "heavylib")
         )
-
+        
     def print_logo(self):
         logo = r"""
            _  _           _____  _____  
@@ -209,8 +209,8 @@ class PicoUF2Generator:
 
         self.print_progress(0.3, "Syncing Source")
         settings = {"pico_board": "pico2"}
-        if os.path.exists("settings.json"):
-            with open("settings.json") as f:
+        if os.path.exists("board.json"):
+            with open("board.json") as f:
                 settings.update(json.load(f))
 
         # ---- Copy sources ----
@@ -227,48 +227,55 @@ class PicoUF2Generator:
             ):
                 shutil.copy2(s, d)
 
-        # Make sure build directory exists
         os.makedirs(self.build_dir, exist_ok=True)
 
         self.print_progress(0.5, "Updating C++ & Manifest")
         manifest = self.collect_and_save_manifest()
 
-        env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(os.path.dirname(os.path.abspath(__file__)))
-        )
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(self.templates))
+
         new_main = env.get_template("main.cpp").render(
-            name=self.patch_name, hv_manifest=manifest, settings=settings
+        name=self.patch_name,
+        hv_manifest=manifest,
+        board=settings
         )
-        m_path = os.path.join(self.project_root, "main.cpp")
-        if not os.path.exists(m_path) or open(m_path).read() != new_main:
-            with open(m_path, "w") as f:
-                f.write(new_main)
+        m_path = os.path.join(self.c_dir, "main.cpp") 
+        with open(m_path, "w") as f:
+            f.write(new_main)
 
         sdk = os.environ.get("PICO_SDK_PATH")
         board = settings.get("pico_board", "pico")
         sdk_target = "pico" if board == "zero" else board
 
         if board == "pico2":
-            tool = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
-        elif board in ["pico", "pico_w", "zero"]:
-            tool = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
-            if board == "zero":
-               cmake_board_name = "pico"
+            toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
         else:
-            raise ValueError(f"Unsupported board: {board}")
+            toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
+        if board == "pico_w":
+            sdk_target = "pico_w"
+        elif board == "zero":
+            sdk_target = "pico"
+            extra_args = ["-DPICO_ZERO_BOARD=1"]
+        else:
+            sdk_target = board
 
         os.makedirs(self.build_dir, exist_ok=True)
         if not os.path.exists(os.path.join(self.build_dir, "Makefile")):
             self.print_progress(0.7, "Configuring CMake")
+            cmake_cmd = [
+                "cmake",
+                "-G", "Unix Makefiles",
+                f"-DPICO_SDK_PATH={sdk}",
+                f"-DPICO_BOARD={sdk_target}",
+                f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+                self.project_root,
+            ]
+
+            if board == "zero":
+                cmake_cmd.append("-DPICO_ZERO_BOARD=1")
+
             self.run_cmd(
-                [
-                    "cmake",
-                    "-G", "Unix Makefiles",
-                    f"-DPICO_SDK_PATH={sdk}",
-                    f"-DPICO_BOARD={sdk_target}",
-                    f"-DCMAKE_TOOLCHAIN_FILE={tool}",
-                    self.project_root, 
-                ],
+                cmake_cmd,
                 cwd=self.build_dir,
                 step_name="CMake",
             )
