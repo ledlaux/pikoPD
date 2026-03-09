@@ -48,7 +48,7 @@
   },
 
   "leds": [
-    { "name": "led1", "pin": 2, "mode": "pd" },
+    { "name": "led1", "pin": 25, "mode": "pd" },
     { "name": "status", "pin": 2, "mode": "status" },
     { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
   ]
