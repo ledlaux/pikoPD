@@ -373,6 +373,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             return;
         {% endfor %}
 
+        {# --- GATE OUT LOOP --- #}
         {% for gate_out in active_gate_outs %}
         case {{ gate_out.hash }}: 
             Pico::updateGate({{ active_btns|length + active_gates|length + loop.index0 }}, val);
