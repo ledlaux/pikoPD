@@ -55,7 +55,7 @@ Check compiled binaries for RP2040 in the release section.
 - To save resources remove unused send and receive objects from the patch.
 - You don't need to remove objects from `board.json`, script adds objects which are present in the patch automatically. 
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.). 
-- If you change the board from pico to pico2, remove the project folder or rename it in the command to rebuild files.  
+- If you change the board in `board.json`, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
