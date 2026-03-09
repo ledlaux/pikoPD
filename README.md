@@ -14,7 +14,7 @@ Check compiled binaries for RP2040 in the release section.
     - core frequency
     - sample rate
     - i2s pins
-    - led (pwm, rgb)
+    - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
     - rotary encoder 
     - gate in/out (gate or trigger)
