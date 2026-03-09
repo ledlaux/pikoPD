@@ -115,9 +115,10 @@ picotool
 pikoPD
 ├── docs
 ├── lib
-│ └── heavylib
+│   └── heavylib
 ├── patches
-└── src
+├── src
+└── templates          
 ```
 
 ## Usage
