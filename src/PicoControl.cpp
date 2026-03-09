@@ -176,11 +176,16 @@ namespace Pico {
             }
     
             // --- Knobs ---
+           
             for (int i = 0; i < n_knob; i++) {
-                adc_select_input(knobs[i].adc_ch);
-                float raw = (float)adc_read() / 4095.0f;
-                float prev = knobs[i].value.load(std::memory_order_relaxed);
-                knobs[i].value.store(prev + (raw - prev) * knobs[i].coeff, std::memory_order_relaxed);  // smoothening
+            adc_select_input(knobs[i].adc_ch);
+            float raw = (float)adc_read() / 4095.0f;
+            float prev = knobs[i].value.load(std::memory_order_relaxed);
+            
+            if (fabsf(raw - prev) > 0.001f) {
+                float next_val = prev + (raw - prev) * knobs[i].coeff;
+                knobs[i].value.store(next_val, std::memory_order_relaxed);   
+                }
             }
 
             // --- Joystic ---    
