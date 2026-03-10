@@ -5,7 +5,6 @@
 #include "pico/multicore.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
-
 {% if board.pico_board == 'pico_w' %}
 #include "pico/cyw43_arch.h"
 {% endif %}
