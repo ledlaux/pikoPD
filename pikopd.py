@@ -179,7 +179,7 @@ class PicoUF2Generator:
 
             shutil.rmtree(subdir, ignore_errors=True)
 
-    def run_all(self, flash=False, serial=False, skip_hvcc=False):
+    def run_all(self, flash=False, serial=False, skip_hvcc=False, midi_host=None):
         self.print_logo()
         start_time = time.time()
         print(f"\033[1mBuilding: {self.patch_name}\033[0m")
@@ -274,6 +274,9 @@ class PicoUF2Generator:
             if board == "zero":
                 cmake_cmd.append("-DPICO_ZERO_BOARD=1")
 
+            if midi_host == "host":
+                cmake_cmd.append("-DMIDI_HOST_ENABLED=1")
+
             self.run_cmd(
                 cmake_cmd,
                 cwd=self.build_dir,
@@ -310,6 +313,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
     parser.add_argument("pd_patch", help="Pure Data patch file (e.g., heavy.pd)")
     parser.add_argument("project_root", help="Project folder")
+    parser.add_argument("-m", "--midi", choices=["host", "device"], help="MIDI mode")
     parser.add_argument("-f", "--flash", action="store_true", help="Flash UF2 to Pico")
     parser.add_argument(
         "-s", "--serial", action="store_true", help="Open serial console after reboot"
@@ -324,6 +328,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+
     cmake_path = os.path.join(args.project_root, "CMakeLists.txt")
     if args.skip_hvcc and not os.path.exists(cmake_path):
         print("\033[33m⚠️  --skip-hvcc (-x) ignored: CMakeLists.txt not found in project root\033[0m")
@@ -331,4 +336,4 @@ if __name__ == "__main__":
 
     src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     gen = PicoUF2Generator(args.pd_patch, args.project_root, src, verbose=args.verbose)
-    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial)
+    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial, midi_host=args.midi)
