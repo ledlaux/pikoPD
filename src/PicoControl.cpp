@@ -7,9 +7,24 @@
 #include "pico/multicore.h"
 #include "pico/audio_pwm.h"
 #include "pico/time.h"
+#include "hardware/pio.h"
 #include <cmath>
+#include "tusb.h"
+
+#ifdef PICO_ZERO
+#include "ws2812.pio.h" 
+#endif
+
+
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2);
+
+extern "C" void on_uart_rx();
+
 
 namespace Pico {
+
+
+// -----------Interface hardware-----------
 
     std::atomic<float> led_vals[12];
 
@@ -57,7 +72,12 @@ namespace Pico {
 
 
     void addKnob(int index, uint32_t pin) {
-        if (index == 0) adc_init();
+        static bool adc_initialized = false;
+        if (!adc_initialized) {
+            adc_init();
+            adc_initialized = true;
+        }
+
         adc_gpio_init(pin);
         knobs[index].adc_ch = pin - 26;
         knobs[index].value.store(0.0f, std::memory_order_relaxed);
@@ -101,9 +121,12 @@ namespace Pico {
         uint chan = pwm_gpio_to_channel(pin);
         pwm_set_wrap(slice, 255);
         pwm_set_enabled(slice, true);
+        
         leds[index].pin = pin;
         leds[index].slice = slice;
         leds[index].chan = chan;
+        leds[index].is_rgb = false;
+        
         if (index >= n_led) n_led = index + 1;
     }
 
@@ -131,23 +154,23 @@ namespace Pico {
     }
 
 
-     void update(uint32_t now) {
-            uint32_t all_pins = gpio_get_all(); 
+    void update(uint32_t now) {
+        uint32_t all_pins = gpio_get_all(); 
             
-            // --- Buttons ---
-            for (int i = 0; i < n_btn; i++) {
-                if (btns[i].mode == GATE_OUT) {
-                    if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                        gpio_put(btns[i].pin, 0);
-                        btns[i].state.store(false, std::memory_order_relaxed);
-                        btns[i].reset_at = 0; 
-                    }
-                    continue; 
+        // --- Buttons ---
+        for (int i = 0; i < n_btn; i++) {
+            if (btns[i].mode == GATE_OUT) {
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    gpio_put(btns[i].pin, 0);
+                    btns[i].state.store(false, std::memory_order_relaxed);
+                    btns[i].reset_at = 0; 
                 }
+                continue; 
+            }
     
-                bool r = (all_pins & btns[i].mask) == 0;
-                if (btns[i].mode == GATE_IN) {
-                    btns[i].state.store(r, std::memory_order_relaxed);
+            bool r = (all_pins & btns[i].mask) == 0;
+            if (btns[i].mode == GATE_IN) {
+                btns[i].state.store(r, std::memory_order_relaxed);
                 } else {
                     if (r != btns[i].raw_prev) {
                         btns[i].last_time = now;
@@ -156,59 +179,133 @@ namespace Pico {
                         btns[i].state.store(r, std::memory_order_relaxed);
                     }
                 }
-            }
+        }
     
-            // --- Encoders ---
-            for (int i = 0; i < n_encoder; i++) {
-                bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
-                bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
+        // --- Encoders ---
+        for (int i = 0; i < n_encoder; i++) {
+            bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
+            bool dt  = (all_pins & (1u << encoders[i].pinB)) != 0;
     
-                if (clk != encoders[i].last_clk) {
-                    if (clk) { 
-                        if (clk != dt) {
-                            encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
-                        } else {
-                            encoders[i].value.fetch_add(1, std::memory_order_relaxed);
-                        }
+            if (clk != encoders[i].last_clk) {
+                if (clk) { 
+                    if (clk != dt) {
+                        encoders[i].value.fetch_sub(1, std::memory_order_relaxed);
+                    } else {
+                        encoders[i].value.fetch_add(1, std::memory_order_relaxed);
                     }
-                    encoders[i].last_clk = clk;
                 }
+                encoders[i].last_clk = clk;
             }
+        }
     
-            // --- Knobs ---
-           
-            for (int i = 0; i < n_knob; i++) {
+        // --- Knobs ---
+        for (int i = 0; i < n_knob; i++) {
             adc_select_input(knobs[i].adc_ch);
             float raw = (float)adc_read() / 4095.0f;
             float prev = knobs[i].value.load(std::memory_order_relaxed);
             
             if (fabsf(raw - prev) > 0.001f) {
                 float next_val = prev + (raw - prev) * knobs[i].coeff;
-                knobs[i].value.store(next_val, std::memory_order_relaxed);   
-                }
+                knobs[i].value.store(next_val, std::memory_order_relaxed);
+            }
+        }
+
+        // --- Joystic ---
+        for (int i = 0; i < n_joystick; i++) {
+            adc_select_input(joystick[i].adcX);
+            float rawX = (float)adc_read();
+            adc_select_input(joystick[i].adcY);
+            float rawY = (float)adc_read();
+
+            if (fabsf(rawX - joystick[i].smoothX) > 1.0f) {
+                joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f; 
+            }
+            if (fabsf(rawY - joystick[i].smoothY) > 1.0f) {
+                joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
             }
 
-            // --- Joystic ---    
-            for (int i = 0; i < n_joystick; i++) {
-            adc_select_input(joystick[i].adcX);
-            uint16_t rawX = adc_read();
-            adc_select_input(joystick[i].adcY);
-            uint16_t rawY = adc_read();
-
-            joystick[i].smoothX = 0.1f * rawX + 0.9f * joystick[i].smoothX;
-            joystick[i].smoothY = 0.1f * rawY + 0.9f * joystick[i].smoothY;
-
             int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
-            int16_t dy = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothY;
+            int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
 
             joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
             joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
         }
+    }   
+
+#ifdef PICO_ZERO
+    void init_neopixel() {
+        static bool initialized = false;
+        if (initialized) return;
+
+        PIO pio = pio1;
+        int sm = 0;
+        if (!pio_can_add_program(pio, &ws2812_program)) return;
+            
+        uint offset = pio_add_program(pio, &ws2812_program);
+        ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+            
+        initialized = true;
+        }
+
+
+    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
+        init_neopixel(); 
+        leds[index].pin = pin;
+        leds[index].is_rgb = true;
+        leds[index].r = r;
+        leds[index].g = g;
+        leds[index].b = b;
+
+        if (index >= n_led) n_led = index + 1;
     }
-        
+
+
+    void set_rgb_color(uint32_t pixel_grb) {
+        pio_sm_put_blocking(pio1, 0, pixel_grb); 
+    }
+
+
+    void updateRGB(int index, float hue, float intensity) {
+        if (index >= 12) return;
+
+        float r = 0, g = 0, b = 0;
+        float h = hue * 6.0f;
+        int i = (int)h;
+        float f = h - i;
+        float q = 1.0f - f;
+
+        switch (i % 6) {
+            case 0: r = 1.0f; g = f;    b = 0.0f; break;
+            case 1: r = q;    g = 1.0f; b = 0.0f; break;
+            case 2: r = 0.0f; g = 1.0f; b = f;    break;
+            case 3: r = 0.0f; g = q;    b = 1.0f; break;
+            case 4: r = f;    g = 0.0f; b = 1.0f; break;
+            case 5: r = 1.0f; g = 0.0f; b = q;    break;
+        }
+
+        float gamma = intensity * intensity;
+        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
+        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
+        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
+
+        uint32_t color = ((uint32_t)(uG) << 16) | 
+                        ((uint32_t)(uR) << 8)  | 
+                        ((uint32_t)(uB));
+
+        static uint32_t last_sent_color = 0;
+        if (color != last_sent_color) {
+            pio_sm_put_blocking(pio1, 0, color);
+            last_sent_color = color;
+        }
+    }
+
+#endif
 
     void __not_in_flash_func(setLedHardware)(int index, float value) {
-        uint16_t level = (uint16_t)(value * value * 255.0f);
+        if (index >= 12) return;
+        float gamma = value * value;
+        if (leds[index].is_rgb) return; 
+        uint16_t level = (uint16_t)(gamma * 255.0f);
         pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
     }
 
@@ -389,7 +486,7 @@ namespace Pico {
         return (cX || cY);
     }
 
-    
+// -----------Audio-----------
 
     static AudioMode _mode;
     static AudioProcessCallback _cb;
@@ -404,6 +501,7 @@ namespace Pico {
         _bpin = bclk_pin;
         _bsize = buffer_size;
     }
+
 
     void __not_in_flash_func(core1_audio_entry)() {
     audio_format_t audio_format = {
@@ -508,4 +606,271 @@ namespace Pico {
     }       
 }
 
+
+// -----------MIDI-----------
+
+    MidiBuffer midi_rb;
+    static int usb_midi_dev0 = -1;
+    static int usb_midi_dev1 = -1;
+
+    void midi_push(uint8_t byte) {
+        uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
+        uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
+
+        if ((h - t) < MIDI_RB_SIZE) {
+            midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
+            midi_rb.head.store(h + 1, std::memory_order_release);
+        }
+    }
+
+
+    bool midi_pop(uint8_t &byte) {
+        uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
+        uint32_t h = midi_rb.head.load(std::memory_order_acquire);
+
+        if (t == h) return false;  // empty
+
+        byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
+        midi_rb.tail.store(t + 1, std::memory_order_release);
+        return true;
+    }
+
+
+    void usb_init() {
+   
+        usb_midi_dev0 = -1;
+        usb_midi_dev1 = -1;
+
+        #ifdef MIDI_HOST
+            tusb_init(0, NULL);
+        #else
+            tusb_init(); 
+        #endif
+    }
+
+
+    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
+
+        if (byte >= 0xF8) { 
+            handler(byte, 0, 0);
+            return;
+        }
+
+        static uint8_t msg[3];
+        static int idx = 0;
+        static int expected = 0;
+        
+        if (byte & 0x80) { 
+            msg[0] = byte; 
+            idx = 1;
+            uint8_t type = byte & 0xF0;
+
+            if (type == 0xC0 || type == 0xD0) expected = 2; 
+            else if (byte == 0xF2) expected = 3;          
+            else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
+            else if (byte < 0xF0) expected = 3;            
+            else expected = 0;                           
+        } 
+        else if (idx > 0) { 
+            msg[idx++] = byte;
+        }
+        if (idx != 0 && idx == expected) {
+            handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+            
+            if (msg[0] < 0xF0) {
+                idx = 1; 
+            } else {
+                idx = 0;
+                expected = 0;
+            }
+        }
+    }
+
+
+    void midi_task() {
+    #ifdef MIDI_HOST
+        tuh_task();
+    #else
+        tud_task();
+    #endif
+        uint8_t b;
+        while (midi_pop(b)) {
+            parse_raw_midi_byte(b, handle_midi_message);
+        }
+    }
+
+    void uart_midi_init() {
+        uart_deinit(uart0);
+        uart_init(uart0, 31250); 
+        gpio_set_function(0, GPIO_FUNC_UART); 
+        gpio_set_function(1, GPIO_FUNC_UART); 
+        uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
+        uart_set_hw_flow(uart0, false, false);
+        uart_set_fifo_enabled(uart0, true);
+        irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
+        uart_set_irq_enables(uart0, true, false); 
+        irq_set_enabled(UART0_IRQ, true);
+    }
+
+
+    void midi_task_uart() {
+        uint8_t byte;
+        while (midi_pop(byte)) {
+            parse_raw_midi_byte(byte, handle_midi_message);
+        }
+    }
+
+
 }
+   
+
+extern "C" {
+
+#if MIDI_HOST
+    void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t qt) {
+        (void)qt;
+        uint8_t packet[4];
+        while (tuh_midi_packet_read(dev_addr, packet)) {
+            uint8_t cin = packet[0] & 0x0F;
+            uint8_t len = 0;
+
+            switch (cin) {
+                case 0x05: case 0x0F: len = 1; break;
+                case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                case 0x03: case 0x04: case 0x07: case 0x08: 
+                case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+            }
+
+            for (uint8_t i = 0; i < len; i++) {
+                Pico::midi_push(packet[i + 1]);
+            }
+        }
+    }
+
+    void tuh_midi_mount_cb(uint8_t dev_addr, const tuh_midi_mount_cb_t *mount_cb_data) {
+        (void)mount_cb_data;
+        if (Pico::usb_midi_dev0 == -1) Pico::usb_midi_dev0 = dev_addr;
+        else if (Pico::usb_midi_dev1 == -1) Pico::usb_midi_dev1 = dev_addr;
+    }
+
+    void tuh_midi_umount_cb(uint8_t dev_addr) {
+        if (Pico::usb_midi_dev0 == dev_addr) Pico::usb_midi_dev0 = -1;
+        else if (Pico::usb_midi_dev1 == dev_addr) Pico::usb_midi_dev1 = -1;
+    }
+#else
+    void tud_midi_rx_cb(uint8_t itf) {
+        (void)itf;
+        uint8_t packet[4];
+        while (tud_midi_available()) {
+            if (tud_midi_packet_read(packet)) {
+                uint8_t cin = packet[0] & 0x0F;
+                uint8_t len = 0;
+
+                switch (cin) {
+                    case 0x05: case 0x0F: len = 1; break;
+                    case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                    case 0x03: case 0x04: case 0x07: case 0x08: 
+                    case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+                }
+
+                for (uint8_t i = 0; i < len; i++) {
+                    Pico::midi_push(packet[i + 1]);
+                }
+            }
+        }
+    }
+#endif
+
+void on_uart_rx() {
+    while (uart_is_readable(uart0)) {
+        Pico::midi_push(uart_getc(uart0));
+    }
+}
+
+}
+
+
+// #include "lwip/apps/httpd.h"
+
+
+// extern "C" {
+//     // These satisfy the linker since we aren't using an actual filesystem
+//     struct fs_file {
+//         const char *data;
+//         int len;
+//         int index;
+//         void *pextension;
+//     };
+
+//     int fs_open(struct fs_file *file, const char *name) {
+//         return 0; // Always fail to find a file
+//     }
+
+//     void fs_close(struct fs_file *file) {
+//         // Nothing to close
+//     }
+
+//     int fs_read(struct fs_file *file, char *buffer, int count) {
+//         return 0; // Nothing to read
+//     }
+
+//     int fs_bytes_left(struct fs_file *file) {
+//         return 0; // No bytes left
+//     }
+// }
+
+
+
+// static const char *cgi_control_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
+//     uint32_t hash = 0;
+//     float val = 0.0f;
+
+//     for (int i = 0; i < iNumParams; i++) {
+//         // 'h' for hex hash, 'v' for float value
+//         if (strcmp(pcParam[i], "h") == 0) hash = (uint32_t)strtoul(pcValue[i], NULL, 16);
+//         if (strcmp(pcParam[i], "v") == 0) val = atof(pcValue[i]);
+//     }
+
+//     if (hash != 0) {
+//         hv_sendFloatToReceiver(&pd_prog, hash, val);
+//     }
+
+//     // Since we have no filesystem, return a non-existent path. 
+//     // The command is already executed!
+//     return "/404.html"; 
+// }
+
+// static const tCGI cgi_handlers[] = {
+//     {"/control", cgi_control_handler},
+// };
+
+// void start_wifi() {
+//     printf("\n--- Wi-Fi Initialization ---\n");
+    
+//     if (cyw43_arch_init()) {
+//         printf("FAILED: Could not initialize cyw43 chip.\n");
+//         return;
+//     }
+    
+//     cyw43_arch_enable_sta_mode();
+//     printf("Searching for SSID: %s...\n", "YOUR_SSID_HERE");
+
+//     // This will block for up to 30 seconds
+//     int connect_status = cyw43_arch_wifi_connect_timeout_ms(
+//         "Redmi", 
+//         "12345678", 
+//         CYW43_AUTH_WPA2_AES_PSK, 
+//         30000
+//     );
+
+//     if (connect_status != 0) {
+//         printf("FAILED: Connection error code: %d\n", connect_status);
+//     } else {
+//         printf("SUCCESS! Connected to Wi-Fi.\n");
+//         printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+        
+//         httpd_init();
+//         http_set_cgi_handlers(cgi_handlers, 1);
+//         printf("HTTP Server Started on port 80.\n");
+//     }
+// }

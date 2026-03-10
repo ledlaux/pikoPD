@@ -1,6 +1,6 @@
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding and testing ahead. Future plan is to add also automated arduino project builder option using arduino-cli.
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. Core logic is established, but there is a significant amount of coding and testing ahead. Future plan is to add automated arduino project builder option using arduino-cli.
 
 Check compiled binaries for RP2040 in the release section.
 
@@ -8,18 +8,20 @@ Check compiled binaries for RP2040 in the release section.
 
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**
 - Uses main.cpp as a template
-- Set in `settings.json`:
+- Set in `board.json`:
   
-    - board (pico, pico_w, pico2)
+    - board (pico, pico_w, zero, pico2)
     - core frequency
     - sample rate
     - i2s pins
-    - led pins
+    - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
-    - encoder pins
-    - gate in/out pins (gate or trigger)
-    - button pins and type (bang, toggle, switch)
-    - joystic pins and range (regular or midi 1-127)
+    - rotary encoder 
+    - gate in/out (gate or trigger)
+    - button (bang, toggle, switch)
+    - joystic and range (regular or midi 1-127)
+    - midi (uart, usb, host)
+      - uart (pins tx 0, rx 1 )
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -28,23 +30,23 @@ Check compiled binaries for RP2040 in the release section.
 
 ## Project Updates
 
-- [x] serial console 
-- [x] led
-- [x] usb midi
+- [x] serial console
 - [x] button
+- [x] led
 - [x] adc
-- [x] cv in
-- [x] gate in
-- [x] gate out
+- [x] uart midi
+- [x] usb midi
+- [x] usb midi host
 - [x] encoder
-- [x] joystic
+- [x] joystick
+- [x] gate in/out
+- [ ] pwm audio
 - [ ] screen
 - [ ] sensors
-- [ ] pwm audio
-- [ ] uart midi
 - [ ] midi clock
 - [ ] usb audio
 - [ ] bluetooth midi
+
 
 ### Working state
 
@@ -54,12 +56,12 @@ Check compiled binaries for RP2040 in the release section.
 
 ## Notes
 
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `settings.json`.  Also check for the correct `@hv_param` argument. 
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - To save resources remove unused send and receive objects from the patch.
-- You don't need to remove objects from `settings.json`, script adds objects which are present in the patch automatically. 
+- You don't need to remove objects from `board.json`, script adds objects which are present in the patch automatically. 
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.). 
-- If you change the board from pico to pico2, remove the project folder or rename it in the command to rebuild files.  
+- If you change the board in `board.json`, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
@@ -119,9 +121,10 @@ picotool
 pikoPD
 ├── docs
 ├── lib
-│ └── heavylib
+│   └── heavylib
 ├── patches
-└── src
+├── src
+└── templates          
 ```
 
 ## Usage

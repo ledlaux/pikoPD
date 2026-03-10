@@ -1,6 +1,6 @@
-## Toolchain setup ##
+# Toolchain setup 
 
-### Python 3.10+ ###
+### Python 3.10+ 
 
   - jinja2
 
@@ -20,7 +20,7 @@ Linux:
 sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
 ```  
 
-### Heavy compiler (hvcc) ###
+### Heavy compiler (hvcc) 
 
 ```bash
 python3 -m venv venv
@@ -30,7 +30,7 @@ cd hvcc/
 pip3 install -e .  
 ```
 
-### Raspberry Pi Pico SDK ###
+### Raspberry Pi Pico SDK 
 
 ```bash
 git clone https://github.com/raspberrypi/pico-sdk.git  
@@ -43,7 +43,7 @@ Set pico-sdk path environment variable:
 export PICO_SDK_PATH=/your_path/pico-sdk
 ```  
 
-### pico-extras ###
+### pico-extras 
 
 Must be places inside the pico-sdk folder.
 
@@ -54,7 +54,7 @@ cd pico-extras
 git submodule update --init  
 ```
 
-### picotool ###
+### picotool 
 
 Mac:  
 ```bash
@@ -88,12 +88,73 @@ optional arguments:
 ```
 
 
-## Hardware settings ##
+# Hardware configuration
 
+Hardware configuration is done by adjusting the `board.json` file.  
+This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mapped to GPIO pins and how it behaves.
 
-**Buttons**
+## Buttons
+
+```json
+"buttons": [
+  { "name": "btn1", "pin": 23, "mode": "switch" },
+  { "name": "btn2", "pin": 11, "mode": "switch" },
+  { "name": "btn3", "pin": 14, "mode": "bang" }
+]
+```
 
 TOGGLE:	Latch (On/Off)   
 SWITCH:	Press & Release (Momentary)  
 BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
+## ADC Inputs
+
+```json
+"adc_pins": [
+  { "name": "knob", "pin": 26, "type": "knob" },
+  { "name": "cv1", "pin": 27, "type": "cv_in" }
+]
+```
+
+| Type    | Description                                             |
+| ------- | ------------------------------------------------------- |
+| `knob`  | Standard analog control such as a knob or potentiometer |
+| `cv_in` | Control voltage input for external analog signals       |
+
+
+## LED configuration
+
+PikoPD boards support three LED modes.
+
+- **pd** – Maps a Pure Data `[send]` object directly to the LED.
+- **status** – LED turns on when the board is powered and working correctly.
+- **midi** – LED blinks in response to incoming MIDI messages.
+
+```json
+"leds": [
+  { "name": "led1", "pin": 25, "mode": "pd" },
+  { "name": "status", "pin": 24, "mode": "status" },
+  { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
+]
+```
+
+**Builtin LED pins**
+| Board     | Pin | Notes                             |
+| --------- | --- | --------------------------------- |
+| Pico      | 25  | Single-color LED                  |
+| Pico W    | 25  | Single-color LED                  |
+| Pico 2    | 25  | Single-color LED                  |
+| Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
+
+Code supports up to 12 led connection.
+
+
+## Joystick 
+
+PikoPD supports 2 joystick connection (each uses 2 adc pins), which can output values in either **regular** or **MIDI 1–127** range.
+
+
+```json
+"joystick": [
+  { "name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true }
+]

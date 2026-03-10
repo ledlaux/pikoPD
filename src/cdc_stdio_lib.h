@@ -19,9 +19,10 @@
   *
   * SPDX-License-Identifier: BSD-3-Clause
   */
- 
 #pragma once
 #include "pico/stdio.h"
+#ifndef MIDI_HOST
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,4 +33,5 @@ extern "C" {
 bool cdc_stdio_lib_init(void);
 #ifdef __cplusplus
 }
+#endif
 #endif

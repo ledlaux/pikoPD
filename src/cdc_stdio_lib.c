@@ -17,8 +17,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include "tusb.h"
+#ifndef MIDI_HOST
 #include "cdc_stdio_lib.h"
 
 // these may not be set if the user is providing tud support (i.e. LIB_TINYUSB_DEVICE is 1 because
@@ -162,4 +162,5 @@ bool cdc_stdio_lib_init(void) {
 #error "This library requires (CFG_TUD_ENABLED | TUSB_OPT_DEVICE_ENABLED) && CFG_TUD_CDC"
 #endif
 
+#endif
 
