@@ -208,10 +208,12 @@ class PicoUF2Generator:
             print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
 
         self.print_progress(0.3, "Syncing Source")
-        settings = {"pico_board": "pico2"}
+        settings = {"pico_board": "pico2", "midi_mode": "usb"} # Defaults
         if os.path.exists("board.json"):
             with open("board.json") as f:
                 settings.update(json.load(f))
+        
+        midi_mode = midi_host if midi_host else settings.get("midi_mode")
 
         # ---- Copy sources ----
         os.makedirs(self.c_dir, exist_ok=True)
@@ -274,8 +276,15 @@ class PicoUF2Generator:
             if board == "zero":
                 cmake_cmd.append("-DPICO_ZERO_BOARD=1")
 
-            if midi_host == "host":
+            if midi_mode == "host":
                 cmake_cmd.append("-DMIDI_HOST_ENABLED=1")
+                print("\033[32m  -> MIDI Host Mode enabled (TinyUSB Host)\033[0m")
+            elif midi_mode == "uart":
+                cmake_cmd.append("-DMIDI_HOST_ENABLED=0") 
+                print("\033[32m  -> MIDI UART Mode enabled (Hardware Pins)\033[0m")
+            else:
+                cmake_cmd.append("-DMIDI_HOST_ENABLED=0")
+                print("\033[32m  -> USB MIDI Device Mode enabled (TinyUSB Device)\033[0m")
 
             self.run_cmd(
                 cmake_cmd,
@@ -313,7 +322,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
     parser.add_argument("pd_patch", help="Pure Data patch file (e.g., heavy.pd)")
     parser.add_argument("project_root", help="Project folder")
-    parser.add_argument("-m", "--midi", choices=["host", "device"], help="MIDI mode")
     parser.add_argument("-f", "--flash", action="store_true", help="Flash UF2 to Pico")
     parser.add_argument(
         "-s", "--serial", action="store_true", help="Open serial console after reboot"
@@ -336,4 +344,4 @@ if __name__ == "__main__":
 
     src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     gen = PicoUF2Generator(args.pd_patch, args.project_root, src, verbose=args.verbose)
-    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial, midi_host=args.midi)
+    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial)
