@@ -9,12 +9,22 @@
 #include "pico/time.h"
 #include "hardware/pio.h"
 #include <cmath>
+#include "tusb.h"
 
 #ifdef PICO_ZERO
 #include "ws2812.pio.h" 
 #endif
 
+
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2);
+
+extern "C" void on_uart_rx();
+
+
 namespace Pico {
+
+
+// -----------Interface hardware-----------
 
     std::atomic<float> led_vals[12];
 
@@ -476,6 +486,7 @@ namespace Pico {
         return (cX || cY);
     }
 
+// -----------Audio-----------
 
     static AudioMode _mode;
     static AudioProcessCallback _cb;
@@ -593,6 +604,187 @@ namespace Pico {
             }
         }
     }       
+}
+
+
+// -----------MIDI-----------
+
+    MidiBuffer midi_rb;
+    static int usb_midi_dev0 = -1;
+    static int usb_midi_dev1 = -1;
+
+    void midi_push(uint8_t byte) {
+        uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
+        uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
+
+        if ((h - t) < MIDI_RB_SIZE) {
+            midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
+            midi_rb.head.store(h + 1, std::memory_order_release);
+        }
+    }
+
+
+    bool midi_pop(uint8_t &byte) {
+        uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
+        uint32_t h = midi_rb.head.load(std::memory_order_acquire);
+
+        if (t == h) return false;  // empty
+
+        byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
+        midi_rb.tail.store(t + 1, std::memory_order_release);
+        return true;
+    }
+
+
+    void usb_init() {
+   
+        usb_midi_dev0 = -1;
+        usb_midi_dev1 = -1;
+
+        #ifdef MIDI_HOST
+            tusb_init(0, NULL);
+        #else
+            tusb_init(); 
+        #endif
+    }
+
+
+    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
+
+        if (byte >= 0xF8) { 
+            handler(byte, 0, 0);
+            return;
+        }
+
+        static uint8_t msg[3];
+        static int idx = 0;
+        static int expected = 0;
+        
+        if (byte & 0x80) { 
+            msg[0] = byte; 
+            idx = 1;
+            uint8_t type = byte & 0xF0;
+
+            if (type == 0xC0 || type == 0xD0) expected = 2; 
+            else if (byte == 0xF2) expected = 3;          
+            else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
+            else if (byte < 0xF0) expected = 3;            
+            else expected = 0;                           
+        } 
+        else if (idx > 0) { 
+            msg[idx++] = byte;
+        }
+        if (idx != 0 && idx == expected) {
+            handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+            
+            if (msg[0] < 0xF0) {
+                idx = 1; 
+            } else {
+                idx = 0;
+                expected = 0;
+            }
+        }
+    }
+
+
+    void midi_task() {
+    #ifdef MIDI_HOST
+        tuh_task();
+    #else
+        tud_task();
+    #endif
+        uint8_t b;
+        while (midi_pop(b)) {
+            parse_raw_midi_byte(b, handle_midi_message);
+        }
+    }
+
+    void uart_midi_init() {
+        uart_deinit(uart0);
+        uart_init(uart0, 31250); 
+        gpio_set_function(0, GPIO_FUNC_UART); 
+        gpio_set_function(1, GPIO_FUNC_UART); 
+        uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
+        uart_set_hw_flow(uart0, false, false);
+        uart_set_fifo_enabled(uart0, true);
+        irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
+        uart_set_irq_enables(uart0, true, false); 
+        irq_set_enabled(UART0_IRQ, true);
+    }
+
+
+    void midi_task_uart() {
+        uint8_t byte;
+        while (midi_pop(byte)) {
+            parse_raw_midi_byte(byte, handle_midi_message);
+        }
+    }
+
+
+}
+   
+
+extern "C" {
+
+#if MIDI_HOST
+    void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t qt) {
+        (void)qt;
+        uint8_t packet[4];
+        while (tuh_midi_packet_read(dev_addr, packet)) {
+            uint8_t cin = packet[0] & 0x0F;
+            uint8_t len = 0;
+
+            switch (cin) {
+                case 0x05: case 0x0F: len = 1; break;
+                case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                case 0x03: case 0x04: case 0x07: case 0x08: 
+                case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+            }
+
+            for (uint8_t i = 0; i < len; i++) {
+                Pico::midi_push(packet[i + 1]);
+            }
+        }
+    }
+
+    void tuh_midi_mount_cb(uint8_t dev_addr, const tuh_midi_mount_cb_t *mount_cb_data) {
+        (void)mount_cb_data;
+        if (Pico::usb_midi_dev0 == -1) Pico::usb_midi_dev0 = dev_addr;
+        else if (Pico::usb_midi_dev1 == -1) Pico::usb_midi_dev1 = dev_addr;
+    }
+
+    void tuh_midi_umount_cb(uint8_t dev_addr) {
+        if (Pico::usb_midi_dev0 == dev_addr) Pico::usb_midi_dev0 = -1;
+        else if (Pico::usb_midi_dev1 == dev_addr) Pico::usb_midi_dev1 = -1;
+    }
+#else
+    void tud_midi_rx_cb(uint8_t itf) {
+        (void)itf;
+        uint8_t packet[4];
+        while (tud_midi_available()) {
+            if (tud_midi_packet_read(packet)) {
+                uint8_t cin = packet[0] & 0x0F;
+                uint8_t len = 0;
+
+                switch (cin) {
+                    case 0x05: case 0x0F: len = 1; break;
+                    case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                    case 0x03: case 0x04: case 0x07: case 0x08: 
+                    case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+                }
+
+                for (uint8_t i = 0; i < len; i++) {
+                    Pico::midi_push(packet[i + 1]);
+                }
+            }
+        }
+    }
+#endif
+
+void on_uart_rx() {
+    while (uart_is_readable(uart0)) {
+        Pico::midi_push(uart_getc(uart0));
+    }
 }
 
 }

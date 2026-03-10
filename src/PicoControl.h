@@ -5,6 +5,46 @@
 #include <atomic>
 #include <cmath>
 
+#ifdef MIDI_HOST
+    #ifndef CFG_TUH_ENABLED
+        #define CFG_TUH_ENABLED 1
+    #endif
+    #ifndef CFG_TUH_MIDI
+        #define CFG_TUH_MIDI 1
+    #endif
+    #ifndef BOARD_TUH_RHPORT
+        #define BOARD_TUH_RHPORT 0
+    #endif
+
+    #include "tusb_config.h"
+    #include "tusb.h"
+    #include "host/usbh.h"
+    #include "class/midi/midi_host.h"
+#else
+    #include "tusb_config.h"
+    #include "tusb.h"
+    #include "cdc_stdio_lib.h" 
+#endif
+
+
+
+#define MIDI_RB_SIZE 1024
+
+struct MidiBuffer {
+    uint8_t data[MIDI_RB_SIZE];
+    std::atomic<uint32_t> head{0};
+    std::atomic<uint32_t> tail{0};
+
+    uint32_t available() const {
+        return head.load() - tail.load();
+    }
+
+    bool is_full() const {
+        return available() >= MIDI_RB_SIZE;
+    }
+};
+
+
 namespace Pico {
 
     enum PinMode {
@@ -80,6 +120,8 @@ namespace Pico {
     extern int n_encoder;
     extern int n_joystick;
 
+    extern MidiBuffer midi_rb;
+
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0);
     void addKnob(int index, uint32_t pin); 
     void addCV(int index, uint32_t pin);   
@@ -114,8 +156,15 @@ namespace Pico {
                     int sample_rate, uint data_pin, uint bclk_pin, int buffer_size);
 
     void __not_in_flash_func(core1_audio_entry)();
-    
 
+
+    void midi_push(uint8_t byte);
+    bool midi_pop(uint8_t &byte);
+    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t));
+    void usb_init();
+    void uart_midi_init();
+    void midi_task();
+    void midi_task_uart();
 }
 
 #endif
