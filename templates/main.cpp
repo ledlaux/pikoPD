@@ -307,13 +307,13 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
             return; 
     }
 
-    {% if board.midi_usb_device %}
+    {% if board.midi_mode == 'usb' %}
     if (tud_midi_mounted() && packet[0] != 0) {
         tud_midi_packet_write(packet);
     }
     {% endif %}
 
-    {% if board.midi_uart %}
+    {% if board.midi_mode == 'uart' %}
     if (raw_len > 0) {
         for (int i = 0; i < raw_len; i++) {
             uart_putc(uart0, raw[i]);
@@ -321,7 +321,7 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     }
     {% endif %}
 
-    {% if board.midi_host %}
+    {% if board.midi_mode == 'uart' %}
     if (raw_len > 0) {
         tuh_midi_stream_write(1, 0, raw, raw_len);
     }
