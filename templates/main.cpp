@@ -288,6 +288,9 @@ int main() {
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
 
+
+    // --- Hardware ---
+
     {% for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
     {% endfor %}
@@ -368,6 +371,7 @@ int main() {
             bool is_active = (now < midi_activity_timer);
             float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
 
+
             // --- LED ---
 
             {% for led in active_leds -%}
@@ -386,7 +390,9 @@ int main() {
             {%- endif %}
             {% endfor %}
 
+                
             // --- Buttons & Gates ---
+                
             {% for btn in active_btns %}
             Pico::processPin({{ loop.index0 }}, val, send); 
             if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
@@ -397,7 +403,9 @@ int main() {
             if (send) hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
             {% endfor %}
 
+                
             // --- Knobs & Encoders ---
+                
             {% for knob in active_knobs -%}
             if (Pico::processKnob({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
             {% endfor %}
@@ -406,7 +414,9 @@ int main() {
             if (Pico::processEnc({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             {% endfor %}
 
+                
             // --- Joysticks ---
+                
             {% for joy in active_joystick -%}
             {
                 float vx = 0.0f, vy = 0.0f;
