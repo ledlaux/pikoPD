@@ -11,16 +11,22 @@
 {% endif %}
 
 {% if board.midi_mode == 'host' %}
+#ifndef MIDI_HOST
+#define MIDI_HOST 1
+#endif
 #ifndef CFG_TUH_ENABLED
 #define CFG_TUH_ENABLED 1
 #endif
 #ifndef CFG_TUH_MIDI
 #define CFG_TUH_MIDI 1
 #endif
+
+#include "tusb_config.h"
 #include "tusb.h"
 #include "host/usbh.h"
 #include "class/midi/midi_host.h"
 {% else %}
+#include "tusb_config.h"
 #include "tusb.h"
 #include "cdc_stdio_lib.h"
 {% endif %}
@@ -133,51 +139,41 @@
 
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
-
-
-void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-    
-    uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;
-
-    switch (type) {
-        case 0x90: 
-            if (data2 > 0) {
-            //  printf("[MIDI IN] Note On: %d | Vel: %d | Chan: %d\n", data1, data2, chan);
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan);
-                break;
-            }
-            [[fallthrough]]; 
-
-        case 0x80: 
-        //  printf("[MIDI IN] Note Off: %d | Chan: %d\n", data1, chan);
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan);
-            break;
-
-        case 0xB0: 
-        //  printf("[MIDI IN] CC: %d | Val: %d | Chan: %d\n", data1, data2, chan);
-            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
-            break;
-
-        case 0xE0: 
-            {
-                int bend = (data2 << 7) | data1;
-        //      printf("[MIDI IN] Bend: %d | Chan: %d\n", bend, chan);
-                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
-            }
-            break;
-
-        default:
-        //    printf("[MIDI IN] Other: Type 0x%02X | D1: %d | D2: %d\n", type, data1, data2);
-            break;
-    }
-}
-
 #define FLASH_DURATION_MS 40
 static uint32_t midi_activity_timer = 0;
 static uint8_t last_midi_velocity = 0;
 static uint8_t current_midi_note = 60; 
 static float cc1_brightness = 1.0f;    
+
+
+void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+    uint8_t type = status & 0xF0;
+    uint8_t chan = status & 0x0F;
+
+    if (type == 0x90 && data2 > 0) {
+        last_midi_velocity = data2;
+        current_midi_note = data1;
+        midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+    }
+    if (type == 0xB0 && data1 == 1) {
+        cc1_brightness = (float)data2 / 127.0f;
+    }
+
+    switch (type) {
+        case 0x90: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+            break;
+        case 0x80: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+            break;
+        case 0xB0: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+            break;
+        case 0xE0: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
+            break;
+    }
+}
 
 
 {% if board.midi_mode in ['uart', 'host'] %}
@@ -203,6 +199,11 @@ static inline int rb_pop(midi_ring_t *rb, uint8_t *b) {
 
 
 void parse_raw_midi_byte(uint8_t byte) {
+    if (byte >= 0xF8) { 
+        handle_midi_message(byte, 0, 0);
+        return;
+    }
+
     static uint8_t msg[3];
     static int idx = 0;
     static int expected = 0;
@@ -212,34 +213,52 @@ void parse_raw_midi_byte(uint8_t byte) {
         idx = 1;
         uint8_t type = byte & 0xF0;
         
-        expected = (type == 0xC0 || type == 0xD0) ? 2 : 3;
+        if (type == 0xC0 || type == 0xD0) expected = 2; 
+        else if (type >= 0xF0) expected = 0; 
+        else expected = 3;                             
     } 
-    else if (idx > 0 && idx < 3) { 
+    else if (idx > 0) { 
         msg[idx++] = byte;
     }
 
     if (idx != 0 && idx == expected) {
         handle_midi_message(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
-
-        // Flash LED for Note On events
-        uint8_t status_type = msg[0] & 0xF0;
-        uint8_t velocity = (expected == 3) ? msg[2] : 0;
-
-        if (status_type == 0x90 && velocity > 0) {
-            midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
-        }
-
-        idx = 1; 
+        idx = (msg[0] < 0xF0) ? 1 : 0; 
     }
 }
 {% endif %}
 
-
 {% if board.midi_mode == 'host' %}
-void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t xferred_bytes) {
-    uint8_t buf[64]; uint8_t cable; uint32_t n;
-    while ((n = tuh_midi_stream_read(dev_idx, &cable, buf, sizeof(buf))) > 0) {
-        for (uint32_t i = 0; i < n; i++) rb_push(&midi_rb, buf[i]);
+static int usb_midi_dev0 = -1;
+static int usb_midi_dev1 = -1;
+
+extern "C" {
+    void tuh_midi_mount_cb(uint8_t dev_idx, const tuh_midi_mount_cb_t *mount_cb_data) {
+        (void) mount_cb_data;
+        printf("USB MIDI Device %d Mounted\n", dev_idx);
+        if (usb_midi_dev0 < 0) {
+            usb_midi_dev0 = dev_idx;
+        } else if (usb_midi_dev1 < 0) {
+            usb_midi_dev1 = dev_idx;
+        }
+    }
+
+    void tuh_midi_umount_cb(uint8_t dev_idx) {
+        printf("USB MIDI Device %d Unmounted\n", dev_idx);
+        if (dev_idx == usb_midi_dev0) usb_midi_dev0 = -1;
+        else if (dev_idx == usb_midi_dev1) usb_midi_dev1 = -1;
+    }
+
+    void tuh_midi_rx_cb(uint8_t dev_idx, uint32_t xferred_bytes) {
+        (void) xferred_bytes;
+        uint8_t buf[64]; 
+        uint8_t cable; 
+        uint32_t n;
+        while ((n = tuh_midi_stream_read(dev_idx, &cable, buf, sizeof(buf))) > 0) {
+            for (uint32_t i = 0; i < n; i++) {
+                rb_push(&midi_rb, buf[i]);
+            }
+        }
     }
 }
 {% endif %}
@@ -316,41 +335,26 @@ void midi_task() {
         uint8_t packet[4];
         while (tud_midi_packet_read(packet)) {
             handle_midi_message(packet[1], packet[2], packet[3]);
-
-            uint8_t status = packet[1];
-            uint8_t type = status & 0xF0;
-            uint8_t data1 = packet[2]; 
-            uint8_t data2 = packet[3]; 
-
-            // 1. Handle Note On for the flash trigger
-            if (type == 0x90 && data2 > 0) {
-                last_midi_velocity = data2;
-                current_midi_note = data1; 
+            
+            uint8_t type = packet[1] & 0xF0;
+            if (type == 0x90 && packet[3] > 0) { // Note On
+                last_midi_velocity = packet[3];
+                current_midi_note = packet[2]; 
                 midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
             }
-
-            // 2. Handle Control Change for brightness
-            if (type == 0xB0 && data1 == 1) { 
-                cc1_brightness = (float)data2 / 127.0f;
+            if (type == 0xB0 && packet[2] == 1) { // CC 1
+                cc1_brightness = (float)packet[3] / 127.0f;
             }
         }
     }
     {% endif %}
 
-    {% if board.midi_mode == 'host' %}
-    tuh_task();
+    {% if board.midi_mode in ['host', 'uart'] %}
     uint8_t b;
     while (rb_pop(&midi_rb, &b)) {
         parse_raw_midi_byte(b);
     }
-    {% endif %}
-
-    {% if board.midi_mode == 'uart' %}
-    uint8_t b;
-    while (rb_pop(&midi_rb, &b)) {
-        parse_raw_midi_byte(b);
-    }
-    {% endif %}
+    {% endif %} 
 }
 
 
@@ -407,7 +411,13 @@ void audioFunc(float* buffer, int frames) {
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
+
+    {% if board.midi_mode == 'usb' %}
+
+    #ifndef MIDI_HOST
     cdc_stdio_lib_init();
+    #endif
+    {% endif %}
 
     {% if board.pico_board == 'zero' %}
     #ifdef PICO_ZERO
@@ -496,13 +506,19 @@ int main() {
 
     while (true) {
 
-        {% if board.midi_mode == 'usb' %}
-        tud_task(); 
-        {% endif %}
-        {% if board.midi_mode == 'host' %}
-        tuh_task(); 
-        {% endif %}
+        // {% if board.midi_mode == 'usb' %}
+        // tud_task(); 
+        // {% endif %}
+        // {% if board.midi_mode == 'host' %}
+        // tuh_task(); 
+        // {% endif %}
 
+        #ifdef MIDI_HOST
+        tuh_task();
+        #else
+        tud_task();
+        #endif
+        
         midi_task(); 
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
@@ -546,7 +562,8 @@ int main() {
             #endif
             {% else %}
             Pico::updateLed(led_idx, target_val);
-            {% endif %}}
+            {% endif %}
+            }
             {% endfor %}
 
             {% for btn in active_btns %}
