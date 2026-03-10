@@ -30,17 +30,23 @@ Check compiled binaries for RP2040 in the release section.
 
 ## Project Updates
 
-| | |
-|---|---|
-|  [x] serial console |  [x] joystic |
-|  [x] led |  [ ] screen |
-|  [x] usb midi |  [ ] sensors |
-|  [x] button |  [] pwm audio |
-|  [x] adc |  [x] uart midi |
-|  [x] cv in |  [ ] midi clock |
-|  [x] gate in |  [ ] usb audio |
-|  [x] gate out |  [ ] bluetooth midi |
-|  [x] encoder |  [] usb midi host |
+- [x] serial console
+- [x] button
+- [x] led
+- [x] adc
+- [x] uart midi
+- [x] usb midi
+- [x] encoder
+- [x] joystick
+- [x] gate in/out
+- [ ] pwm audio
+- [ ] screen
+- [ ] sensors
+- [ ] midi clock
+- [ ] usb audio
+- [x] usb midi host
+- [ ] bluetooth midi
+
 
 ### Working state
 
