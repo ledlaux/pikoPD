@@ -20,7 +20,7 @@ Check compiled binaries for RP2040 in the release section.
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
     - joystic and range (regular or midi 1-127)
-    - midi (uart, usb)
+    - midi (uart, usb, host)
       - uart (pins tx 0, rx 1 )
       
 - Copies hardware config files into project folder from `/src`
