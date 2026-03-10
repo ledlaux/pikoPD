@@ -596,3 +596,89 @@ namespace Pico {
 }
 
 }
+
+
+// #include "lwip/apps/httpd.h"
+
+
+// extern "C" {
+//     // These satisfy the linker since we aren't using an actual filesystem
+//     struct fs_file {
+//         const char *data;
+//         int len;
+//         int index;
+//         void *pextension;
+//     };
+
+//     int fs_open(struct fs_file *file, const char *name) {
+//         return 0; // Always fail to find a file
+//     }
+
+//     void fs_close(struct fs_file *file) {
+//         // Nothing to close
+//     }
+
+//     int fs_read(struct fs_file *file, char *buffer, int count) {
+//         return 0; // Nothing to read
+//     }
+
+//     int fs_bytes_left(struct fs_file *file) {
+//         return 0; // No bytes left
+//     }
+// }
+
+
+
+// static const char *cgi_control_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
+//     uint32_t hash = 0;
+//     float val = 0.0f;
+
+//     for (int i = 0; i < iNumParams; i++) {
+//         // 'h' for hex hash, 'v' for float value
+//         if (strcmp(pcParam[i], "h") == 0) hash = (uint32_t)strtoul(pcValue[i], NULL, 16);
+//         if (strcmp(pcParam[i], "v") == 0) val = atof(pcValue[i]);
+//     }
+
+//     if (hash != 0) {
+//         hv_sendFloatToReceiver(&pd_prog, hash, val);
+//     }
+
+//     // Since we have no filesystem, return a non-existent path. 
+//     // The command is already executed!
+//     return "/404.html"; 
+// }
+
+// static const tCGI cgi_handlers[] = {
+//     {"/control", cgi_control_handler},
+// };
+
+// void start_wifi() {
+//     printf("\n--- Wi-Fi Initialization ---\n");
+    
+//     if (cyw43_arch_init()) {
+//         printf("FAILED: Could not initialize cyw43 chip.\n");
+//         return;
+//     }
+    
+//     cyw43_arch_enable_sta_mode();
+//     printf("Searching for SSID: %s...\n", "YOUR_SSID_HERE");
+
+//     // This will block for up to 30 seconds
+//     int connect_status = cyw43_arch_wifi_connect_timeout_ms(
+//         "Redmi", 
+//         "12345678", 
+//         CYW43_AUTH_WPA2_AES_PSK, 
+//         30000
+//     );
+
+//     if (connect_status != 0) {
+//         printf("FAILED: Connection error code: %d\n", connect_status);
+//     } else {
+//         printf("SUCCESS! Connected to Wi-Fi.\n");
+//         printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+        
+//         httpd_init();
+//         http_set_cgi_handlers(cgi_handlers, 1);
+//         printf("HTTP Server Started on port 80.\n");
+//     }
+// }
