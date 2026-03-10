@@ -52,7 +52,7 @@ Check compiled binaries for RP2040 in the release section.
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
-3. Getting serial console to work with USB MIDI in pico-sdk was tricky, but it now works with [print] objects from  PD. It can get flooded with messages and crash the device, so use it moderately for debugging only. [print] objects are parsed automatically. You can also use the regular console if needed—just uncomment the print lines in the code.
+3. [print] objects output to the serial console. It can get flooded, so use it moderately. All [print] objects in the patch are parsed by the script. You can also use the regular console in the code. 
 4. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
 
