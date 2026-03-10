@@ -45,18 +45,18 @@
 {%- endfor -%}
 
 {%- set active_btns = [] -%}
-{%- for b in board.buttons if b.name in receives -%}
+{%- for b in board.inputs.buttons if b.name in receives -%}
     {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': receives[b.name]}) -%}
 {%- endfor -%}
 
 {%- set active_gates = [] -%}
-{%- for g in board.gate_in if g.name in receives -%}
+{%- for g in board.inputs.gate_in if g.name in receives -%}
     {%- set _ = active_gates.append({'pin': g.pin, 'mode': 'gate_in', 'hash': receives[g.name]}) -%}
 {%- endfor -%}
 
 {%- set active_gate_outs = [] -%}
 {%- set gate_base_index = active_btns|length + active_gates|length -%}
-{%- for go in board.gate_out if go.name in sends -%}
+{%- for go in board.outputs.gate_out if go.name in sends -%}
     {%- set dur = 15 if go.mode == "trigger" else 0 -%}
     {%- set index = gate_base_index + loop.index0 -%}
     {%- set _ = active_gate_outs.append({
@@ -68,7 +68,7 @@
 {%- endfor -%}
 
 {%- set active_knobs = [] -%}
-{%- for k in board.adc_pins if k.name in receives -%}
+{%- for k in board.inputs.adc_pins if k.name in receives -%}
     {%- set _ = active_knobs.append({'hash': receives[k.name], 'pin': k.pin, 'type': k.type}) -%}
 {%- endfor -%}
 
@@ -94,12 +94,12 @@
 {%- endfor -%}
 
 {%- set active_encoders = [] -%}
-{%- for e in board.encoders if e.name in receives -%}
+{%- for e in board.inputs.encoders if e.name in receives -%}
     {%- set _ = active_encoders.append({'a': e.pin_a, 'b': e.pin_b, 'hash': receives[e.name]}) -%}
 {%- endfor -%}
 
 {%- set active_joystick = [] -%}
-{%- for j in board.joystick -%}
+{%- for j in board.inputs.joystick -%}
     {%- set hash_x = receives[j.name + "_x"] -%}
     {%- set hash_y = receives[j.name + "_y"] -%}
     
