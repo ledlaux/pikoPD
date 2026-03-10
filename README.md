@@ -36,6 +36,7 @@ Check compiled binaries for RP2040 in the release section.
 - [x] adc
 - [x] uart midi
 - [x] usb midi
+- [x] usb midi host
 - [x] encoder
 - [x] joystick
 - [x] gate in/out
@@ -44,7 +45,6 @@ Check compiled binaries for RP2040 in the release section.
 - [ ] sensors
 - [ ] midi clock
 - [ ] usb audio
-- [x] usb midi host
 - [ ] bluetooth midi
 
 
