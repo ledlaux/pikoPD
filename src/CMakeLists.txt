@@ -33,6 +33,7 @@ endif()
 
 pico_sdk_init()
 
+
 # 3. Source Collection
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
@@ -43,9 +44,8 @@ file(GLOB HVCC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.cpp"
 )
-set(HTTPD_SOURCE "${PICO_SDK_PATH}/lib/lwip/src/apps/http/httpd.c")
 
-set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES} ${HTTPD_SOURCE})
+set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES})
 
 # 4. Create Executable (This must happen BEFORE target_ commands)
 add_executable(pikopd.elf ${ALL_SOURCES})
@@ -85,7 +85,7 @@ if(PICO_ZERO_BOARD)
 endif()
 
 if("${PICO_BOARD}" STREQUAL "pico_w")
-    target_link_libraries(pikopd.elf PRIVATE pico_cyw43_arch_lwip_threadsafe_background)
+    target_link_libraries(pikopd.elf PRIVATE pico_cyw43_arch_none)
     target_compile_definitions(pikopd.elf PRIVATE PICO_W=1)
 endif()
 
