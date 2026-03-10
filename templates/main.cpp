@@ -237,15 +237,16 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     float val = hv_msg_getFloat(m, 0);
 
     switch (hash) {
-{% for l in board.leds %}
+{% for l in board.leds -%}
+    {%- set led_index = loop.index0 -%} 
     {%- for s in hv_manifest.sends -%}
         {%- if s.name == l.name -%}
-        case {{ s.hash }}: // {{ l.name }}
-            Pico::led_vals[{{ loop.index0 }}].store(val, std::memory_order_relaxed);
+        case {{ s.hash }}U: // {{ l.name }}
+            Pico::led_vals[{{ led_index }}].store(val, std::memory_order_relaxed);
             return;
         {%- endif -%}
     {%- endfor -%}
-{% endfor %}
+{%- endfor %}
         default:
             heavyMidiOutHook(vc, name, hash, m);
             break;
