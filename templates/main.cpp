@@ -5,6 +5,7 @@
 #include "pico/multicore.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
+
 {% if board.pico_board == 'pico_w' %}
 #include "pico/cyw43_arch.h"
 {% endif %}
@@ -119,40 +120,70 @@
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 #define FLASH_DURATION_MS 40
+#define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
 static uint8_t last_midi_velocity = 0;
 static uint8_t current_midi_note = 60; 
-static float cc1_brightness = 1.0f;    
+static uint32_t last_led_tick = 0;
+static uint32_t midi_clock_timer = 0;
+static uint8_t clock_count = 0;
+static bool clock_running = false; 
+static uint32_t last_hw_tick = 0;
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-    uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;
 
-    if (type == 0x90 && data2 > 0) {
-        last_midi_velocity = data2;
-        current_midi_note = data1;
-        midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
-    }
-    if (type == 0xB0 && data1 == 1) {
-        cc1_brightness = (float)data2 / 127.0f;
-    }
+    if (status >= 0xF8) {
+            hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
 
-    switch (type) {
-        case 0x90: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
-            break;
-        case 0x80: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
-            break;
-        case 0xB0: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
-            break;
-        case 0xE0: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
-            break;
+            if (status == 0xFA) { // START
+                clock_count = 23; 
+                clock_running = true;
+                midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+            } 
+            else if (status == 0xFB) { // CONTINUE
+                clock_running = true;
+            } 
+            else if (status == 0xFC) { // STOP
+                clock_running = false;
+                midi_clock_timer = 0; 
+            } 
+            else if (status == 0xF8) { // CLOCK
+                if (clock_running) {
+                    clock_count++;
+                    if (clock_count >= 24) {
+                        clock_count = 0;
+                        midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+                    }
+                }
+            }
+            return; 
+        }
+
+        uint8_t type = status & 0xF0;
+        uint8_t chan = status & 0x0F;
+
+        if (type == 0x90 && data2 > 0) {
+            last_midi_velocity = data2;
+            current_midi_note = data1;
+            midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+        }
+
+        switch (type) {
+            case 0x90: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+                break;
+            case 0x80: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+                break;
+            case 0xB0: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+                break;
+            case 0xE0: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
+                break;
+        }
     }
-}
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
@@ -234,17 +265,25 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
-    float val = hv_msg_getFloat(m, 0);
+    int numElem = hv_msg_getNumElements(m);
+    float val0 = hv_msg_getFloat(m, 0);
 
     switch (hash) {
 {% for l in board.leds -%}
-    {%- set led_index = loop.index0 -%} 
-    {%- for s in hv_manifest.sends -%}
-        {%- if s.name == l.name -%}
+    {%- set led_index = loop.index0 -%}
+    {%- for s in hv_manifest.sends if s.name == l.name -%}
         case {{ s.hash }}U: // {{ l.name }}
-            Pico::led_vals[{{ led_index }}].store(val, std::memory_order_relaxed);
+            {% if l.is_rgb -%}
+            if (numElem >= 2) {
+                Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
+                Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+            } else {
+                Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
+            }
+            {%- else -%}
+            Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
+            {%- endif %}
             return;
-        {%- endif -%}
     {%- endfor -%}
 {%- endfor %}
         default:
@@ -258,12 +297,10 @@ void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
 
-
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
-    stdio_init_all(); 
-
-    {% if board.midi_mode == 'usb' %}
+  
+    {% if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
     #endif
@@ -287,9 +324,6 @@ int main() {
 
     pd_prog.setPrintHook(&hv_print_handler);
     pd_prog.setSendHook(&sendHookHandler);
-
-
-    // --- Hardware ---
 
     {% for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -363,36 +397,62 @@ int main() {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
-        if (now != last_hw_tick) {
-            last_hw_tick = now;
+        if (now - last_led_tick >= 10) {
+            last_led_tick = now;
 
             Pico::update(now); 
 
             bool is_active = (now < midi_activity_timer);
             float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
+            float clock_val = (now < midi_clock_timer) ? 1.0f : 0.0f;
 
-
-            // --- LED ---
-
-            {% for led in active_leds -%}
-            {%- set val = 'midi_val' if led.mode == 'midi' 
-                          else '1.0f' if led.mode == 'status' 
-                          else 'Pico::led_vals[' ~ loop.index0 ~ '].load(std::memory_order_relaxed)' -%}
             
-            {%- if board.pico_board == 'pico_w' and (led.pin == 25) -%}
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, {{ val }} > 0.01f);
-            {%- elif board.pico_board == 'zero' and (led.pin == 16) and (led.is_rgb | default(false)) -%}
-            #ifdef PICO_ZERO
-            Pico::updateRGB({{ loop.index0 }}, {% if led.mode == "midi" %}0.1667f{% elif led.mode == "status" %}0.0f{% else %}0.66f{% endif %}, {{ val }});
-            #endif
-            {%- else -%}
-            Pico::updateLed({{ loop.index0 }}, {{ val }});
-            {%- endif %}
-            {% endfor %}
+             // --- LED ---
 
-                
+                {% for led in active_leds -%}
+                    {%- set idx = loop.index0 -%}
+                    
+                    {%- if led.is_rgb -%}
+                        #ifdef PICO_ZERO
+                        {
+                            float h = Pico::led_hue[{{ idx }}].load(std::memory_order_relaxed);
+                            float i = Pico::led_intensity[{{ idx }}].load(std::memory_order_relaxed);
+
+                            {% if led.mode == 'midi' %}
+                                i = midi_val;
+                                h = 0.66f; 
+                            {% elif led.mode == 'clock' %}
+                                i = clock_val;
+                                h = 0.66f; 
+                            {% elif led.mode == 'status' %}
+                                i = 1.0f;
+                            {% endif %}
+
+                            Pico::updateRGB({{ idx }}, h, i);
+                        }
+                        #endif
+                    {%- else -%}
+                        val = Pico::led_vals[{{ idx }}].load(std::memory_order_relaxed);
+                        
+                        {%- if led.mode == 'status' %} val = 1.0f; {% endif %}
+                        {%- if led.mode == 'midi' %} val = midi_val; {% endif %}
+                        {%- if led.mode == 'clock' %} val = clock_val; {% endif %}
+
+                        {%- if board.pico_board == 'pico_w' and (led.pin == 25) -%}
+                            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, val > 0.01f);
+                        {%- else -%}
+                            Pico::updateLed({{ idx }}, val);
+                        {%- endif %}
+                    {%- endif %}
+                {% endfor %}
+
+                #ifdef PICO_ZERO
+                Pico::showRGB(); 
+                #endif
+            
+
             // --- Buttons & Gates ---
-                
+
             {% for btn in active_btns %}
             Pico::processPin({{ loop.index0 }}, val, send); 
             if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
@@ -403,9 +463,9 @@ int main() {
             if (send) hv_sendFloatToReceiver(&pd_prog, {{ gate.hash }}, val);
             {% endfor %}
 
-                
+
             // --- Knobs & Encoders ---
-                
+
             {% for knob in active_knobs -%}
             if (Pico::processKnob({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
             {% endfor %}
@@ -414,9 +474,9 @@ int main() {
             if (Pico::processEnc({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             {% endfor %}
 
-                
+
             // --- Joysticks ---
-                
+
             {% for joy in active_joystick -%}
             {
                 float vx = 0.0f, vy = 0.0f;
@@ -427,6 +487,7 @@ int main() {
                 }
             }
             {% endfor %}
+          
         } 
     } 
 
