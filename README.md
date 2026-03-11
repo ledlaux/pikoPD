@@ -69,7 +69,7 @@ Check compiled binaries for RP2040 in the release section.
 - To save resources remove unused send and receive objects from the patch.
 - You don't need to remove objects from `board.json`, script adds objects which are present in the patch.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
-- [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately and remove unused from the patch. You can also use the regular console in the code.
+- [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately or it will crash device, also remove unused prints from the patch. Regular console also is available in the code. Use midi cc120 to enable/disable debug console while pikoPD runs.
 - If you change the board in `board.json` or change midi mode, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
