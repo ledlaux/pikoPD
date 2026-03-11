@@ -148,8 +148,6 @@ PikoPD boards support three LED modes.
 
 Code supports up to 12 different led connection.
 
-**RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
-Use [pack f f] object before [s ledRGB] to send 2 values. 
 
 
 ## Joystick 
