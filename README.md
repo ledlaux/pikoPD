@@ -54,8 +54,9 @@ Check compiled binaries for RP2040 in the release section.
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
-3. [print] objects are parsed by the script and output to the serial console. It can get flooded, so use it moderately and remove unused from the patch. You can also use the regular console in the code. 
-4. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
+3. Midi input/output implemented in usb, usb host and uart config. Also midi clock works with [midirealtimein] object.
+4. [print] objects will output to the serial console. Use them moderately and remove unused from the patch. You can also use the regular console in the code.
+5. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
 
 ## Notes
