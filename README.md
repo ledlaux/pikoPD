@@ -55,8 +55,7 @@ Check compiled binaries for RP2040 in the release section.
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
 3. Midi input/output implemented in usb, usb host and uart config. Also midi clock works with [midirealtimein] object.
-4. [print] objects will output to the serial console. Use them moderately and remove unused from the patch. You can also use the regular console in the code.
-5. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
+4. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
 
 ## Notes
@@ -64,8 +63,9 @@ Check compiled binaries for RP2040 in the release section.
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - To save resources remove unused send and receive objects from the patch.
-- You don't need to remove objects from `board.json`, script adds objects which are present in the patch automatically. 
-- Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.). 
+- You don't need to remove objects from `board.json`, script adds objects which are present in the patch automatically.
+- Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).
+- [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately and remove unused from the patch. You can also use the regular console in the code.
 - If you change the board in `board.json` or change midi mode, remove the project folder or rename it in the command to rebuild files.  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
