@@ -65,10 +65,11 @@ Check compiled binaries for RP2040 in the release section.
 
 ## Notes
 
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
+- All hardware configuration is done by adjusting `board.json` file.
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - To save resources remove unused send and receive objects from the patch.
-- You don't need to remove objects from `board.json`, script adds objects which are present in the patch.
+- You don't need to remove objects from `board.json`, script adds objects which are present in the patch only.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
 - [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately or it will crash device, also remove unused prints from the patch. Regular console also is available in the code. Use midi cc120 to enable/disable debug console while pikoPD runs.
 - **If you change the board or change midi mode in `board.json` remove the project folder or rename it in the command to rebuild files.**  
