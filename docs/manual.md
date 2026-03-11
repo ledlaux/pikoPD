@@ -97,7 +97,7 @@ This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mappe
 
 ```json
 "buttons": [
-  { "name": "btn1", "pin": 23, "mode": "switch" },
+  { "name": "btn1", "pin": 23, "mode": "toggle" },
   { "name": "btn2", "pin": 11, "mode": "switch" },
   { "name": "btn3", "pin": 14, "mode": "bang" }
 ]
