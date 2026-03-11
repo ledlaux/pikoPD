@@ -63,7 +63,7 @@ Check compiled binaries for RP2040 in the release section.
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** and **category** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - To save resources remove unused send and receive objects from the patch.
-- You don't need to remove objects from `board.json`, script adds objects which are present in the patch automatically.
+- You don't need to remove objects from `board.json`, script adds objects which are present in the patch.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**) according to the **category** of the object (button, etc.).
 - [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately and remove unused from the patch. You can also use the regular console in the code.
 - If you change the board in `board.json` or change midi mode, remove the project folder or rename it in the command to rebuild files.  
