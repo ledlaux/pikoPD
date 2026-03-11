@@ -28,6 +28,8 @@ namespace Pico {
     std::atomic<float> led_intensity[12];
     static uint32_t led_framebuffer[12] = {0};
     static float smooth_hue[12] = {0.0f};
+
+
 // -----------Interface hardware-----------
 
     Button btns[12];
