@@ -34,8 +34,6 @@
 #define MIDI_RT_STOP            0xFC
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
-#define MIDI_RT_ACTIVESENSE     0xFE
-#define MIDI_RT_RESET           0xFF
 
 {% set receives = {} %}
 {%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
