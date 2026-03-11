@@ -124,16 +124,18 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
 ## LED configuration
 
-PikoPD boards support three LED modes.
+PikoPD boards support 4 LED modes.
 
 - **pd** – Maps a Pure Data `[send]` object directly to the LED.
 - **status** – LED turns on when the board is powered and working correctly.
 - **midi** – LED blinks in response to incoming MIDI messages.
+- **clock** – LED blinks in response to incoming MIDI clock.
 
 ```json
 "leds": [
   { "name": "led1", "pin": 25, "mode": "pd" },
   { "name": "status", "pin": 24, "mode": "status" },
+  { "name": "clock", "pin": 23, "mode": "clock" },
   { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
 ]
 ```
