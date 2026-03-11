@@ -22,6 +22,7 @@ Check compiled binaries for RP2040 in the release section.
     - joystic and range (regular or midi 1-127)
     - midi (uart, usb, host)
       - uart (pins tx 0, rx 1 )
+    - debug console 
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -42,6 +43,7 @@ Check compiled binaries for RP2040 in the release section.
 - [x] gate in/out
 - [x] midi clock
 - [ ] pwm audio
+- [ ] sd card
 - [ ] screen
 - [ ] sensors
 - [ ] usb audio
