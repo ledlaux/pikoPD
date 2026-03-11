@@ -118,39 +118,73 @@
 
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
+static mutex_t pd_mutex;
 
 #define FLASH_DURATION_MS 40
+#define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
 static uint8_t last_midi_velocity = 0;
 static uint8_t current_midi_note = 60; 
-uint32_t last_led_tick = 0; 
+static uint32_t last_led_tick = 0;
+static uint32_t midi_clock_timer = 0;
+static uint8_t clock_count = 0;
+static bool clock_running = false; 
+static uint32_t last_hw_tick = 0;
+
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-    uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;
 
-    if (type == 0x90 && data2 > 0) {
-        last_midi_velocity = data2;
-        current_midi_note = data1;
-        midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
-    }
-   
+    if (status >= 0xF8) {
+            hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
 
-    switch (type) {
-        case 0x90: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
-            break;
-        case 0x80: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
-            break;
-        case 0xB0: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
-            break;
-        case 0xE0: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
-            break;
+            if (status == 0xFA) { // START
+                clock_count = 23; 
+                clock_running = true;
+                midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+            } 
+            else if (status == 0xFB) { // CONTINUE
+                clock_running = true;
+            } 
+            else if (status == 0xFC) { // STOP
+                clock_running = false;
+                midi_clock_timer = 0; 
+            } 
+            else if (status == 0xF8) { // CLOCK
+                if (clock_running) {
+                    clock_count++;
+                    if (clock_count >= 24) {
+                        clock_count = 0;
+                        midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+                    }
+                }
+            }
+            return; 
+        }
+
+        uint8_t type = status & 0xF0;
+        uint8_t chan = status & 0x0F;
+
+        if (type == 0x90 && data2 > 0) {
+            last_midi_velocity = data2;
+            current_midi_note = data1;
+            midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+        }
+
+        switch (type) {
+            case 0x90: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+                break;
+            case 0x80: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+                break;
+            case 0xB0: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+                break;
+            case 0xE0: 
+                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
+                break;
+        }
     }
-}
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
@@ -230,6 +264,7 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
     }
 }
 
+
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
     int numElem = hv_msg_getNumElements(m);
     float val0 = hv_msg_getFloat(m, 0);
@@ -260,14 +295,19 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 
 
 void audioFunc(float* buffer, int frames) {
-    pd_prog.processInlineInterleaved(buffer, buffer, frames);
+    if (mutex_try_enter(&pd_mutex, NULL)) {
+        pd_prog.processInlineInterleaved(buffer, buffer, frames);
+        mutex_exit(&pd_mutex);
+    } else {
+        // If locked, output silence for this tiny block to prevent a pop
+        for(int i=0; i < frames*2; i++) buffer[i] = 0; 
+    }
 }
 
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
-    stdio_init_all(); 
-
+  
     {% if board.midi_mode == 'usb' %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
@@ -345,6 +385,8 @@ int main() {
         {{ board.buffer_size }});
     {% endif %}
 
+
+    mutex_init(&pd_mutex);
     multicore_launch_core1(Pico::core1_audio_entry);
 
     uint32_t last_hw_tick = 0;
@@ -365,60 +407,60 @@ int main() {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
-        if (now != last_hw_tick) {
-            last_hw_tick = now;
+        if (now - last_led_tick >= 10) {
+            last_led_tick = now;
 
             Pico::update(now); 
 
             bool is_active = (now < midi_activity_timer);
             float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
+            float clock_val = (now < midi_clock_timer) ? 1.0f : 0.0f;
 
             
-            // --- LED ---
+             // --- LED ---
 
-  // --- LED ---
-    if (now - last_led_tick >= 25) {
-        last_led_tick = now;
 
-        {% for led in active_leds -%}
-            {%- set idx = loop.index0 -%}
-            
-            {%- if led.is_rgb -%}
+                {% for led in active_leds -%}
+                    {%- set idx = loop.index0 -%}
+                    
+                    {%- if led.is_rgb -%}
+                        #ifdef PICO_ZERO
+                        {
+                            float h = Pico::led_hue[{{ idx }}].load(std::memory_order_relaxed);
+                            float i = Pico::led_intensity[{{ idx }}].load(std::memory_order_relaxed);
+
+                            {% if led.mode == 'midi' %}
+                                i = midi_val;
+                                h = 0.66f; 
+                            {% elif led.mode == 'clock' %}
+                                i = clock_val;
+                                h = 0.66f; 
+                            {% elif led.mode == 'status' %}
+                                i = 1.0f;
+                            {% endif %}
+
+                            Pico::updateRGB({{ idx }}, h, i);
+                        }
+                        #endif
+                    {%- else -%}
+                        val = Pico::led_vals[{{ idx }}].load(std::memory_order_relaxed);
+                        
+                        {%- if led.mode == 'status' %} val = 1.0f; {% endif %}
+                        {%- if led.mode == 'midi' %} val = midi_val; {% endif %}
+                        {%- if led.mode == 'clock' %} val = clock_val; {% endif %}
+
+                        {%- if board.pico_board == 'pico_w' and (led.pin == 25) -%}
+                            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, val > 0.01f);
+                        {%- else -%}
+                            Pico::updateLed({{ idx }}, val);
+                        {%- endif %}
+                    {%- endif %}
+                {% endfor %}
+
                 #ifdef PICO_ZERO
-                {
-                    // Logic for RGB Mode selection
-                    float h = Pico::led_hue[{{ idx }}].load(std::memory_order_relaxed);
-                    float i = Pico::led_intensity[{{ idx }}].load(std::memory_order_relaxed);
-
-                    {% if led.mode == 'midi' %}
-                    i = midi_val; // Use MIDI velocity/activity for brightness
-                    h = 0.66f;    // Default to Blue for MIDI (or keep current hue)
-                    {% elif led.mode == 'status' %}
-                    i = 1.0f;    // Always on
-                    {% endif %}
-
-                    Pico::updateRGB({{ idx }}, h, i);
-                }
+                Pico::showRGB(); 
                 #endif
-            {%- else -%}
-                val = Pico::led_vals[{{ idx }}].load(std::memory_order_relaxed);
-                
-                {%- if led.mode == 'status' %} val = 1.0f; {% endif %}
-                {%- if led.mode == 'midi' %} val = midi_val; {% endif %}
-
-                {%- if board.pico_board == 'pico_w' and (led.pin == 25) -%}
-                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, val > 0.01f);
-                {%- else -%}
-                    Pico::updateLed({{ idx }}, val);
-                {%- endif %}
-            {%- endif %}
-        {% endfor %}
-
-        #ifdef PICO_ZERO
-        Pico::showRGB(); 
-        #endif
-    }
-
+            
 
             // --- Buttons & Gates ---
 
@@ -456,6 +498,7 @@ int main() {
                 }
             }
             {% endfor %}
+          
         } 
     } 
 
