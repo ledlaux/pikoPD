@@ -8,6 +8,27 @@ It is currently a **Proof of Concept**. The core logic of the system has been im
 
 Check compiled binaries for RP2040 in the release section.
 
+## Project Updates
+
+- [x] serial console
+- [x] button
+- [x] led
+- [x] adc
+- [x] uart midi
+- [x] usb midi
+- [x] usb midi host
+- [x] encoder
+- [x] joystick
+- [x] gate in/out
+- [x] midi clock
+- [ ] pwm audio
+- [ ] sd card
+- [ ] screen
+- [ ] sensors
+- [ ] usb audio
+- [ ] bluetooth midi
+      
+
 ## Features
 
 - Converts Pure Data (`.pd`) patches to C code via **hvcc**
@@ -32,27 +53,7 @@ Check compiled binaries for RP2040 in the release section.
 - Builds firmware using **CMake** in a `build/` folder  
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
-
-## Project Updates
-
-- [x] serial console
-- [x] button
-- [x] led
-- [x] adc
-- [x] uart midi
-- [x] usb midi
-- [x] usb midi host
-- [x] encoder
-- [x] joystick
-- [x] gate in/out
-- [x] midi clock
-- [ ] pwm audio
-- [ ] sd card
-- [ ] screen
-- [ ] sensors
-- [ ] usb audio
-- [ ] bluetooth midi
-
+  
 
 ### Working state
 
