@@ -1,10 +1,10 @@
 # PD → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc**, **pico-sdk**, and **picotool**. It is currently a **Proof of Concept**. 
+This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc** compiler and **pico-sdk**. 
 
 The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, and sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
 
-The core logic of the system has been implemented, although considerable amount of coding and testing remains. Development is ongoing to expand features and hardware support. Future plans include adding an automated Arduino project builder based on arduino-cli.
+It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of coding and testing remains. Development is ongoing to expand features and hardware support. Future plans include adding an automated Arduino project builder based on arduino-cli.
 
 Check compiled binaries for RP2040 in the release section.
 
