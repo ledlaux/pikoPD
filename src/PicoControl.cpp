@@ -268,12 +268,10 @@ namespace Pico {
 
     void updateRGB(int index, float hue, float intensity) {
         if (index < 0 || index >= 12) return;
-
-        // 1. Hue Wrap-around Smoothing
         float diff = hue - smooth_hue[index];
         if (diff > 0.5f) diff -= 1.0f;
         if (diff < -0.5f) diff += 1.0f;
-        smooth_hue[index] += diff * 0.15f; // Slightly faster response
+        smooth_hue[index] += diff * 0.15f; 
 
         // Keep hue in 0..1 range
         if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
@@ -306,10 +304,7 @@ namespace Pico {
 
 
    void showRGB() {
-        // Only push if the 8-slot buffer has space (Prevents the "Stuck" crash)
         if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
-
-        // Write color + dummy zeros for timing latch
         pio1->txf[0] = led_framebuffer[0];
         pio1->txf[0] = 0;
         pio1->txf[0] = 0;
