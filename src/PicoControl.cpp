@@ -237,103 +237,6 @@ namespace Pico {
     }   
 
 
-#ifdef PICO_ZERO
-
-    void init_neopixel() {
-        static bool initialized = false;
-        if (initialized) return;
-
-        PIO pio = pio1;
-        int sm = 0;
-        if (!pio_can_add_program(pio, &ws2812_program)) return;
-            
-        uint offset = pio_add_program(pio, &ws2812_program);
-        ws2812_program_init(pio, sm, offset, 16, 800000, false); 
-
-        pio_sm_set_enabled(pio, sm, true);
-            
-        initialized = true;
-    }
-
-
-    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
-        init_neopixel(); 
-        leds[index].pin = pin;
-        leds[index].is_rgb = true;
-        leds[index].r = r;
-        leds[index].g = g;
-        leds[index].b = b;
-
-        if (index >= n_led) n_led = index + 1;
-    }
-
-
-    void updateRGB(int index, float hue, float intensity) {
-        if (index < 0 || index >= 12) return;
-        float diff = hue - smooth_hue[index];
-        if (diff > 0.5f) diff -= 1.0f;
-        if (diff < -0.5f) diff += 1.0f;
-        smooth_hue[index] += diff * 0.15f; 
-
-        // Keep hue in 0..1 range
-        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
-        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
-
-        // 2. HSV to RGB Math
-        float r = 0, g = 0, b = 0;
-        float h = smooth_hue[index] * 6.0f;
-        int i = (int)h;
-        float f = h - i;
-        float q = 1.0f - f;
-
-        switch (i % 6) {
-            case 0: r = 1.0f; g = f;    b = 0.0f; break;
-            case 1: r = q;    g = 1.0f; b = 0.0f; break;
-            case 2: r = 0.0f; g = 1.0f; b = f;    break;
-            case 3: r = 0.0f; g = q;    b = 1.0f; break;
-            case 4: r = f;    g = 0.0f; b = 1.0f; break;
-            case 5: r = 1.0f; g = 0.0f; b = q;    break;
-        }
-
-        // 3. Gamma & Intensity
-        float gamma = intensity * intensity;
-        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
-        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
-        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
-
-        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
-    }
-
-
-   void showRGB() {
-        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
-        pio1->txf[0] = led_framebuffer[0];
-        pio1->txf[0] = 0;
-        pio1->txf[0] = 0;
-        pio1->txf[0] = 0;
-    }
-
-#endif
-
-    void __not_in_flash_func(setLedHardware)(int index, float value) {
-        if (index >= 12) return;
-        float gamma = value * value;
-        if (leds[index].is_rgb) return; 
-        uint16_t level = (uint16_t)(gamma * 255.0f);
-        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
-    }
-
-
-   void updateLed(int index, float val) {
-    if (index < 12) {
-        led_vals[index].store(val, std::memory_order_relaxed);
-        if (!leds[index].is_rgb) {
-            setLedHardware(index, val);
-        }
-    }
-}
-
-
     void updateGate(int index, float val) {
         if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
             int state = (val > 0.5f) ? 1 : 0;
@@ -501,6 +404,104 @@ namespace Pico {
 
         return (cX || cY);
     }
+
+
+#ifdef PICO_ZERO
+
+    void init_neopixel() {
+        static bool initialized = false;
+        if (initialized) return;
+
+        PIO pio = pio1;
+        int sm = 0;
+        if (!pio_can_add_program(pio, &ws2812_program)) return;
+            
+        uint offset = pio_add_program(pio, &ws2812_program);
+        ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+
+        pio_sm_set_enabled(pio, sm, true);
+            
+        initialized = true;
+    }
+
+
+    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
+        init_neopixel(); 
+        leds[index].pin = pin;
+        leds[index].is_rgb = true;
+        leds[index].r = r;
+        leds[index].g = g;
+        leds[index].b = b;
+
+        if (index >= n_led) n_led = index + 1;
+    }
+
+
+    void updateRGB(int index, float hue, float intensity) {
+        if (index < 0 || index >= 12) return;
+        float diff = hue - smooth_hue[index];
+        if (diff > 0.5f) diff -= 1.0f;
+        if (diff < -0.5f) diff += 1.0f;
+        smooth_hue[index] += diff * 0.15f; 
+
+        // Keep hue in 0..1 range
+        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
+        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
+
+        // 2. HSV to RGB Math
+        float r = 0, g = 0, b = 0;
+        float h = smooth_hue[index] * 6.0f;
+        int i = (int)h;
+        float f = h - i;
+        float q = 1.0f - f;
+
+        switch (i % 6) {
+            case 0: r = 1.0f; g = f;    b = 0.0f; break;
+            case 1: r = q;    g = 1.0f; b = 0.0f; break;
+            case 2: r = 0.0f; g = 1.0f; b = f;    break;
+            case 3: r = 0.0f; g = q;    b = 1.0f; break;
+            case 4: r = f;    g = 0.0f; b = 1.0f; break;
+            case 5: r = 1.0f; g = 0.0f; b = q;    break;
+        }
+
+        // 3. Gamma & Intensity
+        float gamma = intensity * intensity;
+        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
+        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
+        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
+
+        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
+    }
+
+
+   void showRGB() {
+        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
+        pio1->txf[0] = led_framebuffer[0];
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+    }
+
+#endif
+
+    void __not_in_flash_func(setLedHardware)(int index, float value) {
+        if (index >= 12) return;
+        float gamma = value * value;
+        if (leds[index].is_rgb) return; 
+        uint16_t level = (uint16_t)(gamma * 255.0f);
+        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
+    }
+
+
+   void updateLed(int index, float val) {
+    if (index < 12) {
+        led_vals[index].store(val, std::memory_order_relaxed);
+        if (!leds[index].is_rgb) {
+            setLedHardware(index, val);
+        }
+    }
+}
+
 
 // -----------Audio-----------
 
