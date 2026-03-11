@@ -23,10 +23,12 @@ extern "C" void on_uart_rx();
 
 namespace Pico {
 
-
-// -----------Interface hardware-----------
-
     std::atomic<float> led_vals[12];
+    std::atomic<float> led_hue[12];        
+    std::atomic<float> led_intensity[12];
+    static uint32_t led_framebuffer[12] = {0};
+    static float smooth_hue[12] = {0.0f};
+// -----------Interface hardware-----------
 
     Button btns[12];
     Led leds[12];
@@ -180,7 +182,7 @@ namespace Pico {
                     }
                 }
         }
-    
+
         // --- Encoders ---
         for (int i = 0; i < n_encoder; i++) {
             bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
@@ -232,7 +234,9 @@ namespace Pico {
         }
     }   
 
+
 #ifdef PICO_ZERO
+
     void init_neopixel() {
         static bool initialized = false;
         if (initialized) return;
@@ -243,9 +247,11 @@ namespace Pico {
             
         uint offset = pio_add_program(pio, &ws2812_program);
         ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+
+        pio_sm_set_enabled(pio, sm, true);
             
         initialized = true;
-        }
+    }
 
 
     void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
@@ -260,16 +266,22 @@ namespace Pico {
     }
 
 
-    void set_rgb_color(uint32_t pixel_grb) {
-        pio_sm_put_blocking(pio1, 0, pixel_grb); 
-    }
-
-
     void updateRGB(int index, float hue, float intensity) {
-        if (index >= 12) return;
+        if (index < 0 || index >= 12) return;
 
+        // 1. Hue Wrap-around Smoothing
+        float diff = hue - smooth_hue[index];
+        if (diff > 0.5f) diff -= 1.0f;
+        if (diff < -0.5f) diff += 1.0f;
+        smooth_hue[index] += diff * 0.15f; // Slightly faster response
+
+        // Keep hue in 0..1 range
+        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
+        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
+
+        // 2. HSV to RGB Math
         float r = 0, g = 0, b = 0;
-        float h = hue * 6.0f;
+        float h = smooth_hue[index] * 6.0f;
         int i = (int)h;
         float f = h - i;
         float q = 1.0f - f;
@@ -283,20 +295,25 @@ namespace Pico {
             case 5: r = 1.0f; g = 0.0f; b = q;    break;
         }
 
+        // 3. Gamma & Intensity
         float gamma = intensity * intensity;
         uint8_t uR = (uint8_t)(r * gamma * 255.0f);
         uint8_t uG = (uint8_t)(g * gamma * 255.0f);
         uint8_t uB = (uint8_t)(b * gamma * 255.0f);
 
-        uint32_t color = ((uint32_t)(uG) << 16) | 
-                        ((uint32_t)(uR) << 8)  | 
-                        ((uint32_t)(uB));
+        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
+    }
 
-        static uint32_t last_sent_color = 0;
-        if (color != last_sent_color) {
-            pio_sm_put_blocking(pio1, 0, color);
-            last_sent_color = color;
-        }
+
+   void showRGB() {
+        // Only push if the 8-slot buffer has space (Prevents the "Stuck" crash)
+        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
+
+        // Write color + dummy zeros for timing latch
+        pio1->txf[0] = led_framebuffer[0];
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
     }
 
 #endif
@@ -310,15 +327,17 @@ namespace Pico {
     }
 
 
-    void updateLed(int index, float val) {
-        if (index < 12) {
-            led_vals[index].store(val, std::memory_order_relaxed);
+   void updateLed(int index, float val) {
+    if (index < 12) {
+        led_vals[index].store(val, std::memory_order_relaxed);
+        if (!leds[index].is_rgb) {
             setLedHardware(index, val);
         }
     }
+}
 
 
-   void updateGate(int index, float val) {
+    void updateGate(int index, float val) {
         if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
             int state = (val > 0.5f) ? 1 : 0;
             
