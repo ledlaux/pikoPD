@@ -126,63 +126,67 @@ static uint32_t last_led_tick = 0;
 static uint32_t midi_clock_timer = 0;
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
-static uint32_t last_hw_tick = 0;
+static bool debug_enabled = false;
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
     if (status >= 0xF8) {
-            hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
+        hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
 
-            if (status == 0xFA) { // START
-                clock_count = 23; 
-                clock_running = true;
-                midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
-            } 
-            else if (status == 0xFB) { // CONTINUE
-                clock_running = true;
-            } 
-            else if (status == 0xFC) { // STOP
-                clock_running = false;
-                midi_clock_timer = 0; 
-            } 
-            else if (status == 0xF8) { // CLOCK
-                if (clock_running) {
-                    clock_count++;
-                    if (clock_count >= 24) {
-                        clock_count = 0;
-                        midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
-                    }
+        if (status == 0xFA) { // START
+            clock_count = 23; 
+            clock_running = true;
+            midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+        } 
+        else if (status == 0xFB) { // CONTINUE
+            clock_running = true;
+        } 
+        else if (status == 0xFC) { // STOP
+            clock_running = false;
+            midi_clock_timer = 0; 
+        } 
+        else if (status == 0xF8) { // CLOCK
+            if (clock_running) {
+                clock_count++;
+                if (clock_count >= 24) {
+                    clock_count = 0;
+                    midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
                 }
             }
-            return; 
         }
-
-        uint8_t type = status & 0xF0;
-        uint8_t chan = status & 0x0F;
-
-        if (type == 0x90 && data2 > 0) {
-            last_midi_velocity = data2;
-            current_midi_note = data1;
-            midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
-        }
-
-        switch (type) {
-            case 0x90: 
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
-                break;
-            case 0x80: 
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
-                break;
-            case 0xB0: 
-                hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
-                break;
-            case 0xE0: 
-                hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
-                break;
-        }
+        return; 
     }
 
+    uint8_t type = status & 0xF0;
+    uint8_t chan = status & 0x0F;
+
+    if (type == 0x90 && data2 > 0) {
+        last_midi_velocity = data2;
+        current_midi_note = data1;
+        midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
+    }
+
+    if (type == 0xB0 && data1 == 120) { 
+    debug_enabled = (data2 > 64); // CC120 enable debug console
+    return; 
+    }
+
+    switch (type) {
+        case 0x90: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+            break;
+        case 0x80: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+            break;
+        case 0xB0: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+            break;
+        case 0xE0: 
+            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
+            break;
+    }
+}
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t packet[4] = {0}; 
@@ -248,6 +252,17 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 
 
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
+    if (!debug_enabled) return;
+    if (!tud_cdc_connected()) return;
+
+    // Print rate limiter
+    static uint32_t last_print_time = 0;
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    if (now - last_print_time < 50) return;
+    last_print_time = now;
+
+    if (tud_cdc_write_available() < 128) return;
+
     bool handled = false;
 
     {% for p in hv_manifest.prints -%}
@@ -256,6 +271,7 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
         handled = true;
     }
     {% endfor %}
+
     if (!handled) {
         printf("[print] %s: %s\n", printName, str);
     }
@@ -377,7 +393,6 @@ int main() {
 
     multicore_launch_core1(Pico::core1_audio_entry);
 
-    uint32_t last_hw_tick = 0;
     float val, v; 
     bool send;
     float target_val; 
