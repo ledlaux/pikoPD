@@ -146,7 +146,8 @@ PikoPD boards support three LED modes.
 | Pico 2    | 25  | Single-color LED                  |
 | Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
 
-Code supports up to 12 led connection.
+Code supports up to 12 different led connection.
+
 
 **RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
 Use [pack f f] object before [s ledRGB] to send 2 values. 

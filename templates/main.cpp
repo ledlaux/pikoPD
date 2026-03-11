@@ -297,7 +297,6 @@ void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
 
-
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
   
@@ -409,7 +408,6 @@ int main() {
 
             
              // --- LED ---
-
 
                 {% for led in active_leds -%}
                     {%- set idx = loop.index0 -%}
