@@ -718,6 +718,7 @@ namespace Pico {
         }
     }
 
+
     void uart_midi_init() {
         uart_deinit(uart0);
         uart_init(uart0, 31250); 
@@ -738,8 +739,6 @@ namespace Pico {
             parse_raw_midi_byte(byte, handle_midi_message);
         }
     }
-
-
 }
    
 
@@ -804,8 +803,7 @@ void on_uart_rx() {
     while (uart_is_readable(uart0)) {
         Pico::midi_push(uart_getc(uart0));
     }
-}
-
+  }
 }
 
 
