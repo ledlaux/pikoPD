@@ -40,10 +40,10 @@ Check compiled binaries for RP2040 in the release section.
 - [x] encoder
 - [x] joystick
 - [x] gate in/out
+- [x] midi clock
 - [ ] pwm audio
 - [ ] screen
 - [ ] sensors
-- [ ] midi clock
 - [ ] usb audio
 - [ ] bluetooth midi
 
