@@ -1,4 +1,4 @@
-# PD → HVCC → Raspberry Pi Pico UF2 Generator 
+# Pure Data → HVCC → Raspberry Pi Pico UF2 Generator 
 
 This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc** compiler and **pico-sdk**. 
 
