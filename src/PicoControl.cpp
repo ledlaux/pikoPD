@@ -627,27 +627,34 @@ namespace Pico {
     static int usb_midi_dev0 = -1;
     static int usb_midi_dev1 = -1;
 
-    void midi_push(uint8_t byte) {
-        uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
-        uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
+   void midi_push(uint8_t byte) {
+    // 1. Load head and tail with ACQUIRE/RELAXED
+    uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
+    uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
 
-        if ((h - t) < MIDI_RB_SIZE) {
-            midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
-            midi_rb.head.store(h + 1, std::memory_order_release);
-        }
+    if ((h - t) < MIDI_RB_SIZE) {
+        // 2. Write the data to the masked index
+        midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
+        
+        // 3. STORE with RELEASE - This tells Core 1 "The data is officially ready"
+        midi_rb.head.store(h + 1, std::memory_order_release);
     }
+}
 
+bool midi_pop(uint8_t &byte) {
+    // 1. Load tail and head with ACQUIRE/RELAXED
+    uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
+    uint32_t h = midi_rb.head.load(std::memory_order_acquire);
 
-    bool midi_pop(uint8_t &byte) {
-        uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
-        uint32_t h = midi_rb.head.load(std::memory_order_acquire);
+    if (t == h) return false; // Empty
 
-        if (t == h) return false;  // empty
-
-        byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
-        midi_rb.tail.store(t + 1, std::memory_order_release);
-        return true;
-    }
+    // 2. Read the data
+    byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
+    
+    // 3. STORE with RELEASE - This tells Core 0 "I am done with this slot"
+    midi_rb.tail.store(t + 1, std::memory_order_release);
+    return true;
+}
 
 
     void usb_init() {
@@ -662,57 +669,59 @@ namespace Pico {
         #endif
     }
 
+void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
 
-    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
-
-        if (byte >= 0xF8) { 
-            handler(byte, 0, 0);
-            return;
-        }
-
-        static uint8_t msg[3];
-        static int idx = 0;
-        static int expected = 0;
-        
-        if (byte & 0x80) { 
-            msg[0] = byte; 
-            idx = 1;
-            uint8_t type = byte & 0xF0;
-
-            if (type == 0xC0 || type == 0xD0) expected = 2; 
-            else if (byte == 0xF2) expected = 3;          
-            else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
-            else if (byte < 0xF0) expected = 3;            
-            else expected = 0;                           
-        } 
-        else if (idx > 0) { 
-            msg[idx++] = byte;
-        }
-        if (idx != 0 && idx == expected) {
-            handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
-            
-            if (msg[0] < 0xF0) {
-                idx = 1; 
-            } else {
-                idx = 0;
-                expected = 0;
-            }
-        }
+    if (byte >= 0xF8) { 
+        handler(byte, 0, 0);
+        return;
     }
 
+    static uint8_t msg[3];
+    static int idx = 0;
+    static int expected = 0;
+    
+    if (byte & 0x80) { 
+        msg[0] = byte; 
+        idx = 1;
+        uint8_t type = byte & 0xF0;
+
+        if (type == 0xC0 || type == 0xD0) expected = 2; 
+        else if (byte == 0xF2) expected = 3;          
+        else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
+        else if (byte < 0xF0) expected = 3;            
+        else {
+            idx = 0;
+            expected = 0; 
+        }
+    } 
+
+    else if (idx > 0 && idx < 3) { 
+        msg[idx++] = byte;
+    }
+
+    if (idx != 0 && idx == expected) {
+        handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+        
+        if (msg[0] < 0xF0) {
+            idx = 1; 
+        } else {
+            idx = 0;
+            expected = 0;
+        }
+    }
+}
 
     void midi_task() {
-    #ifdef MIDI_HOST
-        tuh_task();
-    #else
-        tud_task();
-    #endif
-        uint8_t b;
-        while (midi_pop(b)) {
-            parse_raw_midi_byte(b, handle_midi_message);
+        #ifdef MIDI_HOST
+            tuh_task();
+        #else
+            tud_task(); 
+        #endif
+            uint8_t b;
+            while (midi_pop(b)) {
+                parse_raw_midi_byte(b, handle_midi_message);
+            }
         }
-    }
-
 
     void uart_midi_init() {
         uart_deinit(uart0);
