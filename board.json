@@ -1,27 +1,28 @@
 
 {
   "name": "heavy",
-  "pico_board": "zero",
+  "pico_board": "pico2",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
-  "max_voices": 3,
   "channel": 2,
   "buffer_size": 64,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
   "midi_mode": "usb",
+  "console": false,
 
   "inputs": {
 
     "adc_pins": [
       { "name": "knob", "pin": 26, "type": "knob" },
-      { "name": "cv1", "pin": 27, "type": "cv_in" }
+      { "name": "pot", "pin": 27, "type": "knob" },
+      { "name": "cv1", "pin": 28, "type": "cv_in" }
     ],
 
     "buttons": [
       { "name": "btn1", "pin": 23, "mode": "switch" },
-      { "name": "btn2", "pin": 11, "mode": "toggle" },
+      { "name": "btn2", "pin": 11, "mode": "switch" },
       { "name": "btn3", "pin": 14, "mode": "bang" }
     ],
 
@@ -34,7 +35,7 @@
     ],
 
     "joystick": [
-      { "name": "joy", "joy_x": 28, "joy_y": 29, "midi_range": true }
+      { "name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true }
     ]
   },
 
@@ -47,8 +48,11 @@
   },
 
   "leds": [
+     
     { "name": "led1", "pin": 25, "mode": "pd" },
-    { "name": "status", "pin": 7, "mode": "status" },
-    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
+    { "name": "midi", "pin": 24, "mode": "midi" },
+    { "name": "clock", "pin": 23, "mode": "clock" },
+    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "pd" }
+   
   ]
 }

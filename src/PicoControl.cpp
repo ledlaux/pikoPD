@@ -23,10 +23,12 @@ extern "C" void on_uart_rx();
 
 namespace Pico {
 
-
-// -----------Interface hardware-----------
-
     std::atomic<float> led_vals[12];
+    std::atomic<float> led_hue[12];        
+    std::atomic<float> led_intensity[12];
+    static uint32_t led_framebuffer[12] = {0};
+    static float smooth_hue[12] = {0.0f};
+// -----------Interface hardware-----------
 
     Button btns[12];
     Led leds[12];
@@ -180,7 +182,7 @@ namespace Pico {
                     }
                 }
         }
-    
+
         // --- Encoders ---
         for (int i = 0; i < n_encoder; i++) {
             bool clk = (all_pins & (1u << encoders[i].pinA)) != 0;
@@ -232,7 +234,9 @@ namespace Pico {
         }
     }   
 
+
 #ifdef PICO_ZERO
+
     void init_neopixel() {
         static bool initialized = false;
         if (initialized) return;
@@ -243,9 +247,11 @@ namespace Pico {
             
         uint offset = pio_add_program(pio, &ws2812_program);
         ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+
+        pio_sm_set_enabled(pio, sm, true);
             
         initialized = true;
-        }
+    }
 
 
     void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
@@ -260,16 +266,20 @@ namespace Pico {
     }
 
 
-    void set_rgb_color(uint32_t pixel_grb) {
-        pio_sm_put_blocking(pio1, 0, pixel_grb); 
-    }
-
-
     void updateRGB(int index, float hue, float intensity) {
-        if (index >= 12) return;
+        if (index < 0 || index >= 12) return;
+        float diff = hue - smooth_hue[index];
+        if (diff > 0.5f) diff -= 1.0f;
+        if (diff < -0.5f) diff += 1.0f;
+        smooth_hue[index] += diff * 0.15f; 
 
+        // Keep hue in 0..1 range
+        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
+        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
+
+        // 2. HSV to RGB Math
         float r = 0, g = 0, b = 0;
-        float h = hue * 6.0f;
+        float h = smooth_hue[index] * 6.0f;
         int i = (int)h;
         float f = h - i;
         float q = 1.0f - f;
@@ -283,20 +293,22 @@ namespace Pico {
             case 5: r = 1.0f; g = 0.0f; b = q;    break;
         }
 
+        // 3. Gamma & Intensity
         float gamma = intensity * intensity;
         uint8_t uR = (uint8_t)(r * gamma * 255.0f);
         uint8_t uG = (uint8_t)(g * gamma * 255.0f);
         uint8_t uB = (uint8_t)(b * gamma * 255.0f);
 
-        uint32_t color = ((uint32_t)(uG) << 16) | 
-                        ((uint32_t)(uR) << 8)  | 
-                        ((uint32_t)(uB));
+        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
+    }
 
-        static uint32_t last_sent_color = 0;
-        if (color != last_sent_color) {
-            pio_sm_put_blocking(pio1, 0, color);
-            last_sent_color = color;
-        }
+
+   void showRGB() {
+        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
+        pio1->txf[0] = led_framebuffer[0];
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
     }
 
 #endif
@@ -310,15 +322,17 @@ namespace Pico {
     }
 
 
-    void updateLed(int index, float val) {
-        if (index < 12) {
-            led_vals[index].store(val, std::memory_order_relaxed);
+   void updateLed(int index, float val) {
+    if (index < 12) {
+        led_vals[index].store(val, std::memory_order_relaxed);
+        if (!leds[index].is_rgb) {
             setLedHardware(index, val);
         }
     }
+}
 
 
-   void updateGate(int index, float val) {
+    void updateGate(int index, float val) {
         if (index < 12 && btns[index].mode == Pico::GATE_OUT) {
             int state = (val > 0.5f) ? 1 : 0;
             
@@ -613,27 +627,34 @@ namespace Pico {
     static int usb_midi_dev0 = -1;
     static int usb_midi_dev1 = -1;
 
-    void midi_push(uint8_t byte) {
-        uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
-        uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
+   void midi_push(uint8_t byte) {
+    // 1. Load head and tail with ACQUIRE/RELAXED
+    uint32_t h = midi_rb.head.load(std::memory_order_relaxed);
+    uint32_t t = midi_rb.tail.load(std::memory_order_acquire);
 
-        if ((h - t) < MIDI_RB_SIZE) {
-            midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
-            midi_rb.head.store(h + 1, std::memory_order_release);
-        }
+    if ((h - t) < MIDI_RB_SIZE) {
+        // 2. Write the data to the masked index
+        midi_rb.data[h & (MIDI_RB_SIZE - 1)] = byte;
+        
+        // 3. STORE with RELEASE - This tells Core 1 "The data is officially ready"
+        midi_rb.head.store(h + 1, std::memory_order_release);
     }
+}
 
+bool midi_pop(uint8_t &byte) {
+    // 1. Load tail and head with ACQUIRE/RELAXED
+    uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
+    uint32_t h = midi_rb.head.load(std::memory_order_acquire);
 
-    bool midi_pop(uint8_t &byte) {
-        uint32_t t = midi_rb.tail.load(std::memory_order_relaxed);
-        uint32_t h = midi_rb.head.load(std::memory_order_acquire);
+    if (t == h) return false; // Empty
 
-        if (t == h) return false;  // empty
-
-        byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
-        midi_rb.tail.store(t + 1, std::memory_order_release);
-        return true;
-    }
+    // 2. Read the data
+    byte = midi_rb.data[t & (MIDI_RB_SIZE - 1)];
+    
+    // 3. STORE with RELEASE - This tells Core 0 "I am done with this slot"
+    midi_rb.tail.store(t + 1, std::memory_order_release);
+    return true;
+}
 
 
     void usb_init() {
@@ -648,56 +669,59 @@ namespace Pico {
         #endif
     }
 
+void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
 
-    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
-
-        if (byte >= 0xF8) { 
-            handler(byte, 0, 0);
-            return;
-        }
-
-        static uint8_t msg[3];
-        static int idx = 0;
-        static int expected = 0;
-        
-        if (byte & 0x80) { 
-            msg[0] = byte; 
-            idx = 1;
-            uint8_t type = byte & 0xF0;
-
-            if (type == 0xC0 || type == 0xD0) expected = 2; 
-            else if (byte == 0xF2) expected = 3;          
-            else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
-            else if (byte < 0xF0) expected = 3;            
-            else expected = 0;                           
-        } 
-        else if (idx > 0) { 
-            msg[idx++] = byte;
-        }
-        if (idx != 0 && idx == expected) {
-            handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
-            
-            if (msg[0] < 0xF0) {
-                idx = 1; 
-            } else {
-                idx = 0;
-                expected = 0;
-            }
-        }
+    if (byte >= 0xF8) { 
+        handler(byte, 0, 0);
+        return;
     }
 
+    static uint8_t msg[3];
+    static int idx = 0;
+    static int expected = 0;
+    
+    if (byte & 0x80) { 
+        msg[0] = byte; 
+        idx = 1;
+        uint8_t type = byte & 0xF0;
+
+        if (type == 0xC0 || type == 0xD0) expected = 2; 
+        else if (byte == 0xF2) expected = 3;          
+        else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
+        else if (byte < 0xF0) expected = 3;            
+        else {
+            idx = 0;
+            expected = 0; 
+        }
+    } 
+
+    else if (idx > 0 && idx < 3) { 
+        msg[idx++] = byte;
+    }
+
+    if (idx != 0 && idx == expected) {
+        handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+        
+        if (msg[0] < 0xF0) {
+            idx = 1; 
+        } else {
+            idx = 0;
+            expected = 0;
+        }
+    }
+}
 
     void midi_task() {
-    #ifdef MIDI_HOST
-        tuh_task();
-    #else
-        tud_task();
-    #endif
-        uint8_t b;
-        while (midi_pop(b)) {
-            parse_raw_midi_byte(b, handle_midi_message);
+        #ifdef MIDI_HOST
+            tuh_task();
+        #else
+            tud_task(); 
+        #endif
+            uint8_t b;
+            while (midi_pop(b)) {
+                parse_raw_midi_byte(b, handle_midi_message);
+            }
         }
-    }
 
     void uart_midi_init() {
         uart_deinit(uart0);
@@ -719,8 +743,6 @@ namespace Pico {
             parse_raw_midi_byte(byte, handle_midi_message);
         }
     }
-
-
 }
    
 
@@ -785,8 +807,7 @@ void on_uart_rx() {
     while (uart_is_readable(uart0)) {
         Pico::midi_push(uart_getc(uart0));
     }
-}
-
+  }
 }
 
 

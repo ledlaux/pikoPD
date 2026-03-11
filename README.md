@@ -22,6 +22,7 @@ Check compiled binaries for RP2040 in the release section.
     - joystic and range (regular or midi 1-127)
     - midi (uart, usb, host)
       - uart (pins tx 0, rx 1 )
+    - debug console 
       
 - Copies hardware config files into project folder from `/src`
 - Builds firmware using **CMake** in a `build/` folder  
@@ -40,10 +41,11 @@ Check compiled binaries for RP2040 in the release section.
 - [x] encoder
 - [x] joystick
 - [x] gate in/out
+- [x] midi clock
 - [ ] pwm audio
+- [ ] sd card
 - [ ] screen
 - [ ] sensors
-- [ ] midi clock
 - [ ] usb audio
 - [ ] bluetooth midi
 
@@ -52,7 +54,7 @@ Check compiled binaries for RP2040 in the release section.
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
-3. [print] objects are parsed by the script and output to the serial console. It can get flooded, so use it moderately.  You can also use the regular console in the code. 
+3. [print] objects are parsed by the script and output to the serial console. It can get flooded, so use it moderately and remove unused from the patch. You can also use the regular console in the code. 
 4. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
 

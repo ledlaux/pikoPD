@@ -113,7 +113,9 @@ namespace Pico {
     extern Joystick joystick[2];
 
     extern std::atomic<float> led_vals[12];
-    
+    extern std::atomic<float> led_hue[12];        
+    extern std::atomic<float> led_intensity[12];
+
     extern int n_btn;
     extern int n_knob;
     extern int n_led;
@@ -140,14 +142,15 @@ namespace Pico {
     bool buttonReleased(int i);
     bool buttonToggled(int i, bool& outState);
     void __not_in_flash_func(setLedHardware)(int index, float value);
-#ifdef PICO_ZERO
-    void init_neopixel();
-    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    
-    void set_rgb_led(uint32_t color);
-    uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b);
-    void updateRGB(int index, float hue, float intensity);
-#endif
     void update(uint32_t now);
+
+    void midi_push(uint8_t byte);
+    bool midi_pop(uint8_t &byte);
+    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t));
+    void usb_init();
+    void uart_midi_init();
+    void midi_task();
+    void midi_task_uart();
 
     enum AudioMode { I2S, PWM };
     typedef void (*AudioProcessCallback)(float* buffer, int frames);
@@ -157,14 +160,15 @@ namespace Pico {
 
     void __not_in_flash_func(core1_audio_entry)();
 
+#ifdef PICO_ZERO
+    void init_neopixel();
+    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    
+    void set_rgb_led(uint32_t color);
+    void updateRGB(int index, float hue, float intensity);
+    void showRGB();
+#endif
 
-    void midi_push(uint8_t byte);
-    bool midi_pop(uint8_t &byte);
-    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t));
-    void usb_init();
-    void uart_midi_init();
-    void midi_task();
-    void midi_task_uart();
+   
 }
 
 #endif
