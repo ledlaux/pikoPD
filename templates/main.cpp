@@ -118,7 +118,6 @@
 
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
-static mutex_t pd_mutex;
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
@@ -295,20 +294,13 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 
 
 void audioFunc(float* buffer, int frames) {
-    if (mutex_try_enter(&pd_mutex, NULL)) {
-        pd_prog.processInlineInterleaved(buffer, buffer, frames);
-        mutex_exit(&pd_mutex);
-    } else {
-        // If locked, output silence for this tiny block to prevent a pop
-        for(int i=0; i < frames*2; i++) buffer[i] = 0; 
-    }
+    pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
-
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
   
-    {% if board.midi_mode == 'usb' %}
+    {% if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
     #endif
@@ -385,8 +377,6 @@ int main() {
         {{ board.buffer_size }});
     {% endif %}
 
-
-    mutex_init(&pd_mutex);
     multicore_launch_core1(Pico::core1_audio_entry);
 
     uint32_t last_hw_tick = 0;
