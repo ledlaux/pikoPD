@@ -205,9 +205,9 @@ class PicoUF2Generator:
         
         if not os.path.exists(config_path):
             if board_config:
-                print(f"\033[91m❌ ERROR: Custom board file not found: {board_config}\033[0m")
+                print(f"\033[91m❌ Custom board file not found: {board_config}\033[0m")
             else:
-                print(f"\033[91m❌ ERROR: Default configuration file not found. Create board.json or use -b.\033[0m")
+                print(f"\033[91m❌ Default configuration file not found. Create board.json or use -b.\033[0m")
             sys.exit(1)
 
         with open(config_path) as f:
