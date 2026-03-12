@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
-#include "pico/audio_i2s.h"
 #include "pico/multicore.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
