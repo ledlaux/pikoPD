@@ -144,10 +144,11 @@ python3 pikopd.py patches/heavy.pd project_name
 
 optional arguments:
   -h, --help           Show help message and exit
-  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -b, --board          Path to custom board.json configuration file
   -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
   -s, --serial         Open serial console after reboot
-  -v, --verbose        Enable verbose debug output
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -v, --verbose        Enable verbose compiler console debug output
 ```
 
 ## Useful links
