@@ -4,32 +4,22 @@ import os, json, shutil, subprocess, jinja2, argparse, time, glob, sys
 
 class PicoUF2Generator:
     def __init__(self, pd_path, project_root, src_dir=None, verbose=False):
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.pd_path = os.path.abspath(pd_path)
         self.project_root = os.path.abspath(project_root)
         self.verbose = verbose
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-
-        self.templates = os.path.join(script_dir, "templates")
-
+        self.templates = os.path.join(self.script_dir, "templates")
         if src_dir is None:
-            self.src_dir = os.path.join(script_dir, "src")
+            self.src_dir = os.path.join(self.script_dir, "src")
         else:
             self.src_dir = os.path.abspath(src_dir)
-
         self.c_dir = os.path.join(self.project_root, "src")
-
         self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
-
         self.hvcc_dir = os.path.join(self.project_root, "hvcc")
         self.build_dir = os.path.join(self.project_root, "build")
-
         self.ir_json = os.path.join(self.hvcc_dir, f"{self.patch_name}.heavy.ir.json")
         self.manifest_out = os.path.join(self.hvcc_dir, f"{self.patch_name}_manifest.json")
-
-        self.hv_lib_path = os.path.abspath(
-            os.path.join(self.project_root, "../lib", "heavylib")
-        )
+        self.hv_lib_path = os.path.abspath(os.path.join(self.project_root, "../lib", "heavylib"))
         
     def print_logo(self):
         logo = r"""
@@ -179,7 +169,7 @@ class PicoUF2Generator:
 
             shutil.rmtree(subdir, ignore_errors=True)
 
-    def run_all(self, flash=False, serial=False, skip_hvcc=False, midi_host=None):
+    def run_all(self, flash=False, board_config=None, serial=False, skip_hvcc=False, midi_host=None):
         self.print_logo()
         start_time = time.time()
         print(f"\033[1mBuilding: {self.patch_name}\033[0m")
@@ -207,11 +197,23 @@ class PicoUF2Generator:
         else:
             print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
 
-        self.print_progress(0.3, "Syncing Source")
+        self.print_progress(0.3, "Setup")
         settings = {"pico_board": "pico2", "midi_mode": "usb"} # Defaults
-        if os.path.exists("board.json"):
-            with open("board.json") as f:
-                settings.update(json.load(f))
+
+        config_filename = board_config if board_config else "board.json"
+        config_path = os.path.join(self.script_dir, config_filename)
+        
+        if not os.path.exists(config_path):
+            if board_config:
+                print(f"\033[91m❌ ERROR: Custom board file not found: {board_config}\033[0m")
+            else:
+                print(f"\033[91m❌ ERROR: Default configuration file not found. Create board.json or use -b.\033[0m")
+            sys.exit(1)
+
+        with open(config_path) as f:
+            settings.update(json.load(f))
+            
+        print(f"\033[32m  -> Using config: {config_filename}\033[0m")
         
         midi_mode = midi_host if midi_host else settings.get("midi_mode")
 
@@ -320,6 +322,7 @@ class PicoUF2Generator:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
+    parser.add_argument("-b", "--board", help="Path to custom board configuration json file") 
     parser.add_argument("pd_patch", help="Pure Data patch file (e.g., heavy.pd)")
     parser.add_argument("project_root", help="Project folder")
     parser.add_argument("-f", "--flash", action="store_true", help="Flash UF2 to Pico")
@@ -336,7 +339,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-
     cmake_path = os.path.join(args.project_root, "CMakeLists.txt")
     if args.skip_hvcc and not os.path.exists(cmake_path):
         print("\033[33m⚠️  --skip-hvcc (-x) ignored: CMakeLists.txt not found in project root\033[0m")
@@ -344,4 +346,4 @@ if __name__ == "__main__":
 
     src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
     gen = PicoUF2Generator(args.pd_patch, args.project_root, src, verbose=args.verbose)
-    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial)
+    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial, board_config=args.board)
