@@ -140,7 +140,7 @@ pikoPD
 Enter bootloader mode by holding device boot button
 
 ```
-python3 pikopd.py patches/heavy.pd project_name 
+python3 pikopd.py patches/heavy.pd project_name -f
 
 optional arguments:
   -h, --help           Show help message and exit
