@@ -312,7 +312,8 @@ void audioFunc(float* buffer, int frames) {
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
-  
+    stdio_init_all(); 
+
     {% if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
