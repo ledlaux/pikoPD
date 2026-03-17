@@ -29,6 +29,7 @@ namespace Pico {
     static uint32_t led_framebuffer[12] = {0};
     static float smooth_hue[12] = {0.0f};
 
+    // --- MASTER FX ---
     daisysp::DelayLine<float, 16000> echoL, echoR;
     float delay_level = 0.0f;
     float delay_feedback = 0.0f;
@@ -581,7 +582,6 @@ void init_dsp_effects() {
 }
 
 
-
 static AudioMode _mode;
 static AudioProcessCallback _cb;
 static int _srate, _bpin, _dpin, _bsize; 
@@ -632,9 +632,7 @@ void __not_in_flash_func(core1_audio_entry)() {
                     int frames = buffer->max_sample_count;
 
                     _cb(heavy_buffer, frames);
-                    applyStereoDelay(heavy_buffer, frames);
-                    applyLimiter(heavy_buffer, frames);
-
+                
                     int16_t* out = (int16_t*)buffer->buffer->bytes;
                     for (int i = 0; i < frames * 2; i++) {
                         float v = heavy_buffer[i];
@@ -649,7 +647,6 @@ void __not_in_flash_func(core1_audio_entry)() {
             }       
         }
     }
-       
    else {
         const uint pwm_pin = _dpin;
         gpio_set_function(pwm_pin, GPIO_FUNC_PWM);
