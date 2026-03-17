@@ -57,20 +57,6 @@ Check compiled binaries for RP2040 in the release section.
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
-## Supported MIDI CC
-
-| CC Number | Parameter              | 
-|-----------|------------------------|
-| 7         | Master Volume          | 
-| 8        | Limiter Bypass         | 
-| 90        | Delay Time             |
-| 91        | Delay Send Level       | 
-| 92        | Delay Feedback Amount  |
-| 93        | Delay Bypass           | 
-| 120       | Debug Toggle           | 
-
-To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. 
-  
 
 ## Working state
 
@@ -94,7 +80,23 @@ To use safe volume it is recomended to keep limiter on. I added a simple delay u
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
-### Sample loading
+
+## Supported MIDI CC
+
+| CC Number | Parameter              | 
+|-----------|------------------------|
+| 7         | Master Volume          | 
+| 8        | Limiter Bypass         | 
+| 90        | Delay Time             |
+| 91        | Delay Send Level       | 
+| 92        | Delay Feedback Amount  |
+| 93        | Delay Bypass           | 
+| 120       | Debug Toggle           | 
+
+To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. 
+  
+
+## Sample loading
 
 Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
 
