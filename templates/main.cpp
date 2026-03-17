@@ -323,8 +323,8 @@ void audioFunc(float* buffer, int frames) {
 
 {% if board.console %}
 #define PRINT_QUEUE_SIZE 64
-#define PRINT_STR_LEN 8
-#define PRINT_RATE_MS 150
+#define PRINT_STR_LEN 16
+#define PRINT_RATE_MS 100
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 
 struct PrintMsg {
