@@ -72,7 +72,6 @@ Check compiled binaries for RP2040 in the release section.
 - All hardware configuration is done by adjusting `board.json` file.
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
-- To save resources remove unused send and receive objects from the patch.
 - There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
 - [print] objects are parsed by the scipt automatically, they will output to the serial monitor. Use moderately or it can crash device.  
