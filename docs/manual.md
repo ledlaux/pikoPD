@@ -164,3 +164,18 @@ PikoPD supports 2 joystick connection (each uses 2 adc pins), which can output v
 "joystick": [
   { "name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true }
 ]
+```
+
+## Supported MIDI CC
+
+| CC Number | Parameter              | 
+|-----------|------------------------|
+| 7         | Master Volume          | 
+| 8        | Limiter Bypass         | 
+| 90        | Delay Time             |
+| 91        | Delay Send Level       | 
+| 92        | Delay Feedback Amount  |
+| 93        | Delay Bypass           | 
+| 120       | Debug Toggle           | 
+
+You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
