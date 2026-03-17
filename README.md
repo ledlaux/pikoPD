@@ -75,7 +75,7 @@ Check compiled binaries for RP2040 in the release section.
 - To save resources remove unused send and receive objects from the patch.
 - You don't need to remove objects from `board.json`, script adds objects which are present in the patch only.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
-- [print] objects are parsed by the scipt automatically, they will output to the serial console. Use moderately or it will crash device, also remove unused prints from the patch. Regular console also is available in the code. Use midi cc120 to enable/disable debug console while pikoPD runs.
+- [print] objects are parsed by the scipt automatically, they will output to the serial monitor. Use moderately or it can crash device.  It can be enabled in the config file and midi CC120 will enable/disable console while pikoPD runs.
 - **If you change the board or change midi mode in `board.json` remove the project folder or rename it in the command to rebuild files.**  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
@@ -91,7 +91,7 @@ Check compiled binaries for RP2040 in the release section.
 | 91        | Delay Send Level       | 
 | 92        | Delay Feedback Amount  |
 | 93        | Delay Bypass           | 
-| 120       | Debug Toggle           | 
+| 120       | Print Console Toggle   | 
 
 To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. 
   
