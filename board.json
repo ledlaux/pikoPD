@@ -11,7 +11,7 @@
   "i2s_bclk_pin": 10,
   "pwm_pin": 10,
   "midi_mode": "usb",
-  "console": true,
+  "console": false,
 
   "inputs": {
 
