@@ -29,8 +29,7 @@ namespace Pico {
     static uint32_t led_framebuffer[12] = {0};
     static float smooth_hue[12] = {0.0f};
 
-    // --- MASTER FX ---
-    daisysp::DelayLine<float, 12000> echoL, echoR;
+    daisysp::DelayLine<float, 16000> echoL, echoR;
     float delay_level = 0.0f;
     float delay_feedback = 0.0f;
     float target_delay_samples = 0.0f;
@@ -522,32 +521,33 @@ namespace Pico {
 // -----------Audio-----------
 
 
-// // Stereo Tape-Emulator Delay
+// Stereo Tape-Emulator Delay
 void applyStereoDelay(float* buffer, int frames) {
     if (delay_bypass) return;
 
     current_delay_samples += (target_delay_samples - current_delay_samples) * 0.01f;
-    
-    float offset = 441.0f; 
+
+    const float offset = 441.0f;
+
     echoL.SetDelay(current_delay_samples);
     echoR.SetDelay(current_delay_samples + offset);
 
     for (int i = 0; i < frames * 2; i += 2) {
-        float sigL = buffer[i];
-        float sigR = buffer[i+1];
+        float inL = buffer[i];
+        float inR = buffer[i + 1];
+
         float delL = echoL.Read();
         float delR = echoR.Read();
-        float feedL = (sigL * 0.5f) + (delR * delay_feedback);
-        float feedR = (sigR * 0.5f) + (delL * delay_feedback);
 
-        feedL = fmaxf(-1.0f, fminf(1.0f, feedL));
-        feedR = fmaxf(-1.0f, fminf(1.0f, feedR));
+        float fbL = fmaxf(-1.0f, fminf(1.0f, inL * 0.5f + delR * delay_feedback));
+        float fbR = fmaxf(-1.0f, fminf(1.0f, inR * 0.5f + delL * delay_feedback));
 
-        echoL.Write(feedL);
-        echoR.Write(feedR);
+        echoL.Write(fbL);
+        echoR.Write(fbR);
 
-        buffer[i] = (sigL * 0.7f) + (delL * delay_level * 0.5f);
-        buffer[i+1] = (sigR * 0.7f) + (delR * delay_level * 0.5f);
+        // Mix dry/wet
+        buffer[i]     = fmaxf(-1.0f, fminf(1.0f, inL * 0.7f + delL * delay_level * 0.5f));
+        buffer[i + 1] = fmaxf(-1.0f, fminf(1.0f, inR * 0.7f + delR * delay_level * 0.5f));
     }
 }
 
@@ -649,6 +649,7 @@ void __not_in_flash_func(core1_audio_entry)() {
             }       
         }
     }
+       
    else {
         const uint pwm_pin = _dpin;
         gpio_set_function(pwm_pin, GPIO_FUNC_PWM);
