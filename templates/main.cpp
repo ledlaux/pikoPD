@@ -495,8 +495,8 @@ int main() {
     {% else %}
     Pico::setupAudio(Pico::PWM, audioFunc, 
         {{ board.sample_rate }}, 
-        {{ board.pwm_pin_l }},
-        {{ board.pwm_pin_r }}, 
+        {{ board.pwm_pin }},
+        0,  // second pin is unused
         {{ board.buffer_size }});
     {% endif %}
 
