@@ -115,7 +115,7 @@ namespace Pico {
     extern std::atomic<float> led_vals[12];
     extern std::atomic<float> led_hue[12];        
     extern std::atomic<float> led_intensity[12];
-
+    
     extern int n_btn;
     extern int n_knob;
     extern int n_led;
@@ -123,6 +123,14 @@ namespace Pico {
     extern int n_joystick;
 
     extern MidiBuffer midi_rb;
+
+    extern float delay_level;
+    extern float delay_feedback;
+    extern float target_delay_samples;
+    extern float current_delay_samples;
+    extern bool delay_bypass;
+    extern bool limiter_bypass;
+    extern float midi_master_volume;
 
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0);
     void addKnob(int index, uint32_t pin); 
@@ -167,6 +175,10 @@ namespace Pico {
     void updateRGB(int index, float hue, float intensity);
     void showRGB();
 #endif
+
+    void applyStereoDelay(float* buffer, int frames);
+    void applyLimiter(float* buffer, int frames);
+    void init_dsp_effects();
 
    
 }

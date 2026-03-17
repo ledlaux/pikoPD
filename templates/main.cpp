@@ -125,11 +125,12 @@ static uint32_t last_led_tick = 0;
 static uint32_t midi_clock_timer = 0;
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
-static bool debug_enabled = false;
+static bool debug_enabled = true;
+static uint32_t last_print_tick = 0;
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-
+    // --- 1. Real-time Messages (Clock, Start, Stop) ---
     if (status >= 0xF8) {
         hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
 
@@ -160,32 +161,58 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint8_t type = status & 0xF0;
     uint8_t chan = status & 0x0F;
 
+    // --- 2. Activity Monitoring (LED Flashing) ---
     if (type == 0x90 && data2 > 0) {
         last_midi_velocity = data2;
         current_midi_note = data1;
         midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
     }
 
-    if (type == 0xB0 && data1 == 120) { 
-    debug_enabled = (data2 > 64); // CC120 enable debug console
-    return; 
-    }
-
+    // --- 3. Message Routing ---
     switch (type) {
-        case 0x90: 
+        case 0x90: // Note On
             hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
             break;
-        case 0x80: 
+
+        case 0x80: // Note Off
             hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
             break;
-        case 0xB0: 
+
+        case 0xB0: { // Control Change
+            float val = (float)data2 / 127.0f;
+            bool is_on = (data2 > 64);
+            
+            // DSP Parameter Mapping
+            switch(data1) {
+                case 7:                                          // Master volume
+                    Pico::midi_master_volume = val;
+                    break;
+                case 8: Pico::limiter_bypass = is_on; break;     // Toggle Limiter
+                case 90:                                         // Delay Time
+                    Pico::target_delay_samples = 500.0f + (val * 23000.0f); 
+                    break;
+                case 91:                                        // Delay Send Level
+                    Pico::delay_level = val * 0.8f; 
+                    break;
+                case 92:                                        // Feedback Amount
+                    Pico::delay_feedback = val * 0.95f; 
+                    break;
+                case 93: Pico::delay_bypass = is_on; break;     // Toggle Delay
+                case 120:                                       // Debug Toggle
+                    debug_enabled = (data2 > 64);
+                    break;
+            }
+
             hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
             break;
+        }
+
         case 0xE0: 
             hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
             break;
     }
 }
+
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t packet[4] = {0}; 
@@ -250,70 +277,150 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 }
 
 
-void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
-    if (!debug_enabled) return;
-    if (!tud_cdc_connected()) return;
-
-    // Print rate limiter
-    static uint32_t last_print_time = 0;
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-    if (now - last_print_time < 50) return;
-    last_print_time = now;
-
-    if (tud_cdc_write_available() < 128) return;
-
-    bool handled = false;
-
-    {% for p in hv_manifest.prints -%}
-    if (strcmp(printName, "{{ p.name }}") == 0) {
-        printf("[%s] %s\n", printName, str);
-        handled = true;
-    }
-    {% endfor %}
-
-    if (!handled) {
-        printf("[print] %s: %s\n", printName, str);
-    }
-}
-
-
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
     int numElem = hv_msg_getNumElements(m);
     float val0 = hv_msg_getFloat(m, 0);
 
     switch (hash) {
-{% for l in board.leds -%}
-    {%- set led_index = loop.index0 -%}
-    {%- for s in hv_manifest.sends if s.name == l.name -%}
-        case {{ s.hash }}U: // {{ l.name }}
-            {% if l.is_rgb -%}
-            if (numElem >= 2) {
-                Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
-            } else {
-                Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
-            }
-            {%- else -%}
-            Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
-            {%- endif %}
-            return;
-    {%- endfor -%}
-{%- endfor %}
-        default:
-            heavyMidiOutHook(vc, name, hash, m);
-            break;
-    } 
-}
+    {% for l in board.leds -%}
+        {%- set led_index = loop.index0 -%}
+        {%- for s in hv_manifest.sends if s.name == l.name -%}
+            case {{ s.hash }}U: // {{ l.name }}
+                {% if l.is_rgb -%}
+                if (numElem >= 2) {
+                    Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
+                    Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+                } else {
+                    Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
+                }
+                {%- else -%}
+                Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
+                {%- endif %}
+                return;
+        {%- endfor -%}
+    {%- endfor %}
+            default:
+                heavyMidiOutHook(vc, name, hash, m);
+                break;
+        } 
+    }
 
 
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
+
+    {% if board.masterfx.delay %}
+    Pico::applyStereoDelay(buffer, frames);
+    {% endif %}
+
+    {% if board.masterfx.limiter %}
+    Pico::applyLimiter(buffer, frames);
+    {% endif %}
 }
+
+
+{% if board.console %}
+#define PRINT_QUEUE_SIZE 64
+#define PRINT_STR_LEN 8
+#define PRINT_RATE_MS 250
+#define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
+
+struct PrintMsg {
+    uint8_t id;
+    char str[PRINT_STR_LEN];
+    bool valid_name; 
+};
+
+static volatile PrintMsg queue[PRINT_QUEUE_SIZE];
+static volatile uint8_t head = 0;
+static volatile uint8_t tail = 0;
+
+static uint32_t lastPrintTimes[NUM_PRINT_NAMES] = {0};
+
+static const char* printNames[NUM_PRINT_NAMES] = {
+{% for p in hv_manifest.prints -%}
+    "{{ p.name }}"{% if not loop.last %}, {% endif %}
+{% endfor %}
+};
+
+static int8_t get_print_id(const char *name) {
+    for (uint8_t i = 0; i < NUM_PRINT_NAMES; i++) {
+        if (strcmp(name, printNames[i]) == 0) return i;
+    }
+    return -1;
+}
+
+
+void hv_print_handler(HeavyContextInterface *context,
+                      const char *printName,
+                      const char *str,
+                      const HvMessage *msg)
+{
+    if (!debug_enabled || !str) return;
+
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    int8_t id = get_print_id(printName);
+    bool valid_name = true;
+
+    if (id < 0) {
+        valid_name = false; 
+        id = 0;         
+    } else if (now - lastPrintTimes[id] < PRINT_RATE_MS) {
+        return;  
+    } else {
+        lastPrintTimes[id] = now;
+    }
+
+    uint8_t h = head;
+    uint8_t next = (h + 1) & (PRINT_QUEUE_SIZE - 1);
+    if (next == tail) return; 
+
+    queue[h].id = id;
+    queue[h].valid_name = valid_name;
+
+    for (int i = 0; i < PRINT_STR_LEN - 1; i++) {
+        char c = str[i];
+        queue[h].str[i] = c;
+        if (c == '\0') break;
+    }
+    queue[h].str[PRINT_STR_LEN - 1] = '\0';
+
+    head = next;
+}
+
+
+void process_print_queue() {
+    if (!tud_cdc_connected()) return;
+
+    while (tail != head && tud_cdc_write_available() >= 64) {
+        volatile PrintMsg &v = queue[tail];
+        PrintMsg m;
+        m.id = v.id;
+        m.valid_name = v.valid_name;
+        for (int i = 0; i < PRINT_STR_LEN; i++) {
+            m.str[i] = v.str[i];
+            if (v.str[i] == '\0') break;
+        }
+        m.str[PRINT_STR_LEN - 1] = '\0';
+
+        if (m.valid_name) {
+            printf("[%s] %s\n", printNames[m.id], m.str);
+        } else {
+            printf("[print] %s\n", m.str);
+        }
+
+        tail = (tail + 1) & (PRINT_QUEUE_SIZE - 1);
+    }
+}
+{% endif %}
+
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
 
+  
     {% if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
@@ -336,7 +443,9 @@ int main() {
     Pico::usb_init(); 
     {% endif %}
 
+    {% if board.console %}
     pd_prog.setPrintHook(&hv_print_handler);
+    {% endif %}
     pd_prog.setSendHook(&sendHookHandler);
 
     {% for btn in active_btns %}
@@ -403,12 +512,18 @@ int main() {
         tud_task(); 
         {% elif board.midi_mode == 'host' %}
         tuh_task(); 
-        
+        {% endif %}
+
+        uint32_t now = to_ms_since_boot(get_absolute_time()); 
+
+        {% if board.console %}
+        if (now - last_print_tick >= 150) {
+        last_print_tick = now;
+        process_print_queue();
+        }
         {% endif %}
 
         Pico::midi_task();
-
-        uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         if (now - last_led_tick >= 10) {
             last_led_tick = now;

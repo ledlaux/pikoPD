@@ -6,11 +6,11 @@
 #include "pico/audio_i2s.h"
 #include "pico/multicore.h"
 #include "pico/audio_pwm.h"
-#include "pico/time.h"
 #include "hardware/pio.h"
+#include "pico/time.h"
 #include <cmath>
 #include "tusb.h"
-
+#include "delayline.h"
 #ifdef PICO_ZERO
 #include "ws2812.pio.h" 
 #endif
@@ -28,6 +28,21 @@ namespace Pico {
     std::atomic<float> led_intensity[12];
     static uint32_t led_framebuffer[12] = {0};
     static float smooth_hue[12] = {0.0f};
+
+    // --- MASTER FX ---
+    daisysp::DelayLine<float, 16000> echoL, echoR;
+    float delay_level = 0.0f;
+    float delay_feedback = 0.0f;
+    float target_delay_samples = 0.0f;
+    float current_delay_samples = 0.0f;
+    bool delay_bypass = false;
+    bool limiter_bypass = false;
+    float master_gain = 1.0f;
+    float midi_master_volume = 1.0f;
+    float last_out_L = 0.0f, last_out_R = 0.0f;
+
+    const float release_coeff = 0.0005f; // Smaller = Slower release
+        
 
 
 // -----------Interface hardware-----------
@@ -503,13 +518,75 @@ namespace Pico {
 }
 
 
+
 // -----------Audio-----------
 
-    static AudioMode _mode;
-    static AudioProcessCallback _cb;
-    static int _srate, _bpin, _dpin, _bsize; 
 
-    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
+// Stereo Tape-Emulator Delay
+void applyStereoDelay(float* buffer, int frames) {
+    if (delay_bypass) return;
+
+    current_delay_samples += (target_delay_samples - current_delay_samples) * 0.01f;
+
+    const float offset = 441.0f;
+
+    echoL.SetDelay(current_delay_samples);
+    echoR.SetDelay(current_delay_samples + offset);
+
+    for (int i = 0; i < frames * 2; i += 2) {
+        float inL = buffer[i];
+        float inR = buffer[i + 1];
+
+        float delL = echoL.Read();
+        float delR = echoR.Read();
+
+        float fbL = fmaxf(-1.0f, fminf(1.0f, inL * 0.5f + delR * delay_feedback));
+        float fbR = fmaxf(-1.0f, fminf(1.0f, inR * 0.5f + delL * delay_feedback));
+
+        echoL.Write(fbL);
+        echoR.Write(fbR);
+
+        // Mix dry/wet
+        buffer[i]     = fmaxf(-1.0f, fminf(1.0f, inL * 0.7f + delL * delay_level * 0.5f));
+        buffer[i + 1] = fmaxf(-1.0f, fminf(1.0f, inR * 0.7f + delR * delay_level * 0.5f));
+    }
+}
+
+
+// --- MASTER LIMITER ---
+void applyLimiter(float* buffer, int frames) {
+    if (limiter_bypass) return;
+    for (int i = 0; i < frames * 2; i++) {
+        float sample = buffer[i] * midi_master_volume;
+        float abs_v = fabsf(sample);
+        if (abs_v > 0.95f) {
+            float target_gain = 0.95f / abs_v;
+            if (target_gain < master_gain) master_gain = target_gain;
+        } else {
+            master_gain += (1.0f - master_gain) * release_coeff;
+        }
+
+        sample *= master_gain;
+
+        if (sample > 1.0f) sample = 1.0f;
+        if (sample < -1.0f) sample = -1.0f;
+
+        buffer[i] = sample;
+    }
+}
+
+
+void init_dsp_effects() {
+    echoL.Init();
+    echoR.Init();
+}
+
+
+static AudioMode _mode;
+static AudioProcessCallback _cb;
+static int _srate, _bpin, _dpin, _bsize; 
+
+void setupAudio(AudioMode mode, AudioProcessCallback callback, 
                     int sample_rate, uint data_pin, uint bclk_pin, int buffer_size) {
         _mode = mode;
         _cb = callback;
@@ -519,12 +596,11 @@ namespace Pico {
         _bsize = buffer_size;
     }
 
-
-    void __not_in_flash_func(core1_audio_entry)() {
+void __not_in_flash_func(core1_audio_entry)() {
     audio_format_t audio_format = {
         .sample_freq   = (uint32_t)_srate,
         .format        = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .channel_count = (uint16_t)((_mode == I2S) ? 2 : 1)  // I2S stereo, PWM mono
+        .channel_count = (uint16_t)((_mode == I2S) ? 2 : 1) 
     };
 
     audio_buffer_format_t producer_format = {
@@ -532,10 +608,10 @@ namespace Pico {
         .sample_stride = (uint16_t)(audio_format.channel_count * sizeof(int16_t))
     };
 
-    float* heavy_buffer = new float[_bsize * audio_format.channel_count];
+    float* heavy_buffer = new float[_bsize * 2];
     assert(heavy_buffer);
 
-    if (_mode == I2S) {
+   if (_mode == I2S) {
         struct audio_i2s_config i2s_config = {
             .data_pin       = (uint8_t)_dpin,
             .clock_pin_base = (uint8_t)_bpin,
@@ -549,29 +625,29 @@ namespace Pico {
         audio_i2s_set_enabled(true);
 
         while (true) {
-            struct audio_buffer* buffer = take_audio_buffer(ap, true);
-            if (!buffer) continue;
+            struct audio_buffer* buffer = take_audio_buffer(ap, false);
+            
+            if (buffer) {
+                if (_cb) {
+                    int frames = buffer->max_sample_count;
 
-            if (_cb) {
-                int frames = buffer->max_sample_count;
-                _cb(heavy_buffer, frames);
-
-                int16_t* out = (int16_t*)buffer->buffer->bytes;
-                for (int i = 0; i < frames * 2; i++) {
-                    float v = heavy_buffer[i];
-                    if (v > 1.f) v = 1.f;
-                    if (v < -1.f) v = -1.f;
-                    out[i] = (int16_t)(v * 32767.f);
+                    _cb(heavy_buffer, frames);
+                
+                    int16_t* out = (int16_t*)buffer->buffer->bytes;
+                    for (int i = 0; i < frames * 2; i++) {
+                        float v = heavy_buffer[i];
+                        if (v > 1.0f) v = 1.0f; 
+                        else if (v < -1.0f) v = -1.0f;
+                        out[i] = (int16_t)(v * 32767.0f);
+                    }
                 }
-            }
-
-            buffer->sample_count = buffer->max_sample_count;
-            give_audio_buffer(ap, buffer);
+                
+                buffer->sample_count = buffer->max_sample_count;
+                give_audio_buffer(ap, buffer);
+            }       
         }
-    } 
-
-    else {
-
+    }
+   else {
         const uint pwm_pin = _dpin;
         gpio_set_function(pwm_pin, GPIO_FUNC_PWM);
         uint slice   = pwm_gpio_to_slice_num(pwm_pin);
@@ -579,51 +655,50 @@ namespace Pico {
 
         const uint16_t wrap = 255;  
         pwm_set_wrap(slice, wrap);
-        pwm_set_clkdiv(slice, 1.0f);
         pwm_set_enabled(slice, true);
 
-        uint16_t* pwm_buffer = new uint16_t[_bsize];
-        assert(pwm_buffer);
+        uint16_t* pwm_buffers[2] = { new uint16_t[_bsize], new uint16_t[_bsize] };
+        int write_idx = 0;
 
         int dma_chan = dma_claim_unused_channel(true);
         dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
         channel_config_set_transfer_data_size(&cfg, DMA_SIZE_16);
         channel_config_set_read_increment(&cfg, true);
         channel_config_set_write_increment(&cfg, false);
+        channel_config_set_dreq(&cfg, pwm_get_dreq(slice));
 
         volatile uint16_t* pwm_cc_ptr = ((volatile uint16_t*)&pwm_hw->slice[slice].cc) + channel;
-
-        dma_channel_configure(
-        dma_chan,          
-        &cfg,              
-        pwm_cc_ptr,        
-        pwm_buffer,        
-        _bsize,           
-        true              
-    );
 
         while (true) {
             if (_cb) {
                 _cb(heavy_buffer, _bsize);
+                applyStereoDelay(heavy_buffer, _bsize);
+                applyLimiter(heavy_buffer, _bsize);
 
                 for (int i = 0; i < _bsize; i++) {
-                    float v = heavy_buffer[i];
-                    if (v > 1.f) v = 1.f;
-                    if (v < -1.f) v = -1.f;
-                    pwm_buffer[i] = (uint16_t)((v * 0.5f + 0.5f) * wrap);
+                    float v = (heavy_buffer[i*2] + heavy_buffer[i*2+1]) * 0.5f;
+                    if (v > 1.f) v = 1.f; else if (v < -1.f) v = -1.f;
+                    pwm_buffers[write_idx][i] = (uint16_t)((v * 0.5f + 0.5f) * wrap);
                 }
 
-                dma_channel_set_read_addr(dma_chan, pwm_buffer, true);
+                dma_channel_wait_for_finish_blocking(dma_chan);
 
-                while (dma_channel_is_busy(dma_chan)) {
-                tight_loop_contents();  
-               }
+                dma_channel_configure(
+                    dma_chan, &cfg, 
+                    pwm_cc_ptr,            
+                    pwm_buffers[write_idx], 
+                    _bsize, 
+                    true                 
+                );
+
+                write_idx = 1 - write_idx;
             }
         }
-    }       
+    }
+
 }
-
-
+    
+         
 // -----------MIDI-----------
 
     MidiBuffer midi_rb;
@@ -803,6 +878,10 @@ void on_uart_rx() {
         Pico::midi_push(uart_getc(uart0));
     }
   }
+
+
+
+
 }
 
 
