@@ -187,17 +187,17 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                 case 7:                                          // Master volume
                     Pico::midi_master_volume = val;
                     break;
-                case 12:                                         // Delay Time
+                case 8: Pico::limiter_bypass = is_on; break;     // Toggle Limiter
+                case 90:                                         // Delay Time
                     Pico::target_delay_samples = 500.0f + (val * 23000.0f); 
                     break;
-                case 20: Pico::delay_bypass = is_on; break;     // Toggle Delay
-                case 21: Pico::limiter_bypass = is_on; break;   // Toggle Limiter
                 case 91:                                        // Delay Send Level
                     Pico::delay_level = val * 0.8f; 
                     break;
                 case 92:                                        // Feedback Amount
                     Pico::delay_feedback = val * 0.95f; 
                     break;
+                case 93: Pico::delay_bypass = is_on; break;     // Toggle Delay
                 case 120:                                       // Debug Toggle
                     debug_enabled = (data2 > 64);
                     break;
