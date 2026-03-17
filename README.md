@@ -21,7 +21,7 @@ Check compiled binaries for RP2040 in the release section.
 - [x] joystick
 - [x] gate in/out
 - [x] midi clock
-- [ ] pwm audio
+- [x] pwm audio
 - [ ] sd card
 - [ ] screen
 - [ ] sensors
