@@ -4,9 +4,9 @@
   "pico_board": "pico2",
   "core_freq": 240000,
   "audio_mode": "I2S",
-  "sample_rate": 48000,
+  "sample_rate": 44100,
   "channel": 2,
-  "buffer_size": 64,
+  "buffer_size": 128,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
   "midi_mode": "usb",
@@ -48,11 +48,14 @@
   },
 
   "leds": [
-     
-    { "name": "led1", "pin": 25, "mode": "pd" },
+    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "clock" },
+    { "name": "led1", "pin": 25, "mode": "midi" },
     { "name": "midi", "pin": 24, "mode": "midi" },
-    { "name": "clock", "pin": 23, "mode": "clock" },
-    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "pd" }
+    { "name": "clock", "pin": 23, "mode": "clock" }
    
-  ]
+  ], 
+  "masterfx": {
+    "limiter": true,
+    "delay": true
+  }
 }
