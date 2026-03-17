@@ -217,64 +217,64 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
-    uint8_t packet[4] = {0}; 
-    uint8_t raw[3] = {0};    
-    int raw_len = 0;
-    
-    switch (receiverHash) {
+    uint8_t midiMsg[3] = {0, 0, 0};
+    int humanChannel = 1;
+    int zeroBasedCh  = 0;
+
+    if(hv_msg_getNumElements(m) >= 3)
+        humanChannel = (int)hv_msg_getFloat(m, 2);
+
+    if(humanChannel < 1) humanChannel = 1;
+    if(humanChannel > 16) humanChannel = 16;
+    zeroBasedCh = humanChannel - 1;
+
+    switch(receiverHash) {
         case HV_NOTEOUT_HASH: {
-            int note = (int)msg_getFloat(m, 0);
-            int vel = (int)msg_getFloat(m, 1);
-            bool isNoteOn = (vel > 0);
+            int note = (int)hv_msg_getFloat(m, 0);
+            int vel  = (int)hv_msg_getFloat(m, 1);
 
-            raw[0] = isNoteOn ? 0x90 : 0x80;
-            raw[1] = (uint8_t)note;
-            raw[2] = (uint8_t)vel;
-            raw_len = 3;
-
-            packet[0] = isNoteOn ? 0x09 : 0x08; 
-            packet[1] = raw[0];
-            packet[2] = raw[1];
-            packet[3] = raw[2];
+            midiMsg[0] = vel > 0 ? (0x90 | zeroBasedCh) : (0x80 | zeroBasedCh);
+            midiMsg[1] = note & 0x7F;
+            midiMsg[2] = vel > 0 ? (vel & 0x7F) : 0;
             break;
         }
 
         case HV_CTL_OUT_HASH: {
-            uint8_t ccNum = (uint8_t)msg_getFloat(m, 0);
-            uint8_t ccVal = (uint8_t)msg_getFloat(m, 1);
+            int numElems = hv_msg_getNumElements(m);
+            int val = 0;
+            int cc  = 0;
 
-            raw[0] = 0xB0;
-            raw[1] = ccNum;
-            raw[2] = ccVal;
-            raw_len = 3;
+            if(numElems >= 1) val = (int)hv_msg_getFloat(m, 0);
+            if(numElems >= 2) cc  = (int)hv_msg_getFloat(m, 1);
 
-            packet[0] = 0x0B; 
-            packet[1] = raw[0];
-            packet[2] = raw[1];
-            packet[3] = raw[2];
+            if(val < 0) val = 0;
+            if(val > 127) val = 127;
+            if(cc < 0) cc = 0;
+            if(cc > 127) cc = 127;
+
+            midiMsg[0] = 0xB0 | (zeroBasedCh & 0x0F);
+            midiMsg[1] = cc & 0x7F;
+            midiMsg[2] = val & 0x7F;
             break;
         }
 
         default:
-            return; 
+            return;
     }
 
+    {% if board.midi_mode == 'uart' %}
+    uart_write_blocking(uart0, midiMsg, 3);
+    {% endif %}
+
     {% if board.midi_mode == 'usb' %}
-    if (tud_midi_mounted() && packet[0] != 0) {
+    if(tud_midi_mounted()) {
+        uint8_t packet[4] = {0x0B, midiMsg[0], midiMsg[1], midiMsg[2]};
         tud_midi_packet_write(packet);
     }
     {% endif %}
 
-    {% if board.midi_mode == 'uart' %}
-    if (raw_len > 0) {
-    uart_write_blocking(uart0, raw, raw_len);
-    }
-    {% endif %}
-
     {% if board.midi_mode == 'host' %}
-    if (raw_len > 0) {
-        tuh_midi_stream_write(1, 0, raw, raw_len);
-    }
+    tuh_midi_stream_write(1, 0, midiMsg, 3);
     {% endif %}
 }
 
