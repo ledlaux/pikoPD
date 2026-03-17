@@ -56,10 +56,15 @@ Check compiled binaries for RP2040 in the release section.
 
 ## Supported MIDI CC
 
-| CC Number | Parameter      | 
-|-----------|----------------|
-| 7         | Master Volume  | 
-| 120       | Debug Toggle   | 
+| CC Number | Parameter              | 
+|-----------|------------------------|
+| 7         | Master Volume          | 
+| 8        | Limiter Bypass         | 
+| 90        | Delay Time             |
+| 91        | Delay Send Level       | 
+| 92        | Delay Feedback Amount  |
+| 93        | Delay Bypass           | 
+| 120       | Debug Toggle           | 
   
 
 ## Working state
