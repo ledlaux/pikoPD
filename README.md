@@ -62,7 +62,7 @@ Check compiled binaries for RP2040 in the release section.
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
-3. Midi input/output implemented in usb, usb host and uart config. Also midi clock and start/stop messages work with [midirealtimein] object.
+3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with [midirealtimein] object.
 4. PWM audio is working reliable on RP2350 only.
 5. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
