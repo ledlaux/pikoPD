@@ -653,7 +653,7 @@ void __not_in_flash_func(core1_audio_entry)() {
         uint slice   = pwm_gpio_to_slice_num(pwm_pin);
         uint channel = pwm_gpio_to_channel(pwm_pin);
 
-        const uint16_t wrap = 255;  
+        const uint16_t wrap = 4095;  
         pwm_set_wrap(slice, wrap);
         pwm_set_enabled(slice, true);
 
