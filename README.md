@@ -54,13 +54,6 @@ Check compiled binaries for RP2040 in the release section.
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
 
-## Supported MIDI CC
-
-| CC Number | Parameter      | 
-|-----------|----------------|
-| 7         | Master Volume  | 
-| 120       | Debug Toggle   | 
-
 
 ## Working state
 
