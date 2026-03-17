@@ -53,9 +53,16 @@ Check compiled binaries for RP2040 in the release section.
 - Builds firmware using **CMake** in a `build/` folder  
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
-  
 
-### Working state
+## Supported MIDI CC
+
+| CC Number | Parameter      | 
+|-----------|----------------|
+| 7         | Master Volume  | 
+| 120       | Debug Toggle   | 
+
+
+## Working state
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
