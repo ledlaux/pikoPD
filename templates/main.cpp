@@ -262,10 +262,12 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
             return;
     }
 
+    // --- Send to UART MIDI ---
     {% if board.midi_mode == 'uart' %}
     uart_write_blocking(uart0, midiMsg, 3);
     {% endif %}
 
+    // --- Send to USB MIDI ---
     {% if board.midi_mode == 'usb' %}
     if(tud_midi_mounted()) {
         uint8_t packet[4] = {0x0B, midiMsg[0], midiMsg[1], midiMsg[2]};
@@ -273,6 +275,7 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     }
     {% endif %}
 
+    // --- Send to Host MIDI ---
     {% if board.midi_mode == 'host' %}
     tuh_midi_stream_write(1, 0, midiMsg, 3);
     {% endif %}
@@ -320,11 +323,10 @@ void audioFunc(float* buffer, int frames) {
     {% endif %}
 }
 
-
 {% if board.console %}
 #define PRINT_QUEUE_SIZE 64
 #define PRINT_STR_LEN 16
-#define PRINT_RATE_MS 100
+#define PRINT_THROTTLE_MS 128
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 
 struct PrintMsg {
@@ -333,15 +335,17 @@ struct PrintMsg {
 };
 
 static PrintMsg queue[PRINT_QUEUE_SIZE];
-static uint8_t head = 0;
-static uint32_t lastPrintTimes[NUM_PRINT_NAMES] = {0};
+static uint16_t write_idx = 0; 
+
 static const char* printNames[NUM_PRINT_NAMES] = {
 {% for p in hv_manifest.prints -%}
     "{{ p.name }}"{% if not loop.last %}, {% endif %}
 {% endfor %}
 };
 
+
 static int16_t get_print_id(const char *name) {
+    if (!name) return -1;
     for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
         if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
     }
@@ -349,53 +353,57 @@ static int16_t get_print_id(const char *name) {
 }
 
 
-void hv_print_handler(HeavyContextInterface *context,
-                      const char *printName,
-                      const char *str,
-                      const HvMessage *msg)
-{
-    if (!str) return;
-
-    int16_t id = get_print_id(printName);
+void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
+    static uint32_t last_print = 0;
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
-    if (id >= 0) {
-        if (now - lastPrintTimes[id] < PRINT_RATE_MS) return;
-        lastPrintTimes[id] = now;
+    if (now - last_print < PRINT_THROTTLE_MS || !multicore_fifo_wready()) return;
+
+    PrintMsg *m = &queue[write_idx];
+    m->id = get_print_id(printName);
+
+    if (msg) {
+        sprintf(m->str, "%.2f", hv_msg_getFloat(msg, 0));
+    } else if (str) {
+        strncpy(m->str, str, PRINT_STR_LEN - 1);
+        m->str[PRINT_STR_LEN - 1] = '\0';
     }
 
-    if (!multicore_fifo_wready()) return;
-
-    uint8_t h = head;
-    queue[h].id = id;
-    
-    int i = 0;
-    for (; i < PRINT_STR_LEN - 1 && str[i] != '\0'; i++) {
-        queue[h].str[i] = str[i];
+    if (multicore_fifo_push_timeout_us((uint32_t)m, 0)) {
+        write_idx = (write_idx + 1) & (PRINT_QUEUE_SIZE - 1);
+        last_print = now;
     }
-    queue[h].str[i] = '\0';
-
-    multicore_fifo_push_blocking((uint32_t)&queue[h]);
-    
-    head = (h + 1) & (PRINT_QUEUE_SIZE - 1);
 }
 
 
-void process_print_queue() {
-    if (!tud_cdc_connected()) {
-        while (multicore_fifo_rvalid()) {
-            multicore_fifo_pop_blocking();
-        }
-        return;
-    }
+void process_queue() {
+
 
     while (multicore_fifo_rvalid()) {
-        PrintMsg* m = (PrintMsg*)multicore_fifo_pop_blocking();
+        uint32_t msg = multicore_fifo_pop_blocking();
 
-        if (m->id >= 0 && m->id < NUM_PRINT_NAMES) {
-            printf("[%s] %s\n", printNames[m->id], m->str);
+        if (msg & (1u << 31)) {
+            // --- MIDI OUT LOGIC ---
+            {% if board.midi_mode == 'usb' %}
+            if (tud_midi_mounted()) {
+                uint8_t status = (msg >> 16) & 0xFF;
+                uint8_t d1     = (msg >> 8)  & 0xFF;
+                uint8_t d2     = msg         & 0xFF;
+                
+                // Pack for USB: [CableNumber+CIN, Status, Data1, Data2]
+                uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, d2 };
+                tud_midi_packet_write(packet);
+            }
+            {% endif %}
         } else {
-            printf("[hv] %s\n", m->str);
+            // --- PRINT LOGIC ---
+            {% if board.console %}
+            if (tud_cdc_connected()) { // Only print if someone is listening
+                PrintMsg* m = (PrintMsg*)msg;
+                const char* name = (m->id >= 0 && m->id < NUM_PRINT_NAMES) ? printNames[m->id] : "hv";
+                printf("[%s] %s\n", name, m->str);
+            }
+            {% endif %}
         }
     }
 }
@@ -501,16 +509,13 @@ int main() {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
-        {% if board.console %}
-        if (now - last_print_tick >= 10) {
-        last_print_tick = now;
-        process_print_queue();
-        }
+       {% if board.console %}
+        process_queue();
         {% endif %}
 
         Pico::midi_task();
 
-        if (now - last_led_tick >= 10) {
+        if (now - last_led_tick >= 20) {
             last_led_tick = now;
 
             Pico::update(now); 
