@@ -308,8 +308,14 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
+
+    {% if board.masterfx.delay %}
     Pico::applyStereoDelay(buffer, frames);
+    {% endif %}
+
+    {% if board.masterfx.limiter %}
     Pico::applyLimiter(buffer, frames);
+    {% endif %}
 }
 
 
