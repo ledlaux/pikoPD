@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
@@ -322,30 +324,26 @@ void audioFunc(float* buffer, int frames) {
 {% if board.console %}
 #define PRINT_QUEUE_SIZE 64
 #define PRINT_STR_LEN 8
-#define PRINT_RATE_MS 250
+#define PRINT_RATE_MS 150
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 
 struct PrintMsg {
-    uint8_t id;
+    int16_t id;
     char str[PRINT_STR_LEN];
-    bool valid_name; 
 };
 
-static volatile PrintMsg queue[PRINT_QUEUE_SIZE];
-static volatile uint8_t head = 0;
-static volatile uint8_t tail = 0;
-
+static PrintMsg queue[PRINT_QUEUE_SIZE];
+static uint8_t head = 0;
 static uint32_t lastPrintTimes[NUM_PRINT_NAMES] = {0};
-
 static const char* printNames[NUM_PRINT_NAMES] = {
 {% for p in hv_manifest.prints -%}
     "{{ p.name }}"{% if not loop.last %}, {% endif %}
 {% endfor %}
 };
 
-static int8_t get_print_id(const char *name) {
-    for (uint8_t i = 0; i < NUM_PRINT_NAMES; i++) {
-        if (strcmp(name, printNames[i]) == 0) return i;
+static int16_t get_print_id(const char *name) {
+    for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
+        if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
     }
     return -1;
 }
@@ -356,61 +354,49 @@ void hv_print_handler(HeavyContextInterface *context,
                       const char *str,
                       const HvMessage *msg)
 {
-    if (!debug_enabled || !str) return;
+    if (!str) return;
 
+    int16_t id = get_print_id(printName);
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
-    int8_t id = get_print_id(printName);
-    bool valid_name = true;
-
-    if (id < 0) {
-        valid_name = false; 
-        id = 0;         
-    } else if (now - lastPrintTimes[id] < PRINT_RATE_MS) {
-        return;  
-    } else {
+    if (id >= 0) {
+        if (now - lastPrintTimes[id] < PRINT_RATE_MS) return;
         lastPrintTimes[id] = now;
     }
 
+    if (!multicore_fifo_wready()) return;
+
     uint8_t h = head;
-    uint8_t next = (h + 1) & (PRINT_QUEUE_SIZE - 1);
-    if (next == tail) return; 
-
     queue[h].id = id;
-    queue[h].valid_name = valid_name;
-
-    for (int i = 0; i < PRINT_STR_LEN - 1; i++) {
-        char c = str[i];
-        queue[h].str[i] = c;
-        if (c == '\0') break;
+    
+    int i = 0;
+    for (; i < PRINT_STR_LEN - 1 && str[i] != '\0'; i++) {
+        queue[h].str[i] = str[i];
     }
-    queue[h].str[PRINT_STR_LEN - 1] = '\0';
+    queue[h].str[i] = '\0';
 
-    head = next;
+    multicore_fifo_push_blocking((uint32_t)&queue[h]);
+    
+    head = (h + 1) & (PRINT_QUEUE_SIZE - 1);
 }
 
 
 void process_print_queue() {
-    if (!tud_cdc_connected()) return;
-
-    while (tail != head && tud_cdc_write_available() >= 64) {
-        volatile PrintMsg &v = queue[tail];
-        PrintMsg m;
-        m.id = v.id;
-        m.valid_name = v.valid_name;
-        for (int i = 0; i < PRINT_STR_LEN; i++) {
-            m.str[i] = v.str[i];
-            if (v.str[i] == '\0') break;
+    if (!tud_cdc_connected()) {
+        while (multicore_fifo_rvalid()) {
+            multicore_fifo_pop_blocking();
         }
-        m.str[PRINT_STR_LEN - 1] = '\0';
+        return;
+    }
 
-        if (m.valid_name) {
-            printf("[%s] %s\n", printNames[m.id], m.str);
+    while (multicore_fifo_rvalid()) {
+        PrintMsg* m = (PrintMsg*)multicore_fifo_pop_blocking();
+
+        if (m->id >= 0 && m->id < NUM_PRINT_NAMES) {
+            printf("[%s] %s\n", printNames[m->id], m->str);
         } else {
-            printf("[print] %s\n", m.str);
+            printf("[hv] %s\n", m->str);
         }
-
-        tail = (tail + 1) & (PRINT_QUEUE_SIZE - 1);
     }
 }
 {% endif %}
@@ -420,7 +406,6 @@ int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
 
-  
     {% if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
@@ -517,7 +502,7 @@ int main() {
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         {% if board.console %}
-        if (now - last_print_tick >= 150) {
+        if (now - last_print_tick >= 10) {
         last_print_tick = now;
         process_print_queue();
         }
