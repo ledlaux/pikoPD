@@ -38,7 +38,9 @@ Check compiled binaries for RP2040 in the release section.
     - board (pico, pico_w, zero, pico2)
     - core frequency
     - sample rate
-    - i2s pins
+    - audio mode (I2S, PWM)
+    - I2S pins
+    - PWM pin
     - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
     - rotary encoder 
