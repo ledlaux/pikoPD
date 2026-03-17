@@ -68,6 +68,8 @@ Check compiled binaries for RP2040 in the release section.
 | 92        | Delay Feedback Amount  |
 | 93        | Delay Bypass           | 
 | 120       | Debug Toggle           | 
+
+To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. 
   
 
 ## Working state
