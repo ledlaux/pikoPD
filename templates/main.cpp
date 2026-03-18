@@ -131,6 +131,15 @@ static bool clock_running = false;
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
+#define MIDI_BUF_SIZE 128
+typedef struct {
+    uint32_t data[MIDI_BUF_SIZE];
+    volatile uint32_t head;
+    volatile uint32_t tail;
+} midi_queue_t;
+
+static midi_queue_t midi_usb_rb = { .head = 0, .tail = 0 };
+
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     // --- 1. Real-time Messages (Clock, Start, Stop) ---
@@ -254,10 +263,14 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     tuh_midi_stream_write(1, 0, midiMsg, 3);
     {% endif %}
 
-    // --- USB MIDI ---
+ // --- USB MIDI (Push to Ring Buffer) ---
     {% if board.midi_mode == 'usb' %}
     uint32_t midi_packed = (1u << 31) | (midiMsg[0] << 16) | (midiMsg[1] << 8) | midiMsg[2];
-    multicore_fifo_push_timeout_us(midi_packed, 20);
+    uint32_t next_head = (midi_usb_rb.head + 1) % MIDI_BUF_SIZE;
+    if (next_head != midi_usb_rb.tail) {
+    midi_usb_rb.data[midi_usb_rb.head] = midi_packed;
+    __atomic_store_n(&midi_usb_rb.head, next_head, __ATOMIC_RELEASE);
+    }
     {% endif %}
 
 }
@@ -305,15 +318,16 @@ void audioFunc(float* buffer, int frames) {
 }
 
 
-#define PRINT_POOL_SIZE 24  
-#define PRINT_STR_LEN 16
-#define PRINT_THROTTLE_MS 128
+
+#define PRINT_POOL_SIZE 64
+#define PRINT_THROTTLE_MS 50
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 
 struct PrintMsg {
     std::atomic<bool> busy{false}; 
     int16_t id;
-    char str[PRINT_STR_LEN];
+    float val;      
+    bool is_float;  
 };
 
 static PrintMsg print_pool[PRINT_POOL_SIZE];
@@ -323,6 +337,7 @@ static const char* printNames[NUM_PRINT_NAMES] = {
     "{{ p.name }}"{% if not loop.last %}, {% endif %}
 {% endfor %}
 };
+
 
 static int16_t get_print_id(const char *name) {
     if (!name) return -1;
@@ -334,21 +349,21 @@ static int16_t get_print_id(const char *name) {
 
 
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
-    static uint32_t last_print = 0;
     uint32_t now = to_ms_since_boot(get_absolute_time());
-
+    static uint32_t last_print = 0;
+    
     if (now - last_print < PRINT_THROTTLE_MS) return;
 
     for (int i = 0; i < PRINT_POOL_SIZE; i++) {
+
         if (!print_pool[i].busy.exchange(true, std::memory_order_acquire)) {
-            
             print_pool[i].id = get_print_id(printName);
 
             if (msg) {
-                sprintf(print_pool[i].str, "%.2f", hv_msg_getFloat(msg, 0));
-            } else if (str) {
-                strncpy(print_pool[i].str, str, PRINT_STR_LEN - 1);
-                print_pool[i].str[PRINT_STR_LEN - 1] = '\0';
+                print_pool[i].val = hv_msg_getFloat(msg, 0);
+                print_pool[i].is_float = true;
+            } else {
+                print_pool[i].is_float = false; 
             }
 
             if (multicore_fifo_push_timeout_us((uint32_t)&print_pool[i], 0)) {
@@ -363,34 +378,51 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 
 
 void process_queue() {
-    while (multicore_fifo_rvalid()) {
+    constexpr int MAX_WORK_PER_CALL = 8;
+
+    // --- 1. Drain Hardware FIFO (Prints) ---
+    for (int i = 0; i < MAX_WORK_PER_CALL; ++i) {
+
+        if (!multicore_fifo_rvalid()) break;
+
         uint32_t msg_val = multicore_fifo_pop_blocking();
 
-        if (msg_val & (1u << 31)) {
-            // --- MIDI DATA ---
-            {% if board.midi_mode == 'usb' %}
-            if (tud_midi_mounted()) {
-                uint8_t status = (msg_val >> 16) & 0xFF;
-                uint8_t d1     = (msg_val >> 8)  & 0xFF;
-                uint8_t d2     = msg_val         & 0xFF;
-                uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, d2 };
-                tud_midi_packet_write(packet);
-            }
-            {% endif %}
-        } else {
-            // --- PRINT ---
+        if (!(msg_val & (1u << 31))) {
             {% if board.console %}
             PrintMsg* m = (PrintMsg*)msg_val;
-            
-            if (tud_cdc_connected()) {
-                const char* name = (m->id >= 0 && m->id < NUM_PRINT_NAMES) ? printNames[m->id] : "hv";
-                printf("[%s] %s\n", name, m->str);
+            if (tud_cdc_connected() && debug_enabled) {
+                
+                if (m->is_float) {
+                    const char* name = (m->id >= 0 && m->id < NUM_PRINT_NAMES) 
+                                       ? printNames[m->id] 
+                                       : "print";
+                    
+                    printf("[%s] %.3f\n", name, m->val);
+                }
             }
 
             m->busy.store(false, std::memory_order_release);
             {% endif %}
         }
     }
+
+    // --- 2. Drain MIDI from Software Ring Buffer ---
+    {% if board.midi_mode == 'usb' %}
+    for (int i = 0; i < MAX_WORK_PER_CALL; ++i) {
+        uint32_t tail = midi_usb_rb.tail;
+        if (tail == midi_usb_rb.head || !tud_midi_mounted()) break;
+
+        uint32_t msg = midi_usb_rb.data[tail];
+        uint8_t status = (msg >> 16) & 0xFF;
+        uint8_t d1     = (msg >> 8)  & 0xFF;
+        uint8_t d2     = msg         & 0xFF;
+        uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, d2 };
+
+        if (tud_midi_packet_write(packet)) {
+            midi_usb_rb.tail = (tail + 1) % MIDI_BUF_SIZE;
+        } else break;
+    }
+    {% endif %}
 }
 
 
