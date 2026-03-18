@@ -24,6 +24,7 @@ extern "C" void on_uart_rx();
 
 namespace Pico {
 
+    
     std::atomic<float> led_vals[12];
     std::atomic<float> led_hue[12];        
     std::atomic<float> led_intensity[12];
@@ -523,6 +524,7 @@ namespace Pico {
 // -----------Audio-----------
 
 
+
 // Stereo Tape-Emulator Delay
     void applyStereoDelay(float* buffer, int frames) {
         if (delay_bypass) return;
@@ -582,6 +584,11 @@ namespace Pico {
         echoR.Init();
     }
 
+    #define MAX_BLOCK_SIZE 1024
+
+    static float heavy_buffer[MAX_BLOCK_SIZE * 2] __attribute__((aligned(4)));
+
+    static uint16_t static_pwm_buffers[2][MAX_BLOCK_SIZE] __attribute__((aligned(4)));
 
     static AudioMode _mode;
     static AudioProcessCallback _cb;
@@ -609,8 +616,6 @@ namespace Pico {
             .sample_stride = (uint16_t)(audio_format.channel_count * sizeof(int16_t))
         };
 
-        float* heavy_buffer = new float[_bsize * 2];
-        assert(heavy_buffer);
 
     if (_mode == I2S) {
             struct audio_i2s_config i2s_config = {
@@ -658,7 +663,7 @@ namespace Pico {
             pwm_set_wrap(slice, wrap);
             pwm_set_enabled(slice, true);
 
-            uint16_t* pwm_buffers[2] = { new uint16_t[_bsize], new uint16_t[_bsize] };
+            uint16_t* pwm_buffers[2] = { static_pwm_buffers[0], static_pwm_buffers[1] };
             int write_idx = 0;
 
             int dma_chan = dma_claim_unused_channel(true);
@@ -673,9 +678,7 @@ namespace Pico {
             while (true) {
                 if (_cb) {
                     _cb(heavy_buffer, _bsize);
-                    applyStereoDelay(heavy_buffer, _bsize);
-                    applyLimiter(heavy_buffer, _bsize);
-
+        
                     for (int i = 0; i < _bsize; i++) {
                         float v = (heavy_buffer[i*2] + heavy_buffer[i*2+1]) * 0.5f;
                         if (v > 1.f) v = 1.f; else if (v < -1.f) v = -1.f;
@@ -789,7 +792,6 @@ namespace Pico {
             tuh_task();
         #else
             tud_task();  
-            process_midi_usb_queue();           
         #endif
             uint8_t b;
             while (midi_pop(b)) {
@@ -830,42 +832,45 @@ namespace Pico {
 
             if (!(msg_val & (1u << 31))) {
                 PrintMsg* m = (PrintMsg*)msg_val;
-                
+                #if ENABLE_DEBUG
                 if (tud_cdc_connected() && debug) {
                     const char* name = (m->id >= 0 && m->id < num_names) ? names[m->id] : "print";
                     if (m->is_float) {
                         printf("[%s] %.3f\n", name, m->val);
                     }
                 }
+                #endif
                 m->busy.store(false, std::memory_order_release);
             } 
         }
     }
 
 
-    void process_midi_usb_queue() {
-        constexpr int MAX_MIDI_PER_CALL = 16;
-        for (int i = 0; i < MAX_MIDI_PER_CALL; ++i) {
-            uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
-            if (t == midi_out_rb.head.load(std::memory_order_acquire)) break;
-            if (!tud_midi_mounted()) break;
+    void process_usb_queue() {
+        if (!tud_midi_mounted()) return;
 
-            uint32_t msg = midi_out_rb.data[t];
+        uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
+        uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
+
+        while (t != h) {
+            uint32_t msg = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
+            
+            uint8_t len    = (msg >> 24) & 0xFF; 
             uint8_t status = (msg >> 16) & 0xFF;
             uint8_t d1     = (msg >> 8)  & 0xFF;
             uint8_t d2     = msg         & 0xFF;
-            uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, d2 };
+            
+            uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, (uint8_t)(len == 3 ? d2 : 0) };
 
             if (tud_midi_packet_write(packet)) {
-            
-                midi_out_rb.tail.store((t + 1) % MIDI_OUT_BUF, std::memory_order_release);
+                t++; 
+                midi_out_rb.tail.store(t, std::memory_order_release);
             } else {
                 break; 
             }
         }
-        }
-    }   
-
+    }
+}
 
 extern "C" {
 

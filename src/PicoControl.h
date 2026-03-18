@@ -27,6 +27,50 @@
 #endif
 
 
+
+    #define MIDI_IN_BUF 256
+
+    struct MidiInputBuffer {
+        uint8_t data[MIDI_IN_BUF];
+        std::atomic<uint32_t> head{0};
+        std::atomic<uint32_t> tail{0};
+
+        uint32_t available() const {
+            return head.load() - tail.load();
+        }
+
+        bool is_full() const {
+            return available() >= MIDI_IN_BUF;
+        }
+    };
+
+    #define MIDI_OUT_BUF 256
+
+    struct MidiOutputBuffer {
+    uint32_t data[MIDI_OUT_BUF]; 
+    std::atomic<uint32_t> head{0};
+    std::atomic<uint32_t> tail{0};
+
+    uint32_t occupied() const {
+        return head.load(std::memory_order_acquire) - tail.load(std::memory_order_relaxed);
+    }
+
+    bool is_full() const {
+        return occupied() >= MIDI_OUT_BUF;
+    }
+    };
+
+
+    #define PRINT_POOL_SIZE 64
+
+    struct PrintMsg {
+        std::atomic<bool> busy{false}; 
+        int16_t id;
+        float val;      
+        bool is_float;  
+    };
+
+
 namespace Pico {
 
     enum PinMode {
@@ -141,44 +185,8 @@ namespace Pico {
     #endif
 
 
-    #define MIDI_IN_BUF 512
-
-    struct MidiInputBuffer {
-        uint8_t data[MIDI_IN_BUF];
-        std::atomic<uint32_t> head{0};
-        std::atomic<uint32_t> tail{0};
-
-        uint32_t available() const {
-            return head.load() - tail.load();
-        }
-
-        bool is_full() const {
-            return available() >= MIDI_IN_BUF;
-        }
-    };
-
-    #define MIDI_OUT_BUF 512
-
-    struct MidiOutputBuffer {
-        uint32_t data[MIDI_OUT_BUF];
-        std::atomic<uint32_t> head{0};
-        std::atomic<uint32_t> tail{0};
-        };
-
-    typedef struct MidiOutputBuffer midi_queue_t;
-
-
-    #define PRINT_POOL_SIZE 64
-
-    struct PrintMsg {
-        std::atomic<bool> busy{false}; 
-        int16_t id;
-        float val;      
-        bool is_float;  
-    };
-
-    extern MidiOutputBuffer midi_out_rb;
-    extern MidiInputBuffer  midi_in_rb;
+    extern MidiOutputBuffer midi_out_rb; 
+    extern MidiInputBuffer  midi_in_rb;  
     extern PrintMsg         print_pool[PRINT_POOL_SIZE];
 
     void midi_push(uint8_t byte);
@@ -189,7 +197,7 @@ namespace Pico {
     void midi_task();
     void midi_task_uart();
     void print_queue(const char** names, int num_names, bool debug);
-    void process_midi_usb_queue();
+    void process_usb_queue();
 
    
     enum AudioMode { I2S, PWM };
