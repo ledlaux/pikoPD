@@ -37,6 +37,7 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
+
 {% set receives = {} %}
 {%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
 {%- endfor -%}
@@ -128,7 +129,7 @@ static uint32_t last_led_tick = 0;
 static uint32_t midi_clock_timer = 0;
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
-static bool debug_enabled = true;
+static bool debug_enabled = false;
 static uint32_t last_print_tick = 0;
 
 
@@ -256,14 +257,24 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 
  // --- USB MIDI (Push to Ring Buffer) ---
     {% if board.midi_mode == 'usb' %}
-    uint32_t midi_packed = (1u << 31) | (midiMsg[0] << 16) | (midiMsg[1] << 8) | midiMsg[2];
-    uint32_t current_head = Pico::midi_out_rb.head.load(std::memory_order_relaxed);
-    uint32_t next_head = (current_head + 1) % MIDI_OUT_BUF;
-    if (next_head != Pico::midi_out_rb.tail.load(std::memory_order_acquire)) {
-        Pico::midi_out_rb.data[current_head] = midi_packed;
-        Pico::midi_out_rb.head.store(next_head, std::memory_order_release);
+    uint8_t status = midiMsg[0];
+    uint8_t type   = status & 0xF0;
+    uint8_t cin    = status >> 4; 
+    int len = 3; 
+    if (type == 0xC0 || type == 0xD0) len = 2; 
+    uint32_t midi_packed = ((uint32_t)len << 24) | 
+                           ((uint32_t)status << 16) | 
+                           ((uint32_t)midiMsg[1] << 8) | 
+                           (uint32_t)midiMsg[2];
+
+    uint32_t h = Pico::midi_out_rb.head.load(std::memory_order_relaxed);
+    uint32_t t = Pico::midi_out_rb.tail.load(std::memory_order_acquire);
+
+    if ((h - t) < MIDI_OUT_BUF) {
+        Pico::midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
+        Pico::midi_out_rb.head.store(h + 1, std::memory_order_release);
     }
-    {% endif %}
+{% endif %}
 
 }
 
@@ -297,7 +308,14 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 
 
-#define PRINT_THROTTLE_MS 50
+{% if board.console %}
+    #define ENABLE_DEBUG 1
+{% else %}
+    #define ENABLE_DEBUG 0
+{% endif %}
+
+{% if board.console %}
+#define PRINT_LIMIT 50
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 
 static const char* printNames[NUM_PRINT_NAMES] = {
@@ -315,12 +333,12 @@ static int16_t get_print_id(const char *name) {
     return -1;
 }
 
-{% if board.console %}
+
 void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
     uint32_t now = to_ms_since_boot(get_absolute_time());
     static uint32_t last_print = 0;
     
-    if (now - last_print < PRINT_THROTTLE_MS) return;
+    if (now - last_print < PRINT_LIMIT) return;
 
     for (int i = 0; i < PRINT_POOL_SIZE; i++) {
 
@@ -345,6 +363,7 @@ void hv_print_handler(HeavyContextInterface *context, const char *printName, con
 }
 {% endif %}
 
+
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 
@@ -356,7 +375,6 @@ void audioFunc(float* buffer, int frames) {
     Pico::applyLimiter(buffer, frames);
     {% endif %}
 }
-
 
 
 int main() {
@@ -450,17 +468,18 @@ int main() {
     int led_idx;
  
     while (true) {
-        {% if board.midi_mode == 'usb' %}
-        tud_task(); 
-        {% elif board.midi_mode == 'host' %}
-        tuh_task(); 
-        {% endif %}
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
-        Pico::print_queue(printNames, NUM_PRINT_NAMES, (tud_cdc_connected() && debug_enabled));
-  
+        {% if board.console %}
+        Pico::print_queue(printNames, NUM_PRINT_NAMES, debug_enabled); 
+        {% endif %}
+        
         Pico::midi_task();
+
+        {% if board.midi_mode == 'usb' %}
+        Pico::process_usb_queue();
+        {% endif %}
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
