@@ -30,6 +30,8 @@
 
 #define MIDI_RB_SIZE 1024
 
+
+
 struct MidiBuffer {
     uint8_t data[MIDI_RB_SIZE];
     std::atomic<uint32_t> head{0};

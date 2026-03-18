@@ -784,7 +784,7 @@ void __not_in_flash_func(core1_audio_entry)() {
         #ifdef MIDI_HOST
             tuh_task();
         #else
-            tud_task(); 
+            tud_task();             
         #endif
             uint8_t b;
             while (midi_pop(b)) {
