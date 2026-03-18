@@ -27,26 +27,6 @@
 #endif
 
 
-
-#define MIDI_RB_SIZE 1024
-
-
-
-struct MidiBuffer {
-    uint8_t data[MIDI_RB_SIZE];
-    std::atomic<uint32_t> head{0};
-    std::atomic<uint32_t> tail{0};
-
-    uint32_t available() const {
-        return head.load() - tail.load();
-    }
-
-    bool is_full() const {
-        return available() >= MIDI_RB_SIZE;
-    }
-};
-
-
 namespace Pico {
 
     enum PinMode {
@@ -124,8 +104,6 @@ namespace Pico {
     extern int n_encoder;
     extern int n_joystick;
 
-    extern MidiBuffer midi_rb;
-
     extern float delay_level;
     extern float delay_feedback;
     extern float target_delay_samples;
@@ -154,6 +132,55 @@ namespace Pico {
     void __not_in_flash_func(setLedHardware)(int index, float value);
     void update(uint32_t now);
 
+    #ifdef PICO_ZERO
+    void init_neopixel();
+    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    
+    void set_rgb_led(uint32_t color);
+    void updateRGB(int index, float hue, float intensity);
+    void showRGB();
+    #endif
+
+
+    #define MIDI_IN_BUF 512
+
+    struct MidiInputBuffer {
+        uint8_t data[MIDI_IN_BUF];
+        std::atomic<uint32_t> head{0};
+        std::atomic<uint32_t> tail{0};
+
+        uint32_t available() const {
+            return head.load() - tail.load();
+        }
+
+        bool is_full() const {
+            return available() >= MIDI_IN_BUF;
+        }
+    };
+
+    #define MIDI_OUT_BUF 512
+
+    struct MidiOutputBuffer {
+        uint32_t data[MIDI_OUT_BUF];
+        std::atomic<uint32_t> head{0};
+        std::atomic<uint32_t> tail{0};
+        };
+
+    typedef struct MidiOutputBuffer midi_queue_t;
+
+
+    #define PRINT_POOL_SIZE 64
+
+    struct PrintMsg {
+        std::atomic<bool> busy{false}; 
+        int16_t id;
+        float val;      
+        bool is_float;  
+    };
+
+    extern MidiOutputBuffer midi_out_rb;
+    extern MidiInputBuffer  midi_in_rb;
+    extern PrintMsg         print_pool[PRINT_POOL_SIZE];
+
     void midi_push(uint8_t byte);
     bool midi_pop(uint8_t &byte);
     void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t));
@@ -161,23 +188,16 @@ namespace Pico {
     void uart_midi_init();
     void midi_task();
     void midi_task_uart();
+    void print_queue(const char** names, int num_names, bool debug);
+    void process_midi_usb_queue();
 
+   
     enum AudioMode { I2S, PWM };
     typedef void (*AudioProcessCallback)(float* buffer, int frames);
 
     void setupAudio(AudioMode mode, AudioProcessCallback callback, 
                     int sample_rate, uint data_pin, uint bclk_pin, int buffer_size);
-
     void __not_in_flash_func(core1_audio_entry)();
-
-#ifdef PICO_ZERO
-    void init_neopixel();
-    void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255);    
-    void set_rgb_led(uint32_t color);
-    void updateRGB(int index, float hue, float intensity);
-    void showRGB();
-#endif
-
     void applyStereoDelay(float* buffer, int frames);
     void applyLimiter(float* buffer, int frames);
     void init_dsp_effects();
