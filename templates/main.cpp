@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <atomic>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
@@ -35,6 +36,7 @@
 #define MIDI_RT_STOP            0xFC
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
+
 
 {% set receives = {} %}
 {%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
@@ -127,7 +129,7 @@ static uint32_t last_led_tick = 0;
 static uint32_t midi_clock_timer = 0;
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
-static bool debug_enabled = true;
+static bool debug_enabled = false;
 static uint32_t last_print_tick = 0;
 
 
@@ -219,66 +221,61 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t midiMsg[3] = {0, 0, 0};
     int humanChannel = 1;
-    int zeroBasedCh  = 0;
+    if(hv_msg_getNumElements(m) >= 3) humanChannel = (int)hv_msg_getFloat(m, 2);
 
-    if(hv_msg_getNumElements(m) >= 3)
-        humanChannel = (int)hv_msg_getFloat(m, 2);
-
-    if(humanChannel < 1) humanChannel = 1;
-    if(humanChannel > 16) humanChannel = 16;
-    zeroBasedCh = humanChannel - 1;
+    int zeroBasedCh = (humanChannel < 1) ? 0 : (humanChannel > 16) ? 15 : humanChannel - 1;
 
     switch(receiverHash) {
         case HV_NOTEOUT_HASH: {
             int note = (int)hv_msg_getFloat(m, 0);
             int vel  = (int)hv_msg_getFloat(m, 1);
-
             midiMsg[0] = vel > 0 ? (0x90 | zeroBasedCh) : (0x80 | zeroBasedCh);
             midiMsg[1] = note & 0x7F;
-            midiMsg[2] = vel > 0 ? (vel & 0x7F) : 0;
+            midiMsg[2] = vel & 0x7F;
             break;
         }
-
         case HV_CTL_OUT_HASH: {
-            int numElems = hv_msg_getNumElements(m);
-            int val = 0;
-            int cc  = 0;
-
-            if(numElems >= 1) val = (int)hv_msg_getFloat(m, 0);
-            if(numElems >= 2) cc  = (int)hv_msg_getFloat(m, 1);
-
-            if(val < 0) val = 0;
-            if(val > 127) val = 127;
-            if(cc < 0) cc = 0;
-            if(cc > 127) cc = 127;
-
-            midiMsg[0] = 0xB0 | (zeroBasedCh & 0x0F);
+            int val = (int)hv_msg_getFloat(m, 0);
+            int cc  = (int)hv_msg_getFloat(m, 1);
+            midiMsg[0] = 0xB0 | zeroBasedCh;
             midiMsg[1] = cc & 0x7F;
             midiMsg[2] = val & 0x7F;
             break;
         }
-
-        default:
-            return;
+        default: return;
     }
 
-    // --- Send to UART MIDI ---
-    {% if board.midi_mode == 'uart' %}
+    // --- UART MIDI ---
+        {% if board.midi_mode == 'uart' %}
     uart_write_blocking(uart0, midiMsg, 3);
-    {% endif %}
-
-    // --- Send to USB MIDI ---
-    {% if board.midi_mode == 'usb' %}
-    if(tud_midi_mounted()) {
-        uint8_t packet[4] = {0x0B, midiMsg[0], midiMsg[1], midiMsg[2]};
-        tud_midi_packet_write(packet);
-    }
     {% endif %}
 
     // --- Send to Host MIDI ---
     {% if board.midi_mode == 'host' %}
     tuh_midi_stream_write(1, 0, midiMsg, 3);
     {% endif %}
+
+ // --- USB MIDI (Push to Ring Buffer) ---
+    {% if board.midi_mode == 'usb' %}
+    uint8_t status = midiMsg[0];
+    uint8_t type   = status & 0xF0;
+    uint8_t cin    = status >> 4; 
+    int len = 3; 
+    if (type == 0xC0 || type == 0xD0) len = 2; 
+    uint32_t midi_packed = ((uint32_t)len << 24) | 
+                           ((uint32_t)status << 16) | 
+                           ((uint32_t)midiMsg[1] << 8) | 
+                           (uint32_t)midiMsg[2];
+
+    uint32_t h = Pico::midi_out_rb.head.load(std::memory_order_relaxed);
+    uint32_t t = Pico::midi_out_rb.tail.load(std::memory_order_acquire);
+
+    if ((h - t) < MIDI_OUT_BUF) {
+        Pico::midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
+        Pico::midi_out_rb.head.store(h + 1, std::memory_order_release);
+    }
+{% endif %}
+
 }
 
 
@@ -311,6 +308,62 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
 
 
+{% if board.console %}
+    #define ENABLE_DEBUG 1
+{% else %}
+    #define ENABLE_DEBUG 0
+{% endif %}
+
+{% if board.console %}
+#define PRINT_LIMIT 50
+#define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
+
+static const char* printNames[NUM_PRINT_NAMES] = {
+{% for p in hv_manifest.prints -%}
+    "{{ p.name }}"{% if not loop.last %}, {% endif %}
+{% endfor %}
+};
+
+
+static int16_t get_print_id(const char *name) {
+    if (!name || name[0] == '\0') return -1; 
+    for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
+        if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
+    }
+    return -1;
+}
+
+
+void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    static uint32_t last_print = 0;
+    
+    if (now - last_print < PRINT_LIMIT) return;
+
+    for (int i = 0; i < PRINT_POOL_SIZE; i++) {
+
+        if (!Pico::print_pool[i].busy.exchange(true, std::memory_order_acquire)) {
+            Pico::print_pool[i].id = get_print_id(printName);
+
+            if (msg) {
+                Pico::print_pool[i].val = hv_msg_getFloat(msg, 0);
+                Pico::print_pool[i].is_float = true;
+            } else {
+                Pico::print_pool[i].is_float = false; 
+            }
+
+            if (multicore_fifo_push_timeout_us((uint32_t)&Pico::print_pool[i], 0)) {
+                last_print = now;
+            } else {
+                Pico::print_pool[i].busy.store(false, std::memory_order_release);
+            }
+            return; 
+        }
+    }
+}
+{% endif %}
+
+
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 
@@ -322,92 +375,6 @@ void audioFunc(float* buffer, int frames) {
     Pico::applyLimiter(buffer, frames);
     {% endif %}
 }
-
-{% if board.console %}
-#define PRINT_QUEUE_SIZE 64
-#define PRINT_STR_LEN 16
-#define PRINT_THROTTLE_MS 128
-#define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
-
-struct PrintMsg {
-    int16_t id;
-    char str[PRINT_STR_LEN];
-};
-
-static PrintMsg queue[PRINT_QUEUE_SIZE];
-static uint16_t write_idx = 0; 
-
-static const char* printNames[NUM_PRINT_NAMES] = {
-{% for p in hv_manifest.prints -%}
-    "{{ p.name }}"{% if not loop.last %}, {% endif %}
-{% endfor %}
-};
-
-
-static int16_t get_print_id(const char *name) {
-    if (!name) return -1;
-    for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
-        if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
-    }
-    return -1;
-}
-
-
-void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
-    static uint32_t last_print = 0;
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    if (now - last_print < PRINT_THROTTLE_MS || !multicore_fifo_wready()) return;
-
-    PrintMsg *m = &queue[write_idx];
-    m->id = get_print_id(printName);
-
-    if (msg) {
-        sprintf(m->str, "%.2f", hv_msg_getFloat(msg, 0));
-    } else if (str) {
-        strncpy(m->str, str, PRINT_STR_LEN - 1);
-        m->str[PRINT_STR_LEN - 1] = '\0';
-    }
-
-    if (multicore_fifo_push_timeout_us((uint32_t)m, 0)) {
-        write_idx = (write_idx + 1) & (PRINT_QUEUE_SIZE - 1);
-        last_print = now;
-    }
-}
-
-
-void process_queue() {
-
-
-    while (multicore_fifo_rvalid()) {
-        uint32_t msg = multicore_fifo_pop_blocking();
-
-        if (msg & (1u << 31)) {
-            // --- MIDI OUT LOGIC ---
-            {% if board.midi_mode == 'usb' %}
-            if (tud_midi_mounted()) {
-                uint8_t status = (msg >> 16) & 0xFF;
-                uint8_t d1     = (msg >> 8)  & 0xFF;
-                uint8_t d2     = msg         & 0xFF;
-                
-                // Pack for USB: [CableNumber+CIN, Status, Data1, Data2]
-                uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, d2 };
-                tud_midi_packet_write(packet);
-            }
-            {% endif %}
-        } else {
-            // --- PRINT LOGIC ---
-            {% if board.console %}
-            if (tud_cdc_connected()) { // Only print if someone is listening
-                PrintMsg* m = (PrintMsg*)msg;
-                const char* name = (m->id >= 0 && m->id < NUM_PRINT_NAMES) ? printNames[m->id] : "hv";
-                printf("[%s] %s\n", name, m->str);
-            }
-            {% endif %}
-        }
-    }
-}
-{% endif %}
 
 
 int main() {
@@ -501,19 +468,18 @@ int main() {
     int led_idx;
  
     while (true) {
-        {% if board.midi_mode == 'usb' %}
-        tud_task(); 
-        {% elif board.midi_mode == 'host' %}
-        tuh_task(); 
-        {% endif %}
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
-       {% if board.console %}
-        process_queue();
+        {% if board.console %}
+        Pico::print_queue(printNames, NUM_PRINT_NAMES, debug_enabled); 
         {% endif %}
-
+        
         Pico::midi_task();
+
+        {% if board.midi_mode == 'usb' %}
+        Pico::process_usb_queue();
+        {% endif %}
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
