@@ -821,7 +821,7 @@ namespace Pico {
         }
     }
 
-
+#ifndef MIDI_HOST
     void print_queue(const char** names, int num_names, bool debug) {
         constexpr int MAX_PRINTS_PER_CALL = 8; 
 
@@ -870,7 +870,10 @@ namespace Pico {
             }
         }
     }
+#endif
+
 }
+
 
 extern "C" {
 
