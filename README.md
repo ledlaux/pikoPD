@@ -49,7 +49,7 @@ Check compiled binaries for RP2040 in the release section.
     - joystic and range (regular or midi 1-127)
     - midi (uart, usb, host)
       - uart (pins tx 0, rx 1 )
-    - debug console
+    - debug console 
     - masterfx (delay, limiter)
       
 - Copies hardware config files into project folder from `/src`
@@ -63,7 +63,8 @@ Check compiled binaries for RP2040 in the release section.
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
 3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with [midirealtimein] object.
-4. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
+4. Debug console will also output pd [print] objects, which are parsed automatically. Use moderately. 
+5. Raspberry Pico can't sample audio so [adc] object will not work without an external adc.
 
 
 ## Notes
@@ -73,7 +74,6 @@ Check compiled binaries for RP2040 in the release section.
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
-- [print] objects are parsed by the scipt automatically, they will output to the serial monitor. Use moderately or it can crash device. Use midi CC120 to toggle on or off while pikoPD runs. 
 - **If you change the board or change midi mode in `board.json` remove the project folder or rename it in the command to rebuild files.**  
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
@@ -89,7 +89,7 @@ Check compiled binaries for RP2040 in the release section.
 | 91        | Delay Send Level       | 
 | 92        | Delay Feedback Amount  |
 | 93        | Delay Bypass           | 
-| 120       | Print Console Toggle   | 
+| 120       | Debug Console Toggle   | 
 
 To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. 
   
