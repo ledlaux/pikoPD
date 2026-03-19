@@ -820,6 +820,10 @@ namespace Pico {
             parse_raw_midi_byte(byte, handle_midi_message);
         }
     }
+    
+#ifndef ENABLE_DEBUG
+    #define ENABLE_DEBUG 0 
+#endif
 
 #ifndef MIDI_HOST
     void print_queue(const char** names, int num_names, bool debug) {
@@ -841,10 +845,11 @@ namespace Pico {
                 }
                 #endif
                 m->busy.store(false, std::memory_order_release);
+                
             } 
         }
     }
-
+    
 
     void process_usb_queue() {
         if (!tud_midi_mounted()) return;
@@ -870,10 +875,12 @@ namespace Pico {
             }
         }
     }
+    
 #endif
 
-}
 
+
+}
 
 extern "C" {
 
