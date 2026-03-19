@@ -8,6 +8,8 @@ It is currently a **Proof of Concept**. The core logic of the system has been im
 
 Check compiled binaries for RP2040 in the release section.
 
+
+
 ## Project Updates
 
 - [x] serial console
@@ -68,6 +70,8 @@ Check compiled binaries for RP2040 in the release section.
 
 
 ## Notes
+
+[Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
 
 - All hardware configuration is done by adjusting `board.json` file.
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.  Also check for the correct `@hv_param` argument. 
