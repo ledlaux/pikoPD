@@ -827,29 +827,33 @@ namespace Pico {
 
 #ifndef MIDI_HOST
     void print_queue(const char** names, int num_names, bool debug) {
-        constexpr int MAX_PRINTS_PER_CALL = 8; 
+        constexpr int MAX_PRINTS_PER_CALL = 8;
 
         for (int i = 0; i < MAX_PRINTS_PER_CALL; ++i) {
             if (!multicore_fifo_rvalid()) break;
 
-            uint32_t msg_val = multicore_fifo_pop_blocking();
+            uint32_t idx;
+            if (!multicore_fifo_pop_timeout_us(0, &idx)) break;
+            if (idx >= PRINT_POOL_SIZE) continue;
 
-            if (!(msg_val & (1u << 31))) {
-                PrintMsg* m = (PrintMsg*)msg_val;
-                #if ENABLE_DEBUG
-                if (tud_cdc_connected() && debug) {
-                    const char* name = (m->id >= 0 && m->id < num_names) ? names[m->id] : "print";
-                    if (m->is_float) {
-                        printf("[%s] %.3f\n", name, m->val);
-                    }
+            PrintMsg* m = &print_pool[idx];
+
+            #if ENABLE_DEBUG
+            if (tud_cdc_connected() && debug) {
+                const char* name = (m->id >= 0 && m->id < num_names)
+                                ? names[m->id]
+                                : "print";
+
+                if (m->is_float) {
+                    printf("[%s] %.3f\n", name, m->val);
                 }
-                #endif
-                m->busy.store(false, std::memory_order_release);
-                
-            } 
-        }
-    }
-    
+            }
+            #endif
+
+            m->busy.store(false, std::memory_order_release);
+        } 
+    } 
+
 
     void process_usb_queue() {
         if (!tud_midi_mounted()) return;

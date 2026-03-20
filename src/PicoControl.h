@@ -187,7 +187,7 @@ namespace Pico {
 
     extern MidiOutputBuffer midi_out_rb; 
     extern MidiInputBuffer  midi_in_rb;  
-    extern PrintMsg         print_pool[PRINT_POOL_SIZE];
+    extern PrintMsg print_pool[PRINT_POOL_SIZE];
 
     void midi_push(uint8_t byte);
     bool midi_pop(uint8_t &byte);
