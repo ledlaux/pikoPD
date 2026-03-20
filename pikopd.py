@@ -275,6 +275,12 @@ class PicoUF2Generator:
                 self.project_root,
             ]
 
+            if settings.get("console") is True:
+                cmake_cmd.append("-DENABLE_DEBUG=1")
+                print("\033[32m  -> Console Debugging Enabled\033[0m")
+            else:
+                cmake_cmd.append("-DENABLE_DEBUG=0")
+
             if board == "zero":
                 cmake_cmd.append("-DPICO_ZERO_BOARD=1")
 

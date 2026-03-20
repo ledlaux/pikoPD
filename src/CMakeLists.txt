@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
 
-# 1. Project and SDK Setup
 project(pikopd C CXX ASM)
 
 add_compile_definitions(HV_BARE_METAL)
@@ -11,7 +10,12 @@ set(PICO_EXTRAS_PATH "$ENV{PICO_SDK_PATH}/pico-extras")
 include("${CMAKE_CURRENT_LIST_DIR}/src/pico_sdk_import.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/src/pico_extras_import.cmake")
 
-# 2. Global USB Mode Configuration
+if(ENABLE_DEBUG)
+    add_compile_definitions(ENABLE_DEBUG=1)
+else()
+    add_compile_definitions(ENABLE_DEBUG=0)
+endif()
+
 if(MIDI_HOST_ENABLED)
     set(USB_LIB "tinyusb_host")
     add_compile_definitions(
@@ -34,7 +38,6 @@ endif()
 pico_sdk_init()
 
 
-# 3. Source Collection
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
     "${CMAKE_CURRENT_LIST_DIR}/src/*.c"          
@@ -47,10 +50,8 @@ file(GLOB HVCC_FILES CONFIGURE_DEPENDS
 
 set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES})
 
-# 4. Create Executable (This must happen BEFORE target_ commands)
 add_executable(pikopd.elf ${ALL_SOURCES})
 
-# 5. Target-Specific Settings
 target_compile_definitions(pikopd.elf PRIVATE
     CFG_TUSB_MCU=OPT_MCU_RP2040
     HV_UNIX=1
@@ -64,7 +65,6 @@ target_include_directories(pikopd.elf PRIVATE
     "${PICO_EXTRAS_PATH}/tinyusb"
 )
 
-# 6. Linking
 target_link_libraries(pikopd.elf PRIVATE
     pico_stdlib
     pico_audio_i2s
@@ -77,7 +77,6 @@ target_link_libraries(pikopd.elf PRIVATE
     pico_multicore
 )
 
-# 7. Board/Extras Logic
 if(PICO_ZERO_BOARD)
     target_compile_definitions(pikopd.elf PRIVATE PICO_ZERO=1)
     pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
