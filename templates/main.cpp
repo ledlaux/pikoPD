@@ -322,33 +322,39 @@ static int16_t get_print_id(const char *name) {
 }
 
 
-void hv_print_handler(HeavyContextInterface *context, const char *printName, const char *str, const HvMessage *msg) {
+void hv_print_handler(HeavyContextInterface* context,
+                      const char* printName,
+                      const char* str,
+                      const HvMessage* msg) 
+{
     uint32_t now = to_ms_since_boot(get_absolute_time());
     static uint32_t last_print = 0;
-    
-    if (now - last_print < 50) return; // print limit 
 
-    for (int i = 0; i < PRINT_POOL_SIZE; i++) {
+    if (now - last_print < 50) return;
 
-        if (!Pico::print_pool[i].busy.exchange(true, std::memory_order_acquire)) {
+    for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
+        bool expected = false;
+        if (Pico::print_pool[i].busy.compare_exchange_strong(
+                expected, true, std::memory_order_acquire)) 
+        {
             Pico::print_pool[i].id = get_print_id(printName);
+            Pico::print_pool[i].val = msg ? hv_msg_getFloat(msg, 0) : 0.f;
+            Pico::print_pool[i].is_float = (msg != nullptr);
 
-            if (msg) {
-                Pico::print_pool[i].val = hv_msg_getFloat(msg, 0);
-                Pico::print_pool[i].is_float = true;
-            } else {
-                Pico::print_pool[i].is_float = false; 
-            }
+            __dmb();
 
-            if (multicore_fifo_push_timeout_us((uint32_t)&Pico::print_pool[i], 0)) {
-                last_print = now;
-            } else {
+            if (!multicore_fifo_push_timeout_us(i, 10)) {
                 Pico::print_pool[i].busy.store(false, std::memory_order_release);
+                __dmb();
+            } else {
+                last_print = now;
             }
+
             return; 
         }
     }
 }
+
 {%- endif %}
 
 
