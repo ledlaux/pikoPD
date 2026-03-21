@@ -37,6 +37,11 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
+#ifndef MAX_VOICES
+#define MAX_VOICES 1
+#endif
+
+
 {% set receives = {} %}
 {%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
 {%- endfor -%}
@@ -116,6 +121,11 @@
     {%- endif -%}
 {%- endfor -%}
 
+{%- set active_cny70 = [] -%}
+{%- for cny in board.inputs.sensors.cny70 if cny.name in receives -%}
+    {%- set _ = active_cny70.append({'adc_pin': cny.adc_pin, 'hash': receives[cny.name]}) -%}
+{%- endfor -%}
+
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 #define FLASH_DURATION_MS 40
@@ -131,85 +141,129 @@ static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
 
+
+
+{% set note_receives = [] -%}
+{% for r in hv_manifest.receives if r.name.lower().startswith("note") -%}
+    {% set _ = note_receives.append(r.hash) -%}
+{% endfor -%}
+{% set note_list = note_receives[:board.voice_count] -%}
+{% if note_list | length > 1 %}
+constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
+{%- for hash in note_list %}
+    {{ hash }}{{ "," if not loop.last }}
+{%- endfor %}
+};
+{% endif %}
+
+
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-    
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    // 1. Real-time MIDI (Clock, Start, Stop)
     if (status >= 0xF8) {
         hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
-
-        if (status == 0xFA) {      // START
-            clock_count = 23; 
-            clock_running = true;
-            midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
-        } 
-        else if (status == 0xFB) { // CONTINUE
-            clock_running = true;
-        } 
-        else if (status == 0xFC) { // STOP
-            clock_running = false;
-            midi_clock_timer = 0; 
-        } 
-        else if (status == 0xF8) { // CLOCK
-            if (clock_running) {
-                clock_count++;
-                if (clock_count >= 24) {
+        switch(status) {
+            case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
+            case MIDI_RT_CONTINUE: clock_running = true; break;
+            case MIDI_RT_STOP:     clock_running = false; break;
+            case MIDI_RT_CLOCK:    
+                if(clock_running && ++clock_count >= 24) {
                     clock_count = 0;
-                    midi_clock_timer = to_ms_since_boot(get_absolute_time()) + CLOCK_FLASH_MS;
+                    midi_clock_timer = now + CLOCK_FLASH_MS;
                 }
-            }
+                break;
         }
-        return; 
+        return;
     }
 
     uint8_t type = status & 0xF0;
     uint8_t chan = status & 0x0F;
 
-    if (type == 0x90 && data2 > 0) {
-        last_midi_velocity = data2;
-        current_midi_note = data1;
-        midi_activity_timer = to_ms_since_boot(get_absolute_time()) + FLASH_DURATION_MS;
-    }
+    switch(type) {
+        // --- CASE 1: NOTE ON (0x90) ---
+        case 0x90:
+            if (data2 > 0) {
+                last_midi_velocity = data2;
+                current_midi_note = data1;
+                midi_activity_timer = now + FLASH_DURATION_MS;
+                
+                if (MAX_VOICES <= 1) {
+                    // MONO NOTE ON
+                    hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+                } 
+                
+                else
+                {%- if note_list|length > 1 %}
+                {
+                    // POLY NOTE ON
+                    int v_idx = -1;
+                    for (int i = 0; i < MAX_VOICES; i++) {
+                        if (!voices[i].active) { v_idx = i; break; }
+                    }
 
-    switch (type) {
-        case 0x90: // Note On
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
-            break;
+                    if (v_idx == -1) { // Steal Oldest
+                        uint32_t oldest = UINT32_MAX;
+                        for (int i = 0; i < MAX_VOICES; i++) {
+                            if (voices[i].age < oldest) { oldest = voices[i].age; v_idx = i; }
+                        }
+                        hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)voices[v_idx].note, 0.0f, (float)(chan+1));
+                    }
 
-        case 0x80: // Note Off
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+                    voices[v_idx].note = data1;
+                    voices[v_idx].velocity = data2;
+                    voices[v_idx].active = true;
+                    voices[v_idx].age = voiceCounter++;
+                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)data1, (float)data2, (float)(chan+1));
+                    
+                }
+                {%- endif %}
+                break; 
+            }
+            [[fallthrough]];
+
+        // --- CASE 2: NOTE OFF (0x80) ---
+        case 0x80:
+            if (MAX_VOICES <= 1) {
+                // MONO NOTE OFF
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+            } else {
+                 {%- if note_list|length > 1 %}
+               
+                // POLY NOTE OFF
+                for (int i = 0; i < MAX_VOICES; i++) {
+                    if (voices[i].active && voices[i].note == data1) {
+                        voices[i].active = false;
+                        hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[i], 0.0f, "fff", (float)data1, 0.0f, (float)(chan+1));
+                        break;
+                    }
+                }
+                 {%- endif %}
+            }
+           
             break;
 
         case 0xB0: { // Control Change
             float val = (float)data2 / 127.0f;
             bool is_on = (data2 > 64);
-            // printf("CC %d: %.2f\n", data1, val);
-            
-            switch(data1) {
-                case 7:                                          
-                    Pico::midi_master_volume = val;
-                    break;
-                case 8: Pico::limiter_bypass = is_on; break;     
-                case 90:                                         
-                    Pico::target_delay_samples = 500.0f + (val * 23000.0f); 
-                    break;
-                case 91:                                       
-                    Pico::delay_level = val * 0.8f; 
-                    break;
-                case 92:                                        
-                    Pico::delay_feedback = val * 0.95f; 
-                    break;
-                case 93: Pico::delay_bypass = is_on; break;     
-                case 120:                                       
-                    debug_enabled = (data2 > 64);
-                    break;
+            switch(data1){
+                case 7:   Pico::master_volume = val; break;
+                case 8:   Pico::limiter_bypass = is_on; break;
+                case 90:  Pico::target_delay_samples = 500.0f + val * 23000.0f; break;
+                case 91:  Pico::delay_level = val * 0.8f; break;
+                case 92:  Pico::delay_feedback = val * 0.95f; break;
+                case 93:  Pico::delay_bypass = is_on; break;
+                case 120: debug_enabled = is_on; break;
             }
-
             hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
             break;
         }
 
-        case 0xE0: 
-            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)((data2 << 7) | data1), (float)chan);
+        case 0xE0: { // Pitch Bend
+            int bend = (data2 << 7) | data1;
+            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
             break;
+        }
     }
 }
 
@@ -263,12 +317,12 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
                            ((uint32_t)midiMsg[1] << 8) | 
                            (uint32_t)midiMsg[2];
 
-    uint32_t h = Pico::midi_out_rb.head.load(std::memory_order_relaxed);
-    uint32_t t = Pico::midi_out_rb.tail.load(std::memory_order_acquire);
+    uint32_t h = midi_out_rb.head.load(std::memory_order_relaxed);
+    uint32_t t = midi_out_rb.tail.load(std::memory_order_acquire);
 
     if ((h - t) < MIDI_OUT_BUF) {
-        Pico::midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
-        Pico::midi_out_rb.head.store(h + 1, std::memory_order_release);
+        midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
+        midi_out_rb.head.store(h + 1, std::memory_order_release);
     }
 {%- endif %}
 }
@@ -334,17 +388,17 @@ void hv_print_handler(HeavyContextInterface* context,
 
     for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
         bool expected = false;
-        if (Pico::print_pool[i].busy.compare_exchange_strong(
+        if (print_pool[i].busy.compare_exchange_strong(
                 expected, true, std::memory_order_acquire)) 
         {
-            Pico::print_pool[i].id = get_print_id(printName);
-            Pico::print_pool[i].val = msg ? hv_msg_getFloat(msg, 0) : 0.f;
-            Pico::print_pool[i].is_float = (msg != nullptr);
+            print_pool[i].id = get_print_id(printName);
+            print_pool[i].val = msg ? hv_msg_getFloat(msg, 0) : 0.f;
+            print_pool[i].is_float = (msg != nullptr);
 
             __dmb();
 
             if (!multicore_fifo_push_timeout_us(i, 10)) {
-                Pico::print_pool[i].busy.store(false, std::memory_order_release);
+                print_pool[i].busy.store(false, std::memory_order_release);
                 __dmb();
             } else {
                 last_print = now;
@@ -380,18 +434,16 @@ int main() {
     {%- endif %}
 
     {%- if board.pico_board == 'zero' %}
-    #ifdef PICO_ZERO
     Pico::init_neopixel();
-    #endif
     {%- endif %}
 
     {% if board.pico_board == 'pico_w' %}
     cyw43_arch_init();
     {% endif %}
     {% if board.midi_mode == 'uart' %}
-    Pico::uart_midi_init();
+    uart_midi_init();
     {% elif board.midi_mode in ['usb', 'host'] %}
-    Pico::usb_init(); 
+    usb_init(); 
     {% endif %}
 
     {% if board.console %}
@@ -399,13 +451,13 @@ int main() {
     {% endif %}
     pd_prog.setSendHook(&sendHookHandler);
     {% if board.audio_mode == "I2S" %}
-    Pico::setupAudio(Pico::I2S, audioFunc, 
+    Pico::setupAudio(I2S, audioFunc, 
         {{ board.sample_rate }}, 
         {{ board.i2s_data_pin }}, 
         {{ board.i2s_bclk_pin }}, 
         {{ board.buffer_size }});
     {% else %}
-    Pico::setupAudio(Pico::PWM, audioFunc, 
+    Pico::setupAudio(PWM, audioFunc, 
         {{ board.sample_rate }}, 
         {{ board.pwm_pin }},
         0,  // second pin is unused
@@ -417,11 +469,11 @@ int main() {
     {%- endfor %}
 
     {%- for gate in active_gates %}
-    Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, Pico::GATE_IN);
+    Pico::addPin({{ active_btns|length + loop.index0 }}, {{ gate.pin }}, GATE_IN);
     {%- endfor %}
 
     {%- for gate_out in active_gate_outs %}
-    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, Pico::GATE_OUT, {{ gate_out.duration }});
+    Pico::addPin({{ active_btns|length + active_gates|length + loop.index0 }}, {{ gate_out.pin }}, GATE_OUT, {{ gate_out.duration }});
     {%- endfor %}
 
     {%- for knob in active_knobs %}
@@ -450,6 +502,10 @@ int main() {
     Pico::addJoystick({{ joy.id }}, {{ joy.x }}, {{ joy.y }});
     {%- endfor %}
 
+    {%- for cny in active_cny70 %}
+    Pico::addCNY70({{ cny.adc_pin }}, 380, 750, 0.6f, 2, {{ loop.index0 }});
+    {% endfor %}
+
     multicore_launch_core1(Pico::core1_audio_entry);
 
     float val, v; 
@@ -461,21 +517,22 @@ int main() {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
-        Pico::midi_task();
+        midi_task();
         {% if board.midi_mode == 'usb' %}
-        Pico::process_usb_queue();
+        process_usb_queue();
         {%- endif %}
 
         {%- if board.console %}
-        Pico::print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+        print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
         {% else %}
         sleep_us(50); 
         {%- endif %}
+        
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
 
-            Pico::update(now); 
+           Pico::update(now); 
 
             bool is_active = (now < midi_activity_timer);
             float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
@@ -554,6 +611,17 @@ int main() {
                 if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
                     if (cX) hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_x }}, vx);
                     if (cY) hv_sendFloatToReceiver(&pd_prog, {{ joy.hash_y }}, vy);
+                }
+            }
+            {%- endfor %}
+
+            {%- for cny in active_cny70 %}
+            {
+                float sensor_out = 0.0f; 
+                float raw_val = 0.0f; 
+                if (Pico::processCNY70({{ loop.index0 }}, sensor_out, raw_val)) {
+                    hv_sendFloatToReceiver(&pd_prog, {{ cny.hash }}, sensor_out);
+                //   printf("Sensor %d | Raw: %.1f | Norm: %.3f\n", {{ loop.index0 }}, raw_val, sensor_out);
                 }
             }
             {%- endfor %}
