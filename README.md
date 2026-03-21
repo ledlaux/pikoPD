@@ -175,7 +175,7 @@ pikoPD
 
 ## Usage
 
-Enter bootloader mode by holding device boot button
+Enter bootloader mode by holding device boot button.
 
 ```
 python3 pikopd.py patches/heavy.pd project_name -f
@@ -201,6 +201,6 @@ optional arguments:
 
 ## Licence
 
-The code will be released under an open-source license once the project reaches version 0.0.1
+The code will be released under an open-source license once the project reaches version 0.0.1.
 
 No warranty is provided. Use at your own risk.
