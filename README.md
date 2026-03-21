@@ -96,6 +96,7 @@ To use the custom system:
 
 > When using this system, MIDI routing to `[notein]` will be disabled.
 
+Check example in the patch folder. 
 
 ## Supported MIDI CC
 
