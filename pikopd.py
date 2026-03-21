@@ -28,7 +28,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040|RP2350  v0.0.1 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.0 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
@@ -293,6 +293,10 @@ class PicoUF2Generator:
             else:
                 cmake_cmd.append("-DMIDI_HOST_ENABLED=0")
                 print("\033[32m  -> USB MIDI Device Mode enabled (TinyUSB Device)\033[0m")
+
+            max_voices = settings.get("voice_count", 1)
+            cmake_cmd.append(f"-DMAX_VOICES={max_voices}")
+            print(f"-> Setting voice count: {max_voices}")
 
             self.run_cmd(
                 cmake_cmd,

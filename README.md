@@ -40,18 +40,19 @@ Check compiled binaries for RP2040 in the release section.
     - board (pico, pico_w, zero, pico2)
     - core frequency
     - sample rate
-    - audio mode (I2S, PWM)
-    - I2S pins
-    - PWM pin
+    - audio mode (I2S, PWM) and pins
+    - voice count
     - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
     - rotary encoder 
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
     - joystic and range (regular or midi 1-127)
-    - midi (uart, usb, host)
+    - midi mode (uart, usb, host)
       - uart (pins tx 0, rx 1 )
-    - debug console 
+    - debug console
+    - sensors
+      - cny70 
     - masterfx (delay, limiter)
       
 - Copies hardware config files into project folder from `/src`
@@ -64,12 +65,12 @@ Check compiled binaries for RP2040 in the release section.
 
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
-3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with `[midirealtimein]` object.
-4. `[poly]` object works with midi input, but in next update I will add custom voice alocation as more lightweight solution for the project.  
-5. Debug console will also output pd `[print]` objects, which are parsed automatically. Use moderately. 
-6. Raspberry Pico can't sample audio so `[adc]` object will not work without an external adc.
+3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with PD `[midirealtimein]` object.
+4. Debug console will also output PD `[print]` objects, which are parsed automatically. This function is stable on the RP2040, but there are some issues on the RP2350, which can cause the console to crash device after a few PD `[print]` messages. Use it moderately. This issue is being discussed here [https://github.com/ledlaux/pikoPD/issues/26].
+5. Raspberry Pico can't sample audio so `[adc]` object will not work without an external adc.
+6. Added experimental CNY70 optical sensor support, but it still needs testing and code adjustments. Wiring diagram is in the `docs` folder and there is a patch example.
 
-
+   
 ## Notes
 
 [Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
@@ -83,6 +84,20 @@ Check compiled binaries for RP2040 in the release section.
 - Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
+## Polyphonic input
+
+The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.  Keep *voice count: 1* in `board.json` to use the default system.      
+
+To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
+
+To use the custom system:  
+1. Set **voice count** to 2 or more in `board.json`.  
+2. Add `[NOTE1, [NOTE2]...` objects for each voice.
+4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
+
+> When using this system, MIDI routing to `[notein]` will be disabled.
+
+Check example in the patch folder. 
 
 ## Supported MIDI CC
 
@@ -184,5 +199,8 @@ optional arguments:
   https://www.youtube.com/watch?v=0qgkYWsYdTo
 
 
+## Licence
 
+The code will be released under an open-source license once the project reaches version 0.0.1
 
+No warranty is provided. Use at your own risk.

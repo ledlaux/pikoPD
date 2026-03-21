@@ -16,6 +16,9 @@ else()
     add_compile_definitions(ENABLE_DEBUG=0)
 endif()
 
+add_definitions(-DMAX_VOICES=${MAX_VOICES})
+
+
 if(MIDI_HOST_ENABLED)
     set(USB_LIB "tinyusb_host")
     add_compile_definitions(
@@ -34,6 +37,8 @@ else()
         CFG_TUSB_RHPORT0_MODE=OPT_MODE_DEVICE
     )
 endif()
+
+
 
 pico_sdk_init()
 
