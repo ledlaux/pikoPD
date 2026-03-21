@@ -199,5 +199,8 @@ optional arguments:
   https://www.youtube.com/watch?v=0qgkYWsYdTo
 
 
+## Licence
 
+The code will be released under an open-source license once the project reaches version 0.0.1
 
+No warranty is provided. Use at your own risk.
