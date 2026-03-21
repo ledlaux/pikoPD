@@ -184,6 +184,23 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
+
+## Polyphonic input
+
+The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.  Keep *voice count: 1* in `board.json` to use the default system.      
+
+To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
+
+To use the custom system:  
+1. Set **voice count** to 2 or more in `board.json`.  
+2. Add `[NOTE1, [NOTE2]...` objects for each voice.
+4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
+
+> When using this system, MIDI routing to `[notein]` will be disabled.
+
+Check example in the patch folder. 
+
+
 ## Supported MIDI CC
 
 | CC Number | Parameter              | 
@@ -196,4 +213,14 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 | 93        | Delay Bypass           | 
 | 120       | Debug Toggle           | 
 
+
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
+
+
+## Sample loading
+
+Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
+
+_float table -> const float table_
+
+Then run command with -x flag to skip file rebuilding. 
