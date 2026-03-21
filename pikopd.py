@@ -294,6 +294,10 @@ class PicoUF2Generator:
                 cmake_cmd.append("-DMIDI_HOST_ENABLED=0")
                 print("\033[32m  -> USB MIDI Device Mode enabled (TinyUSB Device)\033[0m")
 
+            max_voices = settings.get("voice_count", 1)
+            cmake_cmd.append(f"-DMAX_VOICES={max_voices}")
+            print(f"-> Setting voice count: {max_voices}")
+
             self.run_cmd(
                 cmake_cmd,
                 cwd=self.build_dir,
