@@ -80,7 +80,7 @@ Check compiled binaries for RP2040 in the release section.
 - There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
 - Make sure to verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
 - **If you change board or MIDI mode in `board.json` and encounter compile-time errors, remove the project build folder or rename project in the command to rebuild files.**
-- - Tested on **macOS**.  
+- Tested on **macOS**.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
 
