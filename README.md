@@ -66,9 +66,9 @@ Check compiled binaries for RP2040 in the release section.
 1. HVCC supported vanilla pd objects.
 2. Heavylib object support (hv.osc, hv.lfo ...) except hv.reverb.
 3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with PD `[midirealtimein]` object.
-4. Debug console will also output PD [print] objects, which are parsed automatically. This function is stable on the RP2040, but there are some issues on the RP2350, which can cause the console to crash device after a few PD [print] messages. Use it moderately. This issue is being discussed here [https://github.com/ledlaux/pikoPD/issues/26].
+4. Debug console will also output PD `[print]` objects, which are parsed automatically. This function is stable on the RP2040, but there are some issues on the RP2350, which can cause the console to crash device after a few PD `[print]` messages. Use it moderately. This issue is being discussed here [https://github.com/ledlaux/pikoPD/issues/26].
 5. Raspberry Pico can't sample audio so `[adc]` object will not work without an external adc.
-6. Added experimental CNY70 optical sensor support, but it still needs testing and some code adjustments. Wiring diagram is in the `docs` folder. 
+6. Added experimental CNY70 optical sensor support, but it still needs testing and code adjustments. Wiring diagram is in the `docs` folder and there is a patch example.
 
    
 ## Notes
