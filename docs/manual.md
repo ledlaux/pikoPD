@@ -169,7 +169,7 @@ PikoPD supports 2 joystick connection (each uses 2 adc pins), which can output v
 
 ## Encoder
 
-PikoPD supports incremental rotary encoders. 
+PikoPD supports 4 incremental rotary encoders 
 
 ```json
 "encoders": [
@@ -177,33 +177,12 @@ PikoPD supports incremental rotary encoders.
 ]
 ```
 
-Use this construct with [r enc @hv_param] in your patch. 
-You can control the number of steps by adjusting the mod value.
+Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pikoPD/blob/main/patches/encoder.pd):
 
-```
-#N canvas 827 239 734 565 12;
-#X obj 259 169 r enc @hv_param;
-#X obj 254 216 t f b;
-#X obj 297 246 f 0;
-#X obj 254 276 +;
-#X obj 254 306 mod 8;
-#X obj 254 336 t f f;
-#X obj 254 374 print enc;
-#X connect 0 0 1 0;
-#X connect 1 0 3 0;
-#X connect 1 1 2 0;
-#X connect 2 0 3 1;
-#X connect 3 0 4 0;
-#X connect 4 0 5 0;
-#X connect 5 0 2 1;
-#X connect 5 0 6 0;
-
-```
-
-- `[r enc @hv_param]` receives incremental encoder changes.  
-- The value is accumulated using `[f]` and `[+]`.  
-- `[mod]` wraps the value into a fixed range.  
-- Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`).  
+- `[r enc @hv_param]` receives incremental encoder changes -1 / +1   
+- The value is accumulated using `[f]` and `[+]`
+- `[mod]` wraps the value into a fixed range 
+- Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
 ## Supported MIDI CC
 
