@@ -68,8 +68,9 @@ Check compiled binaries for RP2040 in the release section.
 3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with `[midirealtimein]` object.
 4. Debug console will also output pd `[print]` objects, which are parsed automatically. Use moderately. 
 5. Raspberry Pico can't sample audio so `[adc]` object will not work without an external adc.
+6. Added experimental CNY70 optical sensor support, but it still needs testing and some code adjustments. Wiring diagram is in the `docs` folder. 
 
-
+   
 ## Notes
 
 [Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
