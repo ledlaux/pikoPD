@@ -87,7 +87,7 @@ Check compiled binaries for RP2040 in the release section.
 
 The `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.  Keep *voice count: 1* in `board.json` to use it.     
 
-To make MIDI note processing lightweight and keep it outside the PD, a custom voice allocation system was implemented using `[r NOTE]` objects.  
+To make MIDI note processing lightweight and keep it outside the PD, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
 
 To use the custom system:  
 1. Set **voice count** to 2 or more in `board.json`.  
