@@ -128,6 +128,7 @@
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
+
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
@@ -139,8 +140,6 @@ static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
-
-
 
 
 {% set note_receives = [] -%}
@@ -188,15 +187,12 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                 current_midi_note = data1;
                 midi_activity_timer = now + FLASH_DURATION_MS;
                 
-                if (MAX_VOICES <= 1) {
-                    // MONO NOTE ON
-                    hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
-                } 
-                
-                else
-                {%- if note_list|length > 1 %}
+                // 1. Always send to the standard [notein] receiver
+                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+
+                // 2. Polyphonic Voice Tracking (Only exists if note_receives were found)
+                {%- if note_receives|length > 1 %}
                 {
-                    // POLY NOTE ON
                     int v_idx = -1;
                     for (int i = 0; i < MAX_VOICES; i++) {
                         if (!voices[i].active) { v_idx = i; break; }
@@ -214,8 +210,8 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                     voices[v_idx].velocity = data2;
                     voices[v_idx].active = true;
                     voices[v_idx].age = voiceCounter++;
-                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)data1, (float)data2, (float)(chan+1));
                     
+                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)data1, (float)data2, (float)(chan+1));
                 }
                 {%- endif %}
                 break; 
@@ -224,25 +220,21 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
         // --- CASE 2: NOTE OFF (0x80) ---
         case 0x80:
-            if (MAX_VOICES <= 1) {
-                // MONO NOTE OFF
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
-            } else {
-                 {%- if note_list|length > 1 %}
-               
-                // POLY NOTE OFF
-                for (int i = 0; i < MAX_VOICES; i++) {
-                    if (voices[i].active && voices[i].note == data1) {
-                        voices[i].active = false;
-                        hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[i], 0.0f, "fff", (float)data1, 0.0f, (float)(chan+1));
-                        break;
-                    }
-                }
-                 {%- endif %}
-            }
-           
-            break;
+            // 1. Always send to the standard [notein] receiver
+            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
 
+            // 2. Polyphonic Voice Tracking (Only exists if note_receives were found)
+            {%- if note_receives|length > 1 %}
+            for (int i = 0; i < MAX_VOICES; i++) {
+                if (voices[i].active && voices[i].note == data1) {
+                    voices[i].active = false;
+                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[i], 0.0f, "fff", (float)data1, 0.0f, (float)(chan+1));
+                    break;
+                }
+            }
+            {%- endif %}
+            break;
+        
         case 0xB0: { // Control Change
             float val = (float)data2 / 127.0f;
             bool is_on = (data2 > 64);
@@ -621,7 +613,7 @@ int main() {
                 float raw_val = 0.0f; 
                 if (Pico::processCNY70({{ loop.index0 }}, sensor_out, raw_val)) {
                     hv_sendFloatToReceiver(&pd_prog, {{ cny.hash }}, sensor_out);
-                //   printf("Sensor %d | Raw: %.1f | Norm: %.3f\n", {{ loop.index0 }}, raw_val, sensor_out);
+                //  printf("Sensor %d | Raw: %.1f | Norm: %.3f\n", {{ loop.index0 }}, raw_val, sensor_out);
                 }
             }
             {%- endfor %}
