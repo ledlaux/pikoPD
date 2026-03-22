@@ -222,3 +222,6 @@ Sample loading works despite the limitations (link to tutorial is in the last se
 _float table -> const float table_
 
 Then run command with -x flag to skip file rebuilding. 
+
+
+## Changelog
