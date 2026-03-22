@@ -296,7 +296,6 @@ class PicoUF2Generator:
 
             max_voices = settings.get("voice_count", 1)
             cmake_cmd.append(f"-DMAX_VOICES={max_voices}")
-            print(f"-> Setting voice count: {max_voices}")
 
             self.run_cmd(
                 cmake_cmd,
