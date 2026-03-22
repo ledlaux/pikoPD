@@ -217,11 +217,22 @@ You can enable the masterFX in the board.json. To use safe volume it is recomend
 
 # Sample loading
 
-Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
+Sample loading works despite the limitations (link to tutorial is in the next section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
 
 _float table -> const float table_
 
 Then run command with -x flag to skip file rebuilding. 
+
+
+# Useful links
+
+- About HVCC compiler  
+  https://wasted-audio.github.io/hvcc/
+- Supported vanilla objects  
+  https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
+- Tutorial of how to load samples into the pd patch for the HVCC compiler  
+  https://www.youtube.com/watch?v=0qgkYWsYdTo
+
 
 
 # Changelog
