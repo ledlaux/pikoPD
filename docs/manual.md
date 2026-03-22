@@ -199,7 +199,7 @@ To use the custom system:
 Check example in the patch folder. 
 
 
-## Supported MIDI CC
+# MIDI CC
 
 | CC Number | Parameter              | 
 |-----------|------------------------|
@@ -215,7 +215,7 @@ Check example in the patch folder.
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
 
 
-## Sample loading
+# Sample loading
 
 Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
 
@@ -224,4 +224,4 @@ _float table -> const float table_
 Then run command with -x flag to skip file rebuilding. 
 
 
-## Changelog
+# Changelog
