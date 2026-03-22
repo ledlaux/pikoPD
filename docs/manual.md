@@ -187,7 +187,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 
 ## Polyphonic input
 
-The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.  Keep *voice count: 1* in `board.json` to use the default system.      
+The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
 
 To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
 
@@ -195,8 +195,6 @@ To use the custom system:
 1. Set **voice count** to 2 or more in `board.json`.  
 2. Add `[NOTE1, [NOTE2]...` objects for each voice.
 4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
-
-> When using this system, MIDI routing to `[notein]` will be disabled.
 
 Check example in the patch folder. 
 
