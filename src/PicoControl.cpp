@@ -287,7 +287,7 @@ namespace Pico {
     bool delay_bypass = false;
     bool limiter_bypass = false;
     float master_gain = 1.0f;
-    float master_volume = 1.0f;
+    float master_volume = 0.8f;
     float last_out_L = 0.0f, last_out_R = 0.0f;
 
     const float release_coeff = 0.0005f; // Smaller = Slower release
@@ -1050,14 +1050,14 @@ extern "C" {
 
     void tuh_midi_mount_cb(uint8_t dev_addr, const tuh_midi_mount_cb_t *mount_cb_data) {
         (void)mount_cb_data;
-        if (Pico::usb_midi_dev0 == -1) Pico::usb_midi_dev0 = dev_addr;
-        else if (Pico::usb_midi_dev1 == -1) Pico::usb_midi_dev1 = dev_addr;
+        if (usb_midi_dev0 == -1) usb_midi_dev0 = dev_addr;
+        else if (usb_midi_dev1 == -1) usb_midi_dev1 = dev_addr;
     }
 
 
     void tuh_midi_umount_cb(uint8_t dev_addr) {
-        if (Pico::usb_midi_dev0 == dev_addr) Pico::usb_midi_dev0 = -1;
-        else if (Pico::usb_midi_dev1 == dev_addr) Pico::usb_midi_dev1 = -1;
+        if (usb_midi_dev0 == dev_addr) usb_midi_dev0 = -1;
+        else if (usb_midi_dev1 == dev_addr) usb_midi_dev1 = -1;
     }
 
 #else
