@@ -374,7 +374,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     float val0 = hv_msg_getFloat(m, 0);
 
     {% if active_keypad -%}
-    // 1. Handle Dynamic Sequencer Steps (Playhead)
+    // Handle Dynamic Sequencer Steps (Playhead)
     // Using the STEP_HASHES array generated at the top of the file
     for (int i = 0; i < (sizeof(STEP_HASHES)/sizeof(STEP_HASHES[0])); i++) {
         if (hash == STEP_HASHES[i]) {
@@ -384,7 +384,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     }
     {%- endif %}
     switch (hash) {
-    // 2. Handle Standard LEDs (Jinja Generated)
+    // LEDs 
     {% for l in board.leds -%}
         {%- set led_index = loop.index0 -%}
         {%- for s in hv_manifest.sends if s.name == l.name -%}
@@ -402,6 +402,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             return;
             {%- endfor -%}
         {%- endfor %}
+             
         {% if active_keypad -%}
         {%- for s in hv_manifest.sends if s.name == "keypad" -%}
             case {{ s.hash }}U: // Dynamic hash for "keypad" object
