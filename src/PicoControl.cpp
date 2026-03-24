@@ -201,31 +201,42 @@
 #ifndef MIDI_HOST
     void print_queue(const char** names, int num_names, bool debug) {
         constexpr int MAX_PRINTS_PER_CALL = 8;
-
+    
         for (int i = 0; i < MAX_PRINTS_PER_CALL; ++i) {
             if (!multicore_fifo_rvalid()) break;
-
-            uint32_t idx;
-            if (!multicore_fifo_pop_timeout_us(0, &idx)) break;
+    
+            uint32_t idx = multicore_fifo_pop_blocking();
+            
+            // Safety check: is the index within our pool?
             if (idx >= PRINT_POOL_SIZE) continue;
-
+    
             PrintMsg* m = &print_pool[idx];
-
-            #if ENABLE_DEBUG
-            if (tud_cdc_connected() && debug) {
-                const char* name = (m->id >= 0 && m->id < num_names)
-                                ? names[m->id]
-                                : "print";
-
-                if (m->is_float) {
-                    printf("[%s] %.3f\n", name, m->val);
+            
+            // CRITICAL: Capture the values locally so Core 1 can't 
+            // change them while we are mid-printf.
+            int id = m->id;
+            float val = m->val;
+            bool is_float = m->is_float;
+    
+            if (debug && tud_cdc_connected()) {
+                // Check if the ID is valid for our local names array
+                const char* safe_name = (id >= 0 && id < num_names) ? names[id] : "heavy";
+    
+                if (is_float) {
+                    printf("[DEBUG] %.3f\n", names, m->val);   //temporal fix for rp2350 crash
+    
+    
+                } else {
+                    printf("[%s] %d\n", names, (int)val);
                 }
+                
+                tud_cdc_write_flush();
             }
-            #endif
-
+    
+            // Release the slot so Core 1 can reuse it
             m->busy.store(false, std::memory_order_release);
-        } 
-    } 
+        }
+    }
 
 
     void process_usb_queue() {
