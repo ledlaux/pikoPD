@@ -42,6 +42,10 @@ endif()
 
 pico_sdk_init()
 
+set(PIMORONI_PICO_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pimoroni-pico")
+include(${PIMORONI_PICO_PATH}/pimoroni_pico_import.cmake)
+add_subdirectory(${PIMORONI_PICO_PATH}/libraries/pico_rgb_keypad pico_rgb_keypad)
+
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
@@ -68,7 +72,11 @@ target_include_directories(pikopd.elf PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/hvcc"
     "${PICO_SDK_PATH}/lib/tinyusb/src"
     "${PICO_EXTRAS_PATH}/tinyusb"
+    "${PIMORONI_PICO_PATH}/libraries/pico_rgb_keypad"
+
 )
+
+
 
 target_link_libraries(pikopd.elf PRIVATE
     pico_stdlib
@@ -79,7 +87,9 @@ target_link_libraries(pikopd.elf PRIVATE
     hardware_clocks
     hardware_adc
     hardware_pwm
+    hardware_i2c
     pico_multicore
+    pico_rgb_keypad
 )
 
 if(PICO_ZERO_BOARD)
