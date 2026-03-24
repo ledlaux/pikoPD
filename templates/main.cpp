@@ -642,7 +642,7 @@ int main() {
         {%- if board.console %}
         print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
         {% else %}
-        sleep_us(50); 
+        sleep_ms(1); 
         {%- endif %}
         
 
