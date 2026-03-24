@@ -8,6 +8,7 @@
   "buffer_size": 64,
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10,
+  "pwm_pin": 8,
   "voice_count": 1,
   "midi_mode": "usb",
   "console": false,
