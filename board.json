@@ -13,18 +13,10 @@
   "midi_mode": "usb",
   "console": false,
   "inputs": {
-    "adc_pins": [
-
-    ],
-    "buttons": [
-
-    ],
-    "gate_in": [
-  
-    ],
-    "encoders": [
-   
-    ],
+    "adc_pins": [],
+    "buttons": [],
+    "gate_in": [],
+    "encoders": [],
     
     "rgb_keypad": [
         {
@@ -34,11 +26,7 @@
           "brightness": 0.5
         }
       ],
-    "sensors": {
-      "cny70": [
-      ]
-      
-    }
+    "sensors": {}
   },
   "outputs": {
     "gate_out": [
