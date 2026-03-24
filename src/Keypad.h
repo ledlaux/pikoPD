@@ -2,7 +2,7 @@
 #define PICO_KEYPAD_HPP
 
 #include "pico/stdlib.h"
-#include "pico_rgb_keypad.hpp" // Pimoroni header
+#include "pico_rgb_keypad.hpp" 
 
 namespace Pico {
     struct Keypad {
