@@ -37,9 +37,11 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
+
 #ifndef MAX_VOICES
 #define MAX_VOICES 1
 #endif
+
 
 
 {% set receives = {} %}
@@ -126,8 +128,21 @@
     {%- set _ = active_cny70.append({'adc_pin': cny.adc_pin, 'hash': receives[cny.name]}) -%}
 {%- endfor -%}
 
-Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
+{%- set active_keypad = [] -%}
+{%- if board.inputs.rgb_keypad is defined -%}
+    {%- for kp in board.inputs.rgb_keypad if kp.name in sends -%}
+        {%- set _ = active_keypad.append({
+            'sda': kp.sda,
+            'scl': kp.scl,
+            'brightness': kp.brightness | default(0.5),
+            'name': kp.name
+        }) -%}
+    {%- endfor -%}
+{%- endif -%}
+
+
+Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
@@ -155,6 +170,40 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 };
 {% endif %}
 
+// --- Generated Sequencer Hashes ---
+{%- set step_hashes = [] -%}
+{%- set trig_hashes = [] -%}
+
+{# 1. Collect SEND hashes for the playhead (step0, step1...) #}
+{%- for s in hv_manifest.sends -%}
+    {%- if s.name.lower().startswith("step") -%}
+        {%- set _ = step_hashes.append(s.hash) -%}
+    {%- endif -%}
+{%- endfor -%}
+
+{# 2. Collect RECEIVE hashes for the triggers (trigger0, trigger1...) #}
+{%- for r in hv_manifest.receives -%}
+    {%- if r.name.lower().startswith("trigger") -%}
+        {%- set _ = trig_hashes.append(r.hash) -%}
+    {%- endif -%}
+{%- endfor -%}
+
+// --- Dynamic Sequencer Hashes ---
+{% if step_hashes | length > 0 -%}
+constexpr uint32_t STEP_HASHES[] = {
+{%- for hash in step_hashes %} {{ hash }}U{{ "," if not loop.last }}{% endfor %}
+};
+{%- else -%}
+constexpr uint32_t STEP_HASHES[0] = {}; 
+{%- endif %}
+
+{% if trig_hashes | length > 0 -%}
+constexpr uint32_t TRIG_HASHES[] = {
+{%- for hash in trig_hashes %} {{ hash }}U{{ "," if not loop.last }}{% endfor %}
+};
+{%- else -%}
+constexpr uint32_t TRIG_HASHES[0] = {}; 
+{%- endif %}
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     uint32_t now = to_ms_since_boot(get_absolute_time());
@@ -324,30 +373,89 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     int numElem = hv_msg_getNumElements(m);
     float val0 = hv_msg_getFloat(m, 0);
 
+    {% if active_keypad -%}
+    // 1. Handle Dynamic Sequencer Steps (Playhead)
+    // Using the STEP_HASHES array generated at the top of the file
+    for (int i = 0; i < (sizeof(STEP_HASHES)/sizeof(STEP_HASHES[0])); i++) {
+        if (hash == STEP_HASHES[i]) {
+            Pico::keypad.steps[i] = (int)val0;
+            return;
+        }
+    }
+    {%- endif %}
     switch (hash) {
+    // 2. Handle Standard LEDs (Jinja Generated)
     {% for l in board.leds -%}
         {%- set led_index = loop.index0 -%}
         {%- for s in hv_manifest.sends if s.name == l.name -%}
-            case {{ s.hash }}U: // {{ l.name }}
-                {% if l.is_rgb -%}
-                if (numElem >= 2) {
-                    Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                    Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
-                } else {
-                    Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
+        case {{ s.hash }}U: // {{ l.name }}
+            {% if l.is_rgb -%}
+            if (numElem >= 2) {
+                Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
+                Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+            } else {
+                Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
+            }
+            {%- else -%}
+            Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
+            {%- endif %}
+            return;
+            {%- endfor -%}
+        {%- endfor %}
+        {% if active_keypad -%}
+        {%- for r in hv_manifest.receives if r.name == "keypad" -%}
+            case {{ r.hash }}U: // Dynamic hash for "keypad" object
+                if (val0 > 0.5f) {
+                    Pico::clearKeypad();
                 }
-                {%- else -%}
-                Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                {%- endif %}
                 return;
-        {%- endfor -%}
-    {%- endfor %}
-            default:
-                heavyMidiOutHook(vc, name, hash, m);
-                break;
-        } 
+            {%- endfor -%}
+            {%- endif %}
+
+        default:
+            heavyMidiOutHook(vc, name, hash, m);
+            break;
+    }
 }
 
+
+
+{% if active_keypad -%}
+void handle_keypad_sequencer(HeavyContextInterface *vc) {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    
+    // 1. Hardware Update (LEDs and Buttons)
+    Pico::processKeypad(now);
+
+    static int prev_steps[4] = {-1, -1, -1, -1};
+    
+    size_t num_trigs = sizeof(TRIG_HASHES) / sizeof(uint32_t);
+    if (num_trigs == 0) return;
+
+    for (int row = 0; row < (int)num_trigs; row++) {
+        int current_step = Pico::keypad.steps[row];
+        
+        // --- DEBUG: Print only when the step changes ---
+        if (current_step != prev_steps[row]) {
+            printf("[SEQ] Row %d -> Step %d\n", row, current_step);
+            
+            prev_steps[row] = current_step;
+            
+            if (current_step >= 0 && current_step < 4) {
+                int pad_idx = (row * 4) + current_step;
+                
+                // If pad is active in the sequencer, send bang to PD
+                if (Pico::keypad.selected[pad_idx]) {
+                    // --- DEBUG: Print when a trigger actually fires ---
+                    printf("  [HIT] Pad %d Triggered!\n", pad_idx);
+                    
+                    hv_sendFloatToReceiver(vc, TRIG_HASHES[row], 1.0f);
+                }
+            }
+        }
+    }
+}
+{%- endif %}
 
 {%- if board.console %}
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
@@ -413,6 +521,10 @@ void audioFunc(float* buffer, int frames) {
     Pico::applyLimiter(buffer, frames);
     {%- endif %}
 }
+
+
+
+
 
 
 int main() {
@@ -497,6 +609,18 @@ int main() {
     {%- for cny in active_cny70 %}
     Pico::addCNY70({{ cny.adc_pin }}, 380, 750, 0.6f, 2, {{ loop.index0 }});
     {% endfor %}
+
+    
+    
+  // -------------- Keypad Setup -------------
+    {% if active_keypad -%}
+    {% for kp in active_keypad -%}
+    Pico::addKeypad({{ kp.sda }}, {{ kp.scl }}, {{ kp.brightness }}f);
+    {% endfor -%}
+    {% endif %}
+
+    // -----------------------------------
+
 
     multicore_launch_core1(Pico::core1_audio_entry);
 
@@ -617,7 +741,10 @@ int main() {
                 }
             }
             {%- endfor %}
-          
+
+            {% if active_keypad %}
+            handle_keypad_sequencer(&pd_prog);
+            {% endif %}
         } 
         tight_loop_contents();
     } 
