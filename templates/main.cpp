@@ -383,9 +383,8 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         }
     }
     {%- endif %}
-        
     switch (hash) {
-
+    // 2. Handle Standard LEDs (Jinja Generated)
     {% for l in board.leds -%}
         {%- set led_index = loop.index0 -%}
         {%- for s in hv_manifest.sends if s.name == l.name -%}
@@ -403,10 +402,9 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             return;
             {%- endfor -%}
         {%- endfor %}
-             
         {% if active_keypad -%}
-        {%- for r in hv_manifest.receives if r.name == "keypad" -%}
-            case {{ r.hash }}U: // Dynamic hash for "keypad" object
+        {%- for s in hv_manifest.sends if s.name == "keypad" -%}
+            case {{ s.hash }}U: // Dynamic hash for "keypad" object
                 if (val0 > 0.5f) {
                     Pico::clearKeypad();
                 }
