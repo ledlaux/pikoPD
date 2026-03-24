@@ -4,6 +4,7 @@
 #include "pico/stdlib.h"
 #include <atomic>
 #include <cmath>
+#include "Keypad.h"
 
 #ifdef MIDI_HOST
     #ifndef CFG_TUH_ENABLED
@@ -126,12 +127,14 @@ namespace Pico {
     extern Joystick joystick[2];
     extern CNY70 cny70[1];
 
+
     extern int n_btn;
     extern int n_knob;
     extern int n_led;
     extern int n_encoder;
     extern int n_joystick;
     extern int n_cny70;
+
 
     extern std::atomic<float> led_vals[12];
     extern std::atomic<float> led_hue[12];        
@@ -178,7 +181,7 @@ namespace Pico {
     void updateRGB(int index, float hue, float intensity);
     void showRGB();
     #endif
-
+    
     typedef void (*AudioProcessCallback)(float* buffer, int frames);
     void setupAudio(AudioMode mode, AudioProcessCallback callback, 
                     int sample_rate, uint data_pin, uint bclk_pin, int buffer_size);
@@ -189,7 +192,7 @@ namespace Pico {
    
 }
 
- 
+
     #define MIDI_IN_BUF 256
 
     struct MidiInputBuffer {

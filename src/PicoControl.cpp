@@ -17,6 +17,7 @@
 #include "ws2812.pio.h" 
 #endif
 
+
     // ----------- Voice -----------
 
 
@@ -304,6 +305,7 @@ namespace Pico {
     int n_encoder = 0; 
     int n_joystick = 0;
     int n_cny70 = 0;
+
 
     void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
         gpio_init(pin);
