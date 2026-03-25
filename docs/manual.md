@@ -94,6 +94,30 @@ optional arguments:
 Hardware configuration is done by adjusting the `board.json` file.  
 This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mapped to GPIO pins and how it behaves.
 
+
+## Audio setup
+
+- I2S (PCM5102)
+  
+```json
+  "audio_mode": "I2S",
+  "sample_rate": 48000,
+  "channel": 2,
+  "buffer_size": 64,
+  "i2s_data_pin": 9,
+  "i2s_bclk_pin": 10
+```
+Besides DATA and BCLK pin, LRCK pin is asigned automatically as next after the BCLK.
+
+- PWM 
+  
+```json
+  "audio_mode": "PWM",
+  "sample_rate": 48000,
+  "buffer_size": 64,
+  "pwm_pin": 10
+```
+
 ## Buttons
 
 ```json
