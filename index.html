@@ -9,7 +9,7 @@
         :root { 
             --bg: #0f0f0f; --panel: #1e1e1e; --accent: #00ff88; --text: #e0e0e0; 
             --adc: #ff9800; --pwr: #ff4444; --gnd: #555; --audio-res: #00bcd4;
-            --input-clr: #4caf50; --output-clr: #2196f3; --led-clr: #e91e63; 
+            --input-clr: #4caf50; --output-clr: #e6c300; --led-clr: #e91e63; 
             --gpio-default: #ffd54f;
         }
 
@@ -1543,7 +1543,7 @@ function renderLists() {
             } else if (pinEl.classList.contains('assigned-led')) {
                 themeColor = 'var(--led-clr)';   // Pink
             } else if (pinEl.classList.contains('assigned-output')) {
-                themeColor = 'var(--pwr)';       // Red/Accent
+                themeColor = 'var(--output-clr)';       // Red/Accent
             } else if (pinEl.classList.contains('audio-reserved')) {
                 themeColor = '#9d00ff';          // Purple
             }
