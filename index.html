@@ -14,7 +14,6 @@
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
         
-    
     nav {
         background: #000;
         width: 100%;
@@ -40,7 +39,6 @@
     .page.active {
         display: block; 
     }
-
 
     .main-layout { 
         display: flex; 
@@ -74,8 +72,6 @@
         padding: 25px;
     }
 
-
-
         .pin { width: 45px; height: 26px; background: var(--gpio-default); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #333; font-weight: bold; transition: 0.1s; border: 1px solid rgba(0,0,0,0.1); }
         .pin.spacer { visibility: hidden; pointer-events: none; }
         .pin.drag-over { outline: 3px dashed white !important; background: #fff !important; transform: scale(1.1); }
@@ -86,11 +82,8 @@
         .pin.audio-reserved { background: var(--audio-res) !important; color: #fff !important; border: 2px solid #fff; }
         .pin.gnd-pin { background: var(--gnd); color: white; cursor: default; }
         .pin.pwr-pin { background: var(--pwr); color: white; cursor: default; }
-/* --- Layout Grid --- */
-        .main-layout { 
-            display: flex; gap: 30px; width: 100%; max-width: 1600px; 
-            margin: 0 auto; align-items: flex-start; 
-        }
+        
+        .main-layout { display: flex; gap: 30px; width: 100%; max-width: 1600px; margin: 0 auto; align-items: flex-start; }
 
         .config-area { 
             flex: 1; display: grid; 
@@ -107,461 +100,437 @@
 
         h3 { margin: 0 0 15px 0; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent); font-size: 14px; text-transform: uppercase; }
 
-        /* --- Vertical Pillars (Stretch Logic) --- */
         .top-row-tools { grid-column: span 2; display: flex; gap: 20px; }
         .top-row-tools .panel { flex: 1; }
 
-/* Ensure the Active Components area spans the bottom correctly */
-.active-components-panel {
-    grid-column: span 2;
-    grid-row: 2;
-    display: flex;
-    flex-direction: column;
-}
-
-
-/* Analog / ADC = Orange */
-.pin.assigned-adc { 
-    background: var(--adc) !important; 
-    color: #000 !important; 
-}
-
-/* Digital Inputs (Buttons) = Green */
-.pin.assigned-input { 
-    background: var(--input-clr) !important; 
-    color: #fff !important; 
-}
-
-/* LEDs = Pink/Red */
-.pin.assigned-led { 
-    background: var(--led-clr) !important; 
-    color: #fff !important; 
-}
-
-/* The horizontal container for the 3 groups */
-.comp-groups {
-    display: flex;
-    gap: 15px;
-    flex: 1; /* Fills the panel height */
-    align-items: stretch;
-}
-
-/* Individual Group Boxes */
-.group-box {
-    flex: 1; /* Makes all 3 columns exactly the same width */
-    background: #111; /* Slightly darker for depth */
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Style the Labels (H4) to be clean and readable */
-.group-box h4 {
-    margin: 0 0 10px 0;
-    font-size: 10px;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid #222;
-    padding-bottom: 5px;
-}
-
-/* The actual list area inside the group */
-.comp-list {
-    flex: 1;
-    min-height: 100px;
-    overflow-y: auto;
-}        
-        .settings-column {
-            grid-column: 3; grid-row: 1 / span 2;
-            display: flex; flex-direction: column; gap: 20px;
+        .active-components-panel {
+            grid-column: span 2;
+            grid-row: 2;
+            display: flex;
+            flex-direction: column;
         }
-        /* This makes System and Audio panels grow to fill the pillar */
-        .settings-column .panel { flex: 1; }
 
-        .json-panel { grid-column: 4; grid-row: 1 / span 2; }
-
-        /* --- Components & Groups --- */
-        .comp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-grow: 1; }
         
-        .group-box {
-            background: #151515; border: 1px solid #222; padding: 12px;
-            height: 400px; overflow-y: auto; overflow-x: hidden;
-            display: flex; flex-direction: column; align-items: center;
+        /* Analog / ADC = Orange */
+        .pin.assigned-adc { 
+            background: var(--adc) !important; 
+            color: #000 !important; 
         }
-
-        .comp-item { 
-            width: 100%; box-sizing: border-box; padding: 8px; 
-            background: #222; border-radius: 4px; margin-bottom: 8px;
-            font-size: 11px; border-left: 4px solid var(--accent); 
-        }
-
-        /* --- UI Elements --- */
-        #json-preview {
-            background: #000; color: var(--accent); padding: 15px; flex-grow: 1;
-            font-size: 11px; border: 1px solid #333; border-radius: 6px;
-            overflow-y: auto; white-space: pre-wrap; margin: 10px 0;
-        }
-
-        select, input[type="text"], input[type="number"] { 
-            width: 100%; padding: 6px; background: #2d2d2d; border: 1px solid #444; 
-            color: white; border-radius: 4px; font-size: 11px; margin-bottom: 10px; 
-        }
-
-        .compact-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .compact-row label { margin: 0; }
-        label { font-size: 10px; color: #888; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 4px; }
-
-        button { 
-            background: var(--accent); border: none; padding: 12px; border-radius: 4px; 
-            font-weight: bold; cursor: pointer; transition: 0.2s; 
-        }
-        button:hover { opacity: 0.8; }
-
-        /* --- Custom Scrollbar --- */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-
-        .comp-item { display: flex; flex-direction: column; padding: 8px; border-radius: 4px; margin-bottom: 8px; background: #222; font-size: 11px; border-left: 4px solid #444; }
-        .comp-item input { background: transparent; border: none; color: var(--accent); font-weight: bold; margin-bottom: 4px; padding: 2px; width: 80%; font-size: 12px; }
-        .comp-header { display: flex; justify-content: space-between; align-items: center; }
-        .group-box.drag-target { border: 1px dashed var(--accent); background: #1a2a1a; }
-
-        pre { background: #000; padding: 15px; border-radius: 6px; font-size: 11px; color: #00ff00; height: 320px; overflow-y: auto; border: 1px solid #333; margin: 0; }
-        .del-btn { color: #ff5555; cursor: pointer; font-weight: bold; padding: 4px; }
-        button { background: var(--accent); border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; color: #000; transition: 0.2s; }
-        select, input { width: 100%; padding: 4px; background: #2d2d2d; border: 1px solid #444; color: white; border-radius: 4px; font-size: 11px; margin-bottom: 5px; box-sizing: border-box; }
-        label { display: block; font-size: 10px; color: #888; margin-bottom: 4px; font-weight: bold; }
         
-        .pd-tag { display: inline-block; background: #333; color: var(--accent); padding: 5px 12px; border-radius: 15px; font-size: 11px; margin: 3px; cursor: grab; border: 1px solid #444; user-select: none; }
+        /* Digital Inputs (Buttons) = Green */
+        .pin.assigned-input { 
+            background: var(--input-clr) !important; 
+            color: #fff !important; 
+        }
         
-        /* Content Page Styling */
-        .content-wrap { max-width: 800px; margin: 0 auto; line-height: 1.6; }
-        #blog-container {
-    flex: 1;
-    margin-top: 15px; /* Adjust this until it aligns with the Calendar top */
-    padding-bottom: 80vh;
-}
-     .blog-post { 
-    scroll-margin-top: 80px; /* Increased from 100 to 120 */
-    border-bottom: 1px solid #333; 
-    padding-bottom: 20px; 
-    margin-bottom: 20px; 
-}
-        .blog-post h2 { color: var(--accent); margin-bottom: 5px; }
-        .date { font-size: 11px; color: #666; font-weight: bold; }
-
-   #markdown-viewer h1, #markdown-viewer h2 {
-    color: var(--accent);
-    margin-top: 30px;
-}
-
-#markdown-viewer h3 {
-    color: #fff;
-    border-bottom: 1px solid #333;
-    padding-bottom: 5px;
-}
-
-/* This is for inline code like `this` */
-#markdown-viewer :not(pre) > code {
-    background: #1a1a1a;
-    color: var(--accent);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.9em;
-}
-
-/* This is for the large code blocks */
-#markdown-viewer pre {
-    background: #000;
-    border: 1px solid #444;
-    padding: 15px;
-    border-radius: 8px;
-    overflow-x: auto;
-    /* FIX: Force height to wrap content instead of 320px */
-    height: auto !important; 
-    margin: 15px 0;
-}
-
-/* Clean up the code inside the pre block */
-#markdown-viewer pre code {
-    background: transparent;
-    padding: 0;
-    color: #00ff88; /* Keeps it matching your JSON preview */
-    font-size: 12px;
-    border: none;
-}
-
-#markdown-viewer table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
-}
-
-#markdown-viewer th, #markdown-viewer td {
-    padding: 10px;
-    border: 1px solid #333;
-    text-align: left;
-    font-size: 13px;
-}
-
-#markdown-viewer th {
-    background: #222;
-    color: var(--accent);
-}
-
-.date { 
-    font-size: 12px; /* Smaller date */
-    color: var(--adc); 
-    font-weight: bold; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    width: 100%;
-    margin-bottom: 10px;
-}
-
-
-.date .pd-tag { 
-    font-size: 9px; /* Smaller tags */
-    padding: 2px 6px; 
-    margin-left: 5px;
-    height: fit-content;
-    text-transform: uppercase;
-}
-#blog-calendar {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
-    text-align: center;
+        /* LEDs = Pink/Red */
+        .pin.assigned-led { 
+            background: var(--led-clr) !important; 
+            color: #fff !important; 
+        }
     
-}
-.cal-day {
-    font-size: 10px;
-    padding: 8px 0;
-    background: #151515;
-    border-radius: 4px;
-    color: #555;
-}
-.cal-day.has-post {
-    background: var(--accent);
-    color: #000;
-    font-weight: bold;
-    cursor: pointer;
-}
-.cal-header {
-    font-size: 9px;
-    color: var(--adc);
-    font-weight: bold;
-    margin-bottom: 5px;
-}
 
+    .comp-groups {
+        display: flex;
+        gap: 15px;
+        flex: 1;
+        align-items: stretch;
+    }
+    
+ 
+    .group-box {
+        flex: 1; 
+        background: #111; 
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .group-box h4 {
+        margin: 0 0 10px 0;
+        font-size: 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-bottom: 1px solid #222;
+        padding-bottom: 5px;
+    }
+    
+    .comp-list {
+        flex: 1;
+        min-height: 100px;
+        overflow-y: auto;
+    }        
+            .settings-column {
+                grid-column: 3; grid-row: 1 / span 2;
+                display: flex; flex-direction: column; gap: 20px;
+            }
 
+            .settings-column .panel { flex: 1; }
+    
+            .json-panel { grid-column: 4; grid-row: 1 / span 2; }
+    
+            .comp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-grow: 1; }
+            
+            .group-box {
+                background: #151515; border: 1px solid #222; padding: 12px;
+                height: 400px; overflow-y: auto; overflow-x: hidden;
+                display: flex; flex-direction: column; align-items: center;
+            }
+    
+            .comp-item { 
+                width: 100%; box-sizing: border-box; padding: 8px; 
+                background: #222; border-radius: 4px; margin-bottom: 8px;
+                font-size: 11px; border-left: 4px solid var(--accent); 
+            }
+    
+            #json-preview {
+                background: #000; color: var(--accent); padding: 15px; flex-grow: 1;
+                font-size: 11px; border: 1px solid #333; border-radius: 6px;
+                overflow-y: auto; white-space: pre-wrap; margin: 10px 0;
+            }
+    
+            select, input[type="text"], input[type="number"] { 
+                width: 100%; padding: 6px; background: #2d2d2d; border: 1px solid #444; 
+                color: white; border-radius: 4px; font-size: 11px; margin-bottom: 10px; 
+            }
+    
+            .compact-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+            .compact-row label { margin: 0; }
+            label { font-size: 10px; color: #888; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 4px; }
+    
+            button { 
+                background: var(--accent); border: none; padding: 12px; border-radius: 4px; 
+                font-weight: bold; cursor: pointer; transition: 0.2s; 
+            }
+            button:hover { opacity: 0.8; }
+    
+            /* --- Custom Scrollbar --- */
+            ::-webkit-scrollbar { width: 5px; }
+            ::-webkit-scrollbar-track { background: #0a0a0a; }
+            ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+            ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    
+    
+            .comp-item { display: flex; flex-direction: column; padding: 8px; border-radius: 4px; margin-bottom: 8px; background: #222; font-size: 11px; border-left: 4px solid #444; }
+            .comp-item input { background: transparent; border: none; color: var(--accent); font-weight: bold; margin-bottom: 4px; padding: 2px; width: 80%; font-size: 12px; }
+            .comp-header { display: flex; justify-content: space-between; align-items: center; }
+            .group-box.drag-target { border: 1px dashed var(--accent); background: #1a2a1a; }
+    
+            pre { background: #000; padding: 15px; border-radius: 6px; font-size: 11px; color: #00ff00; height: 320px; overflow-y: auto; border: 1px solid #333; margin: 0; }
+            .del-btn { color: #ff5555; cursor: pointer; font-weight: bold; padding: 4px; }
+            button { background: var(--accent); border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; color: #000; transition: 0.2s; }
+            select, input { width: 100%; padding: 4px; background: #2d2d2d; border: 1px solid #444; color: white; border-radius: 4px; font-size: 11px; margin-bottom: 5px; box-sizing: border-box; }
+            label { display: block; font-size: 10px; color: #888; margin-bottom: 4px; font-weight: bold; }
+            
+            .pd-tag { display: inline-block; background: #333; color: var(--accent); padding: 5px 12px; border-radius: 15px; font-size: 11px; margin: 3px; cursor: grab; border: 1px solid #444; user-select: none; }
+            
+            .content-wrap { max-width: 800px; margin: 0 auto; line-height: 1.6; }
+           
+        #blog-container {
+        flex: 1;
+        margin-top: 15px;
+        padding-bottom: 80vh;
+    }
+         .blog-post { 
+        scroll-margin-top: 80px; 
+        border-bottom: 1px solid #333; 
+        padding-bottom: 20px; 
+        margin-bottom: 20px; 
+    }
+            .blog-post h2 { color: var(--accent); margin-bottom: 5px; }
+            .date { font-size: 11px; color: #666; font-weight: bold; }
+    
+       #markdown-viewer h1, #markdown-viewer h2 {
+        color: var(--accent);
+        margin-top: 30px;
+    }
+    
+    #markdown-viewer h3 {
+        color: #fff;
+        border-bottom: 1px solid #333;
+        padding-bottom: 5px;
+    }
+    
+    #markdown-viewer :not(pre) > code {
+        background: #1a1a1a;
+        color: var(--accent);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    
+    #markdown-viewer pre {
+        background: #000;
+        border: 1px solid #444;
+        padding: 15px;
+        border-radius: 8px;
+        overflow-x: auto;
+        height: auto !important; 
+        margin: 15px 0;
+    }
+    
 
-.index-year-header {
-    font-size: 14px;
-    color: var(--accent);
-    font-weight: bold;
-    margin-top: 15px;
-    border-bottom: 1px solid #444;
-    padding-bottom: 3px;
-}
+    #markdown-viewer pre code {
+        background: transparent;
+        padding: 0;
+        color: #00ff88; 
+        font-size: 12px;
+        border: none;
+    }
+    
+    #markdown-viewer table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+    
+    #markdown-viewer th, #markdown-viewer td {
+        padding: 10px;
+        border: 1px solid #333;
+        text-align: left;
+        font-size: 13px;
+    }
+    
+    #markdown-viewer th {
+        background: #222;
+        color: var(--accent);
+    }
+    
+    .date { 
+        font-size: 12px; /* Smaller date */
+        color: var(--adc); 
+        font-weight: bold; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    
+    .date .pd-tag { 
+        font-size: 9px; /* Smaller tags */
+        padding: 2px 6px; 
+        margin-left: 5px;
+        height: fit-content;
+        text-transform: uppercase;
+    }
+    #blog-calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 5px;
+        text-align: center;
+        
+    }
+    .cal-day {
+        font-size: 10px;
+        padding: 8px 0;
+        background: #151515;
+        border-radius: 4px;
+        color: #555;
+    }
+    .cal-day.has-post {
+        background: var(--accent);
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .cal-header {
+        font-size: 9px;
+        color: var(--adc);
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    
+    
+    .index-year-header {
+        font-size: 14px;
+        color: var(--accent);
+        font-weight: bold;
+        margin-top: 15px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 3px;
+    }
+    
+    .index-month-header {
+        font-size: 9px;
+        color: var(--adc);
+        letter-spacing: 1.5px;
+        margin: 10px 0 5px 5px;
+        font-weight: bold;
+    }
+    
+    .title-link-item {
+        padding: 6px 10px;
+        font-size: 11px;
+        color: #bbb;
+        cursor: pointer;
+        border-left: 1px solid #333;
+        margin-left: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: 0.1s;
+    }
+    
+    .title-link-item:hover {
+        color: white;
+        border-left: 2px solid var(--accent);
+        background: rgba(255,255,255,0.05);
+        padding-left: 12px;
+    }
+    
+    .side-column, #blog-title-list { 
+        scrollbar-width: none; 
+    }
+    .side-column::-webkit-scrollbar, #blog-title-list::-webkit-scrollbar { 
+        display: none; 
+    }
+    
+    
+    #docs-index-list .title-link-item {
+        padding: 4px 8px;
+        border-left: 1px solid #333;
+        margin-bottom: 2px;
+        cursor: pointer;
+        transition: 0.1s;
+    }
+    
+    #docs-index-list .title-link-item:hover {
+        border-left: 2px solid var(--accent);
+        color: white;
+        background: rgba(255,255,255,0.05);
+    }
+    
+    #docs-index-list {
+        scrollbar-width: none;
+    }
+    #docs-index-list::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .link-card {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #333 !important; /* Force border to show */
+        position: relative;
+        top: 0;
+    }
+    
+    .link-card:hover {
+        top: -5px; /* Physical lift */
+        border-color: var(--accent) !important;
+        background: #252525 !important;
+        box-shadow: 0 10px 20px rgba(0, 255, 136, 0.1);
+    }
+    
+    .contact-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid #222 !important;
+    }
+    
+    .contact-item:hover {
+        border-color: var(--accent) !important;
+        background: #1a1a1a !important;
+    }
 
-.index-month-header {
-    font-size: 9px;
-    color: var(--adc);
-    letter-spacing: 1.5px;
-    margin: 10px 0 5px 5px;
-    font-weight: bold;
-}
+        
+    .card-thumb-wrap {
+        height: 140px; 
+        width: 100%;
+        background: #151515; 
+        border-radius: 4px; 
+        margin-bottom: 12px; 
+        overflow: hidden; 
+        position: relative;
+        border: 1px solid #333;
+    }
+    
 
-.title-link-item {
-    padding: 6px 10px;
-    font-size: 11px;
-    color: #bbb;
-    cursor: pointer;
-    border-left: 1px solid #333;
-    margin-left: 5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: 0.1s;
-}
+    .card-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; 
+        display: block;
+        transition: transform 0.4s ease-in-out; /* The zoom speed */
+    }
+    
 
-.title-link-item:hover {
-    color: white;
-    border-left: 2px solid var(--accent);
-    background: rgba(255,255,255,0.05);
-    padding-left: 12px;
-}
+    .link-card:hover .card-img {
+        transform: scale(1.15); /* Grows by 15% */
+    }
+    
 
-/* 2. Hide Scrollbars */
-.side-column, #blog-title-list { 
-    scrollbar-width: none; 
-}
-.side-column::-webkit-scrollbar, #blog-title-list::-webkit-scrollbar { 
-    display: none; 
-}
-
-
-#docs-index-list .title-link-item {
-    padding: 4px 8px;
-    border-left: 1px solid #333;
-    margin-bottom: 2px;
-    cursor: pointer;
-    transition: 0.1s;
-}
-
-#docs-index-list .title-link-item:hover {
-    border-left: 2px solid var(--accent);
-    color: white;
-    background: rgba(255,255,255,0.05);
-}
-
-/* Hide scrollbar for the index list specifically */
-#docs-index-list {
-    scrollbar-width: none;
-}
-#docs-index-list::-webkit-scrollbar {
-    display: none;
-}
-
-/* 1. Base Project Card Hover */
-.link-card {
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    border: 1px solid #333 !important; /* Force border to show */
-    position: relative;
-    top: 0;
-}
-
-.link-card:hover {
-    top: -5px; /* Physical lift */
-    border-color: var(--accent) !important;
-    background: #252525 !important;
-    box-shadow: 0 10px 20px rgba(0, 255, 136, 0.1);
-}
-
-/* 2. Contact Item Hover */
-.contact-item {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid #222 !important;
-}
-
-.contact-item:hover {
-    border-color: var(--accent) !important;
-    background: #1a1a1a !important;
-}
-
-/* 3. Thumb Icon Animation */
-
-/* The Frame: This stays the same size and clips the image */
-.card-thumb-wrap {
-    height: 140px; 
-    width: 100%;
-    background: #151515; 
-    border-radius: 4px; 
-    margin-bottom: 12px; 
-    overflow: hidden; /* CRITICAL: This stops the image from being bigger than the card */
-    position: relative;
-    border: 1px solid #333;
-}
-
-/* The Image: This lives inside the frame */
-.card-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Ensures the image fills the area without stretching */
-    display: block;
-    transition: transform 0.4s ease-in-out; /* The zoom speed */
-}
-
-/* The Animation: Only the image grows, the frame stays still */
-.link-card:hover .card-img {
-    transform: scale(1.15); /* Grows by 15% */
-}
-
-/* The Card: Overall container behavior */
-.link-card {
-    cursor: pointer;
-    transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.link-card:hover {
-    transform: translateY(-5px); /* Entire card lifts slightly */
-    border-color: var(--accent) !important;
-}
-
-
-.role-badge {
-    font-size: 10px;       /* Slightly larger for readability since it's now just text */
-    font-weight: 500;      /* Medium weight instead of Bold */
-    color: #666;           /* Dimmed gray color */
-    background: none;      /* REMOVED background */
-    padding: 0;            /* REMOVED padding */
-    border: none;          /* REMOVED border */
-    text-transform: uppercase;
-    letter-spacing: 0.8px; /* Slightly more spacing for a "pro" look */
-    white-space: nowrap;
-    opacity: 0.8;
-}
-
-/* Optional: hover effect to show it's a fixed label */
-
-
-
-/* Custom "Hardware" Checkbox */
-.hw-checkbox {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: #111;           /* Matches your dark panel background */
-    border: 1px solid #444;    /* Subtle border */
-    border-radius: 2px;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s ease;
-    margin: 0;
-}
-
-/* The "ON" State (Solid Green) */
-.hw-checkbox:checked {
-    background: var(--accent); /* Uses your Pico green */
-    border-color: var(--accent);
-}
-
-/* The checkmark symbol inside */
-.hw-checkbox:checked::after {
-    content: '';
-    position: absolute;
-    left: 4px;
-    top: 1px;
-    width: 3px;
-    height: 7px;
-    border: solid #000; /* Dark checkmark against green background */
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-}
-
-/* Hover effect for better UX */
-.hw-checkbox:hover {
-    border-color: #666;
-}
-
+    .link-card {
+        cursor: pointer;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    
+    .link-card:hover {
+        transform: translateY(-5px); 
+        border-color: var(--accent) !important;
+    }
+    
+    
+    .role-badge {
+        font-size: 10px;      
+        font-weight: 500;      
+        color: #666;           
+        background: none;     
+        padding: 0;           
+        border: none;        
+        text-transform: uppercase;
+        letter-spacing: 0.8px; 
+        white-space: nowrap;
+        opacity: 0.8;
+    }
+    
+    .hw-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        background: #111;          
+        border: 1px solid #444;    
+        border-radius: 2px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        margin: 0;
+    }
+    
+    .hw-checkbox:checked {
+        background: var(--accent); 
+        border-color: var(--accent);
+    }
+    
+    .hw-checkbox:checked::after {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 1px;
+        width: 3px;
+        height: 7px;
+        border: solid #000; 
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    
+    .hw-checkbox:hover {
+        border-color: #666;
+    }
+    
 
     </style>
 </head>
 <body>
 
-    
  <nav>
     <div style="flex: 1; display: flex; align-items: center; padding-left: 20px; cursor: pointer;" >
         <span style="color: var(--accent); font-weight: bold; font-size: 13px; letter-spacing: 1px;">
@@ -704,7 +673,7 @@
                 <option value="32000">32000</option>
                 <option value="44100">44100</option>
                 <option value="48000" selected>48000</option>
-                <option value="96000" selected>96000</option>
+                <option value="96000">96000</option>
             </select>
             
             <label>Audio Mode</label>
@@ -1020,7 +989,6 @@ async function fetchBlogPosts() {
             </div>
         `).join('');
 
-        // ✅ SINGLE SWAP (no flicker)
         container.replaceChildren(...temp.childNodes);
 
         // UI updates AFTER render
@@ -1204,46 +1172,43 @@ function showPage(id) {
         activeNavLink.classList.add('active');
     }
 
-    // Optional: Auto-fetch content for docs/blog
     if (id === 'docs-page' && typeof fetchGitHubManual === 'function') fetchGitHubManual();
     if (id === 'blog-page' && typeof fetchBlogPosts === 'function') fetchBlogPosts();
     
-    // Smooth scroll to top
    
 }
-        // --- YOUR ORIGINAL CONFIG LOGIC START ---
-        let config = {
-    name: "heavy",
-    pico_board: "pico2", // Updated to default to your new source
-    core_freq: 240000,   // New: Support for overclocking
-    audio_mode: "I2S",
-    sample_rate: 48000,
-    channel: 2,
-    buffer_size: 64,
-    voice_count: 4,
-    midi_mode: "usb",
-    console: false,
-    i2s_data_pin: 9,
-    i2s_bclk_pin: 10,
-    i2s_lrck_pin: 11,
-    pwm_pin: 8,
-    inputs: {
-        adc_pins: [],
-        buttons: [],
-        gate_in: [],
-        encoders: [],
-        joystick: [],
-        sensors: {cny70: []}
-    },
-    outputs: {
-        gate_out: []
-    },
-    leds: [],
-    masterfx: { 
-        limiter: true,
-        delay: false
-    }
-};
+    let config = {
+        name: "heavy",
+        pico_board: "pico2", 
+        core_freq: 240000,   
+        audio_mode: "I2S",
+        sample_rate: 48000,
+        channel: 2,
+        buffer_size: 64,
+        voice_count: 4,
+        midi_mode: "usb",
+        console: false,
+        i2s_data_pin: 9,
+        i2s_bclk_pin: 10,
+        i2s_lrck_pin: 11,
+        pwm_pin: 8,
+        inputs: {
+            adc_pins: [],
+            buttons: [],
+            gate_in: [],
+            encoders: [],
+            joystick: [],
+            sensors: {cny70: []}
+        },
+        outputs: {
+            gate_out: []
+        },
+        leds: [],
+        masterfx: { 
+            limiter: true,
+            delay: false
+        }
+    };
 
         const picoPins = [0, "VBUS", 1, "VSYS", "GND", "GND", 2, "EN", 3, "3V3", 4, "ADC_V", 5, 28, "GND", "GND", 6, 27, 7, 26, 8, "GND", 9, 22, "GND", "GND", 10, 21, 11, 20, 12, 19, 13, 18, "GND", "GND", 14, 17, 15, 16];
         const zeroPins = [
@@ -1280,8 +1245,8 @@ function showPage(id) {
                         if (param) { selectPin(val); autoFillAndAdd(param); }
                     });
                 } else {
-            // UPDATED LOGIC HERE:
-            // Check for Power pins (VBUS, VSYS, 3V3, 5V) vs Grey pins (GND, EN, ADC_V)
+
+        // Check for Power pins (VBUS, VSYS, 3V3, 5V) vs Grey pins (GND, EN, ADC_V)
             if (val.includes('V') && val !== 'ADC_V') {
                 div.className = 'pin pwr-pin';
             } else if (val === 'GND' || val === 'EN' || val === 'ADC_V') {
@@ -1316,7 +1281,8 @@ function showPage(id) {
             reader.readAsText(file);
         }
 
-       function handlePDUpload(event) {
+    function handlePDUpload(event) {
+        
     const file = event.target.files[0];
     const reader = new FileReader();
 
