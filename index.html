@@ -613,7 +613,7 @@
             
             <div class="top-row-tools">
                 <div class="panel">
-                    <h3>Integration</h3>
+                    <h3>1. Integration</h3>
                     <label>Load Pure Data Patch (.pd)</label>
                     <input type="file" id="pd-input" accept=".pd" onchange="handlePDUpload(event)">
                     <div id="pd-found-tags" style="margin-top: 10px; border: 1px dashed #444; padding: 10px; min-height: 50px;"></div>
@@ -622,7 +622,7 @@
                 </div>
 
                 <div class="panel">
-                    <h3>Manual Entry</h3>
+                    <h3>2. Manual Entry</h3>
                     <label>Selected Pin: <span id="pin-display" style="color:var(--accent)">None</span></label>
                     <input type="text" id="comp-name" placeholder="Label / Name">
                     <label>Category</label>
@@ -715,35 +715,32 @@
 
     
    <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 12px; margin-top: auto;">
-    
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Master Limiter</span>
         <input type="checkbox" id="fx-limiter" checked onchange="config.masterfx.limiter = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
     </div>
-
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Master Delay</span>
         <input type="checkbox" id="fx-delay" onchange="config.masterfx.delay = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
     </div>
-
 </div>
-    </div>
+</div>
 </div>
 
             <div class="panel json-panel">
-                <div class="json-header" onclick="toggleJson()" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                <div class="json-header">
                     <h3 style="margin: 0;">board.json</h3>
-                    <span id="json-arrow">▼</span>
+                    <span id="json-arrow"></span>
                 </div>
                 <pre id="json-preview"></pre>
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
                     <button style="flex: 1; background: var(--accent); color: #000;" onclick="downloadJSON()">Export</button>
                     <button style="flex: 1; background: #333; color: white;" onclick="copyJson()">Copy</button>
-                    
                 </div>
             </div>
-
-        </div> </div> </div>
+        </div> 
+    </div> 
+</div>
 <div id="docs-page" class="page">
     <div class="main-layout">
         <div class="side-column">
@@ -1696,6 +1693,87 @@ function renameComp(cat, i, val) {
     // 3. LEDs & Outputs
     config.leds = filterPins(config.leds);
     config.outputs.gate_out = filterPins(config.outputs.gate_out);
+}
+
+// function toggleJson() {
+//     const preview = document.getElementById('json-preview');
+//     const arrow = document.getElementById('json-arrow');
+//     if (preview.style.display === "none") {
+//         preview.style.display = "block";
+//         arrow.innerText = "▼";
+//     } else {
+//         preview.style.display = "none";
+//         arrow.innerText = "▶";
+//     }
+// }
+
+// 2. Fix the Copy Error
+async function copyJson() {
+    const jsonArea = document.getElementById('json-preview');
+    // Find the button that was clicked
+    const btn = document.querySelector('button[onclick="copyJson()"]');
+    
+    if (!jsonArea) return;
+
+    const text = jsonArea.innerText;
+
+    // 1. Attempt Modern Copy
+    let success = false;
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            success = true;
+        } catch (err) {
+            console.warn("Clipboard API failed, trying fallback...");
+        }
+    }
+
+    // 2. Fallback if Modern API fails
+    if (!success) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            success = document.execCommand('copy');
+        } catch (err) {
+            success = false;
+        }
+        document.body.removeChild(textArea);
+    }
+
+    // 3. SILENT VISUAL FEEDBACK (No more Alert!)
+    if (success && btn) {
+        const originalText = btn.innerText;
+        const originalBg = btn.style.background;
+        
+        btn.innerText = "COPIED!";
+        btn.style.background = "var(--accent)";
+        btn.style.color = "#000";
+
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = originalBg;
+            btn.style.color = "white";
+        }, 1200);
+    } else if (!success) {
+        // Only show alert if it actually fails completely
+        alert("Copy failed. Please select manually.");
+    }
+}
+
+
+
+function showCopySuccess(btn) {
+    const originalText = btn.innerText;
+    btn.innerText = "COPIED!";
+    btn.style.background = "#fff";
+    btn.style.color = "#000";
+    setTimeout(() => {
+        btn.innerText = originalText;
+        btn.style.background = "transparent";
+        btn.style.color = "var(--accent)";
+    }, 1200);
 }
 
       function removeComp(cat, i) {
