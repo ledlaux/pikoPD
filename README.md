@@ -8,7 +8,7 @@ It is currently a **Proof of Concept**. The core logic of the system has been im
 
 Check compiled binaries for RP2040 in the release section.
 
-
+I also created a small interactive web configuration tool. You can try it here: [Live Demo](https://ledlaux.github.io/pikoPD)
 
 ## Project Updates
 
