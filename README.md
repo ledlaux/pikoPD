@@ -6,7 +6,7 @@ The goal of this project is to develop an interface between the Raspberry Pi Pic
 
 It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. Future plans include adding an automated project builder using arduino-cli workflow.
 
-Check compiled binaries for RP2040 in the release section.
+Compiled binaries for RP2040are published in the release section. Check Discussions for the project updates. 
 
 I also created a small interactive web configuration tool. You can try it here: [Live Demo](https://ledlaux.github.io/pikoPD)
 
