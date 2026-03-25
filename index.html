@@ -737,8 +737,9 @@
                 </div>
                 <pre id="json-preview"></pre>
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
-                    <button style="flex: 1; background: #333; color: white;" onclick="downloadJSON()">Export</button>
-                    <button style="flex: 1; background: var(--accent); color: #000;" onclick="copyJson()">Save</button>
+                    <button style="flex: 1; background: var(--accent); color: #000;" onclick="downloadJSON()">Export</button>
+                    <button style="flex: 1; background: #333; color: white;" onclick="copyJson()">Copy</button>
+                    
                 </div>
             </div>
 
@@ -1517,9 +1518,12 @@ function showPage(id) {
 
      
 function refreshUI() {
+    // 1. Update JSON Preview & Render the Sidebar Lists
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
     renderLists();
     
+    // 2. Reset ALL pins to default state before re-applying colors
+    // Added 'assigned-adc' to the removal list so colors don't "stick" after deletion
     document.querySelectorAll('.pin').forEach(p => {
         p.classList.remove(
             'assigned-input', 
