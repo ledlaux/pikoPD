@@ -1345,24 +1345,39 @@ function autoFillAndAdd(val) {
     const typeSelect = document.getElementById('comp-type');
     
     nameInput.value = val;
+    typeSelect.value = ""; 
     const v = val.toLowerCase();
 
-    // Mapping logic
-    if (v.includes('knob') || v.includes('pot') || v.includes('cv')) typeSelect.value = "adc_pins";
-    else if (v.includes('btn') || v.includes('sw') || v.includes('switch')) typeSelect.value = "buttons";
-    else if (v.includes('led')) typeSelect.value = "leds";
-    else if (v.includes('enc')) typeSelect.value = "encoders";
-    else if (v.includes('gate_out')) typeSelect.value = "gate_out";
-    else if (v.includes('gate_in')) typeSelect.value = "gate_in";
+    if (v.includes('enc')) {
+        typeSelect.value = "encoders";
+    } 
+    else if (v.includes('gate_out')) {
+        typeSelect.value = "gate_out";
+    }
+    else if (v.includes('gate_in')) {
+        typeSelect.value = "gate_in";
+    }
+    else if (v.includes('knob') || v.includes('pot') || v.includes('cv') || v.includes('adc')) {
+        typeSelect.value = "adc_pins";
+    } 
+    else if (v.includes('btn') || v.includes('sw') || v.includes('toggle')) {
+        typeSelect.value = "buttons";
+    } 
+    else if (v.includes('led')) {
+        typeSelect.value = "leds";
+    }
+    if (typeSelect.value === "") {
+        typeSelect.value = "adc_pins";
+    }
 
-    // 1. Update the UI for the new category
     updateModeUI();
 
-    // 2. Wait a split second for the DOM to catch up, then add
     setTimeout(() => {
         addComponent();
-    }, 10); 
+    }, 50); 
 }
+
+
 
 function isNameDuplicate(newName) {
     if (!newName) return false;
