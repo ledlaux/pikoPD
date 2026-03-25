@@ -9,7 +9,7 @@
         :root { 
             --bg: #0f0f0f; --panel: #1e1e1e; --accent: #00ff88; --text: #e0e0e0; 
             --adc: #ff9800; --pwr: #ff4444; --gnd: #555; --audio-res: #00bcd4;
-            --input-clr: #4caf50; --output-clr: #2196f3; --led-clr: #e91e63;
+            --input-clr: #4caf50; --output-clr: #2196f3; --led-clr: #e91e63; 
             --gpio-default: #ffd54f;
         }
 
@@ -116,6 +116,12 @@
                 background: var(--led-clr) !important; 
                 color: #fff !important; 
             }
+
+            .pin.assigned-encoder { 
+                background: var(--enc-clr) !important; 
+                color: #fff !important; 
+                box-shadow: 0 0 8px rgba(0, 136, 255, 0.4);
+}
         
         .comp-groups {display: flex; gap: 15px; flex: 1; align-items: stretch;}
         
@@ -137,6 +143,15 @@
             letter-spacing: 1px;
             border-bottom: 1px solid #222;
             padding-bottom: 5px;
+        }
+
+
+        .comp-item {
+            border-left: 5px solid transparent; 
+            padding-left: 10px;
+            margin-bottom: 8px;
+            background: #1a1a1a; 
+            border-radius: 4px;
         }
         
         .comp-list {flex: 1; min-height: 100px; overflow-y: auto;}
@@ -544,24 +559,29 @@
                 </div>
 
                 <div class="panel">
-                    <h3>Manual Entry</h3>
-                    <label>Selected Pin: <span id="pin-display" style="color:var(--accent)">None</span></label>
-                    <input type="text" id="comp-name" placeholder="Label / Name">
-                    <label>Category</label>
-                    <select id="comp-type" onchange="updateModeUI()">
-                        <option value="adc_pins">Analog (Knob/CV)</option>
-                        <option value="buttons">Button</option>
-                        <option value="encoders">Encoder (2-Pins)</option>
-                        <option value="joystick">Joystick (X/Y)</option>
-                        <option value="cny70">Sensor (CNY70 IR)</option> 
-                        <option value="leds">LED</option>
-                        <option value="gate_in">Gate In</option>
-                        <option value="gate_out">Gate Out</option>
-                    </select>
-                    <div id="mode-ui-container"></div>
-                    <button onclick="addComponent()">Add Component</button>
-                    <div id="error-msg" style="color: #ff4444; font-size: 11px; margin-top: 5px; height: 14px; font-weight: bold;"></div>
-                </div>
+                   <h3>Manual Entry</h3>
+    <label>Selected Pin: <span id="pin-display" style="color:var(--accent)">None</span></label>
+    <input type="text" id="comp-name" placeholder="Label / Name" style="margin-bottom: 10px;">
+    
+    <label>Category</label>
+    <select id="comp-type" onchange="updateModeUI()">
+        <option value="adc_pins">Analog (Knob/CV)</option>
+        <option value="buttons">Button</option>
+        <option value="encoders">Encoder (2-Pins)</option>
+        <option value="joystick">Joystick (X/Y)</option>
+        <option value="cny70">Sensor (CNY70 IR)</option> 
+        <option value="leds">LED</option>
+        <option value="gate_in">Gate In</option>
+        <option value="gate_out">Gate Out</option>
+    </select>
+
+    <div id="mode-ui-container" style="min-height: 70px; margin-top: 12px; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;">
+    </div>
+
+    <button onclick="addComponent()" style="margin-top: 15px; width: 100%;">Add Component</button>
+    
+    <div id="error-msg" style="color: #ff4444; font-size: 11px; margin-top: 8px; height: 14px; font-weight: bold;"></div>
+</div>
             </div>
 
             <div class="panel active-components-panel">
@@ -956,6 +976,8 @@ async function fetchBlogPosts() {
     }
 }
 
+
+
 function updateCategoryUI() {
     const container = document.getElementById('blog-categories');
     if (!container) return;
@@ -1191,7 +1213,7 @@ function showPage(id) {
             } else if (val === 'GND' || val === 'EN' || val === 'ADC_V') {
                 div.className = 'pin gnd-pin';
             } else {
-                div.className = 'pin gnd-pin'; // Catch-all for other non-GPIO/non-Power
+                div.className = 'pin gnd-pin'; 
             }
             div.innerText = val;
         }
@@ -1199,12 +1221,14 @@ function showPage(id) {
             });
             document.getElementById('pico-model').value = config.pico_board;
         }
+        
 
         function selectPin(val) {
             selectedPin = val;
             document.querySelectorAll('.pin').forEach(p => p.classList.remove('active'));
             document.getElementById(`pin-${val}`)?.classList.add('active');
             document.getElementById('pin-display').innerText = `GP${val}`;
+
         }
 
         function loadJSON(event) {
@@ -1220,7 +1244,7 @@ function showPage(id) {
             reader.readAsText(file);
         }
 
-    function handlePDUpload(event) {
+function handlePDUpload(event) {
         
     const file = event.target.files[0];
     const reader = new FileReader();
@@ -1259,20 +1283,88 @@ function showPage(id) {
 
     reader.readAsText(file);
 }
-        function autoFillAndAdd(val) {
-            document.getElementById('comp-name').value = val;
-            const typeSelect = document.getElementById('comp-type');
-            const v = val.toLowerCase();
-            if (v.includes('knob') || v.includes('pot') || v.includes('cv')) typeSelect.value = "adc_pins";
-            else if (v.includes('btn') || v.includes('sw')) typeSelect.value = "buttons";
-            else if (v.includes('led')) typeSelect.value = "leds";
-            else if (v.includes('enc')) typeSelect.value = "encoders";
-            else if (v.includes('gate_out')) typeSelect.value = "gate_out";
-            else if (v.includes('gate_in')) typeSelect.value = "gate_in";
-            updateModeUI(); addComponent();
-        }
 
-      function isNameDuplicate(newName) {
+function saveSettingsAsDefault() {
+    const defaults = {
+        // System Settings
+        pico_board: config.pico_board,
+        audio_mode: config.audio_mode,
+        sample_rate: config.sample_rate,
+        midi_mode: config.midi_mode,
+        // Component Layout (Optional: remove if you only want to save system settings)
+        inputs: JSON.parse(JSON.stringify(config.inputs)),
+        outputs: JSON.parse(JSON.stringify(config.outputs)),
+        leds: JSON.parse(JSON.stringify(config.leds))
+    };
+    
+    localStorage.setItem('piko_defaults', JSON.stringify(defaults));
+    
+    const btn = document.getElementById('save-defaults-btn');
+    if (btn) {
+        btn.innerText = "LAYOUT SAVED!";
+        btn.style.background = "var(--accent)";
+        btn.style.color = "#000";
+        setTimeout(() => {
+            btn.innerText = "SAVE CURRENT AS DEFAULT";
+            btn.style.background = "";
+            btn.style.color = "";
+        }, 1500);
+    }
+}
+
+
+function clearConfig() {
+    if (!confirm("Are you sure you want to clear all components?")) return;
+
+    config.inputs = {
+        adc_pins: [],
+        buttons: [],
+        gate_in: [],
+        encoders: [],
+        joystick: [],
+        sensors: { cny70: [] }
+    };
+    config.outputs = { gate_out: [] };
+    config.leds = [];
+    selectedPin = null;
+    document.getElementById('pin-display').innerText = "None";
+
+    refreshUI(); 
+}
+
+
+function getPinColor(pinNumber) {
+    const pinEl = document.getElementById(`pin-${pinNumber}`);
+    if (!pinEl) return 'var(--accent)'; // fallback
+    return window.getComputedStyle(pinEl).backgroundColor;
+}
+
+
+function autoFillAndAdd(val) {
+    const nameInput = document.getElementById('comp-name');
+    const typeSelect = document.getElementById('comp-type');
+    
+    nameInput.value = val;
+    const v = val.toLowerCase();
+
+    // Mapping logic
+    if (v.includes('knob') || v.includes('pot') || v.includes('cv')) typeSelect.value = "adc_pins";
+    else if (v.includes('btn') || v.includes('sw') || v.includes('switch')) typeSelect.value = "buttons";
+    else if (v.includes('led')) typeSelect.value = "leds";
+    else if (v.includes('enc')) typeSelect.value = "encoders";
+    else if (v.includes('gate_out')) typeSelect.value = "gate_out";
+    else if (v.includes('gate_in')) typeSelect.value = "gate_in";
+
+    // 1. Update the UI for the new category
+    updateModeUI();
+
+    // 2. Wait a split second for the DOM to catch up, then add
+    setTimeout(() => {
+        addComponent();
+    }, 10); 
+}
+
+function isNameDuplicate(newName) {
     if (!newName) return false;
     
     const categories = [
@@ -1289,7 +1381,8 @@ function showPage(id) {
     );
 }
 
-   function addComponent() {
+
+function addComponent() {
     const errorEl = document.getElementById('error-msg');
     const type = document.getElementById('comp-type').value;
     const name = document.getElementById('comp-name').value.trim() || `${type}_${selectedPin}`;
@@ -1395,15 +1488,101 @@ function showPage(id) {
     }
 }
 
-        function updateCompPin(cat, idx, newPin) {
-            newPin = parseInt(newPin);
-            removeCompByPin(newPin);
-            if (cat === 'leds') config.leds[idx].pin = newPin;
-            else if (cat === 'gate_out') config.outputs.gate_out[idx].pin = newPin;
-            else if (cat === 'encoders') { config.inputs.encoders[idx].pin_a = newPin; config.inputs.encoders[idx].pin_b = newPin+1; }
-            else config.inputs[cat][idx].pin = newPin;
-            refreshUI();
+function updateCompPin(cat, idx, newPin) {
+    newPin = parseInt(newPin);
+    removeCompByPin(newPin);
+    if (cat === 'leds') config.leds[idx].pin = newPin;
+    else if (cat === 'gate_out') config.outputs.gate_out[idx].pin = newPin;
+    else if (cat === 'encoders') { config.inputs.encoders[idx].pin_a = newPin; config.inputs.encoders[idx].pin_b = newPin+1; }
+    else config.inputs[cat][idx].pin = newPin;
+    refreshUI();
+}
+
+
+function renderLists() {
+    const containers = { 'list-inputs': [], 'list-outputs': [], 'list-leds': [] };
+
+    const createRow = (item, cat, i, curPin) => {
+        let pinList = config.pico_board === 'zero' 
+            ? [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26,27,28,29] 
+            : [0,1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28];
+
+        if (['adc_pins', 'cny70', 'joystick'].includes(cat)) pinList = [26, 27, 28, 29];
+        
+        const pinOptions = pinList.map(p => 
+            `<option value="${p}" ${p == curPin ? 'selected' : ''}>GP${p}</option>`
+        ).join('');
+        
+        let roleText = (item.type || item.mode || cat.replace('_pins', '')).toUpperCase();
+        if (cat === 'joystick') roleText = "JOYSTICK";
+        if (cat === 'cny70') roleText = "CNY70";
+
+        const pinEl = document.getElementById(`pin-${curPin}`);
+        let themeColor = '#444'; 
+
+        if (pinEl) {
+            if (pinEl.classList.contains('assigned-adc')) {
+                themeColor = 'var(--adc)';       // Orange
+            } else if (pinEl.classList.contains('assigned-input')) {
+                themeColor = 'var(--input-clr)'; // Green
+            } else if (pinEl.classList.contains('assigned-led')) {
+                themeColor = 'var(--led-clr)';   // Pink
+            } else if (pinEl.classList.contains('assigned-output')) {
+                themeColor = 'var(--pwr)';       // Red/Accent
+            } else if (pinEl.classList.contains('audio-reserved')) {
+                themeColor = '#9d00ff';          // Purple
+            }
         }
+
+        return `
+        <div class="comp-item" style="border-left: 5px solid ${themeColor}; padding: 8px 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 4px;">
+            <div class="comp-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <input type="text" value="${item.name}" 
+                       style="background:transparent; border:none; color:white; font-weight:bold; width: 80%;" 
+                       oninput="renameComp('${cat}', ${i}, this.value)">
+                <span class="del-btn" style="cursor:pointer; color:#ff4444; font-size: 14px;" onclick="removeComp('${cat}', ${i})">✕</span>
+            </div>
+            <div class="comp-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                <select style="flex: 1.2; background:#222; color:white; border:1px solid #444; border-radius: 3px; padding: 2px;" 
+                        onchange="updateCompPin('${cat}', ${i}, this.value)">
+                    ${pinOptions}
+                </select>
+                <span class="role-badge" style="background: ${themeColor}; color: #000; font-weight: bold; padding: 2px 6px; border-radius: 3px; font-size: 9px; min-width: 45px; text-align: center;">
+                    ${roleText}
+                </span>
+            </div>
+        </div>`;
+    };
+
+    const inputCategories = ['adc_pins', 'buttons', 'encoders', 'gate_in', 'joystick'];
+    inputCategories.forEach(key => {
+        if (config.inputs[key]) {
+            config.inputs[key].forEach((it, i) => {
+                const pin = it.pin ?? it.pin_a ?? it.joy_x;
+                containers['list-inputs'].push(createRow(it, key, i, pin));
+            });
+        }
+    });
+
+    if (config.inputs.sensors?.cny70) {
+        config.inputs.sensors.cny70.forEach((it, i) => {
+            containers['list-inputs'].push(createRow(it, 'cny70', i, it.adc_pin));
+        });
+    }
+
+    if (config.outputs?.gate_out) {
+        config.outputs.gate_out.forEach((it, i) => containers['list-outputs'].push(createRow(it, 'gate_out', i, it.pin)));
+    }
+    
+    if (config.leds) {
+        config.leds.forEach((it, i) => containers['list-leds'].push(createRow(it, 'leds', i, it.pin)));
+    }
+
+    for (const [id, html] of Object.entries(containers)) {
+        const target = document.getElementById(id);
+        if (target) target.innerHTML = html.join('');
+    }
+}
 
      
 function refreshUI() {
@@ -1471,56 +1650,13 @@ function refreshUI() {
     config.leds.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-led');
     });
+
+    setTimeout(() => {
+        renderLists();
+    }, 50);
 }
-      function renderLists() {
-    const containers = { 'list-inputs': [], 'list-outputs': [], 'list-leds': [] };
 
-    const createRow = (item, cat, i, curPin) => {
-        let pinList = config.pico_board === 'zero' 
-            ? [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26,27,28,29] 
-            : [0,1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28];
 
-        const pinOptions = pinList.map(p => `<option value="${p}" ${p == curPin ? 'selected' : ''}>GP${p}</option>`).join('');
-
-        if (['adc_pins', 'cny70', 'joystick'].includes(cat)) {
-        pinList = [26, 27, 28, 29];
-    }
-        
-        let roleText = (item.type || item.mode || cat.replace('_pins', '')).toUpperCase();
-        if (cat === 'joystick') roleText = "JOYSTICK";
-        if (cat === 'cny70') roleText = "CNY70";
-
-        return `<div class="comp-item">
-            <div class="comp-header">
-                <input type="text" value="${item.name}" oninput="renameComp('${cat}', ${i}, this.value)">
-                <span class="del-btn" onclick="removeComp('${cat}', ${i})">✕</span>
-            </div>
-            <div class="comp-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
-                <select style="flex: 1.2;" onchange="updateCompPin('${cat}', ${i}, this.value)">${pinOptions}</select>
-                <span class="role-badge">${roleText}</span>
-            </div>
-        </div>`;
-    };
-
-    config.inputs.adc_pins.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'adc_pins', i, it.pin)));
-    config.inputs.buttons.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'buttons', i, it.pin)));
-    config.inputs.encoders.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'encoders', i, it.pin_a)));
-    
-    if (config.inputs.joystick) {
-        config.inputs.joystick.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'joystick', i, it.joy_x)));
-    }
-    
-    if (config.inputs.sensors?.cny70) {
-        config.inputs.sensors.cny70.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'cny70', i, it.adc_pin)));
-    }
-
-    config.outputs.gate_out.forEach((it, i) => containers['list-outputs'].push(createRow(it, 'gate_out', i, it.pin)));
-    config.leds.forEach((it, i) => containers['list-leds'].push(createRow(it, 'leds', i, it.pin)));
-
-    for (const [id, html] of Object.entries(containers)) {
-        document.getElementById(id).innerHTML = html.join('');
-    }
-}
 
 function renameComp(cat, i, val) {
     if (cat === 'leds') {
@@ -1536,7 +1672,7 @@ function renameComp(cat, i, val) {
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
 }
 
-        function removeCompByPin(pinId) {
+function removeCompByPin(pinId) {
     const p = parseInt(pinId);
     if (isNaN(p)) return;
 
@@ -1575,7 +1711,7 @@ function renameComp(cat, i, val) {
 //     }
 // }
 
-// 2. Fix the Copy Error
+
 async function copyJson() {
     const jsonArea = document.getElementById('json-preview');
 
@@ -1627,7 +1763,6 @@ async function copyJson() {
 }
 
 
-
 function showCopySuccess(btn) {
     const originalText = btn.innerText;
     btn.innerText = "COPIED!";
@@ -1659,33 +1794,51 @@ function showCopySuccess(btn) {
     refreshUI();
 }
 
-       function updateModeUI() {
+function updateModeUI() {
     const type = document.getElementById('comp-type').value;
     const container = document.getElementById('mode-ui-container');
     let html = '';
 
-    if (type === "adc_pins") {
-        html = '<select id="comp-mode"><option value="knob">Knob</option><option value="cv_in">Cv_in</option></select>';
-    } else if (type === "buttons") {
-        html = '<select id="comp-mode"><option value="bang">Bang</option><option value="toggle">Toggle</option><option value="switch">Switch</option></select>';
-    } else if (type === "leds") {
-        html = '<select id="comp-mode"><option value="pd">Pd</option><option value="midi">Midi</option><option value="clock">Clock</option><option value="status">Status</option></select>';
+    // Logic for dynamic content
+    if (type === "leds") {
+        html = `
+            <select id="comp-mode" style="margin-bottom: 12px;">
+                <option value="pd">Pd</option>
+                <option value="midi">Midi</option>
+                <option value="clock">Clock</option>
+                <option value="status">Status</option>
+            </select>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">RGB</span>
+                <input type="checkbox" id="is-rgb-check" class="hw-checkbox">
+            </div>`;
     } else if (type === "joystick") {
         html = `
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                <label style="margin: 0;">MIDI Range (0-127)</label>
-                <input type="checkbox" id="joy-midi-check" checked style="width: auto; margin: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">MIDI Range (0-127)</span>
+                <input type="checkbox" id="joy-midi-check" class="hw-checkbox" checked>
             </div>`;
+    } else if (type === "buttons") {
+        html = '<select id="comp-mode"><option value="bang">Bang</option><option value="toggle">Toggle</option><option value="switch">Switch</option></select>';
+    } else if (type === "adc_pins") {
+        html = '<select id="comp-mode"><option value="knob">Knob</option><option value="cv_in">CV</option></select>';
+    } else if (type === "gate_out") {
+        html = '<select id="comp-mode"><option value="gate">Gate</option><option value="trigger">Trigger</option></select>';
     }
 
     container.innerHTML = html;
 }
-        function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('drag-target'); }
-        function clearDrop(e) { e.currentTarget.classList.remove('drag-target'); }
-        function handleDropToList(e, cat) { e.preventDefault(); clearDrop(e); const p = e.dataTransfer.getData("text/plain"); if(p) autoFillAndAdd(p); }
-        function downloadJSON() { const b = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${config.name}.json`; a.click(); }
 
-        initBoard(); updateModeUI(); refreshUI();
-    </script>
+function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('drag-target'); }
+
+function clearDrop(e) { e.currentTarget.classList.remove('drag-target'); }
+
+function handleDropToList(e, cat) { e.preventDefault(); clearDrop(e); const p = e.dataTransfer.getData("text/plain"); if(p) autoFillAndAdd(p); }
+
+function downloadJSON() { const b = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${config.name}.json`; a.click(); }
+
+initBoard(); updateModeUI(); refreshUI();
+
+</script>
 </body>
 </html>
