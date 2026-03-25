@@ -1810,10 +1810,8 @@ function refreshUI() {
     config.leds.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-led');
     });
-
-    setTimeout(() => {
         renderLists();
-    }, 50);
+ 
 }
 
 
