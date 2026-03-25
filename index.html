@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>pikoPD | Config tool DEMO</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -494,6 +494,95 @@
         .hw-checkbox:hover {
             border-color: #666;
         }
+
+        
+/* --- MOBILE SCREEN (@media) --- */
+    @media screen and (max-width: 1100px) {
+        .main-layout {
+            flex-direction: column !important;
+            align-items: center !important;
+            padding: 10px !important;
+            gap: 10px !important;
+        }
+    
+        .board-container {
+            position: relative !important; 
+            top: 0 !important;
+            transform: scale(0.85); 
+            transform-origin: center top;
+            margin-bottom: -40px !important; 
+            width: fit-content !important;
+            flex-shrink: 1 !important;
+        }
+    
+        .config-area {
+            display: flex !important;
+            flex-direction: column !important; 
+            width: 100% !important;
+            gap: 15px !important;
+        }
+    
+     
+        .panel, 
+        .settings-column, 
+        .json-panel, 
+        .active-components-panel,
+        .top-row-tools {
+            width: 100% !important;
+            max-width: 100% !important;
+            grid-column: span 1 !important; 
+            box-sizing: border-box !important;
+        }
+    
+        .comp-groups {
+            grid-template-columns: 1fr !important; 
+            gap: 10px !important;
+        }
+    
+        .group-box {
+            height: auto !important; 
+            min-height: 150px;
+        }
+    
+       
+        #json-preview {
+            height: 250px !important;
+            font-size: 10px !important;
+        }
+    
+      
+        select, 
+        input[type="text"], 
+        button {
+            height: 44px !important; 
+            font-size: 16px !important; 
+        }
+    
+        .pin {
+            width: 40px !important; 
+            height: 24px !important;
+        }
+    
+        .board-pico {
+            column-gap: 80px !important; 
+        }
+    }
+    
+    @media screen and (max-width: 480px) {
+        .board-container {
+            transform: scale(0.7);
+            margin-bottom: -100px !important;
+        }
+        
+        nav {
+            gap: 10px;
+            padding: 10px 0;
+        }
+        
+        nav a {
+            font-size: 10px;
+        }
+    }
     
     </style>
 </head>
