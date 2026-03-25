@@ -12,65 +12,61 @@
             --input-clr: #4caf50; --output-clr: #2196f3; --led-clr: #e91e63;
             --gpio-default: #ffd54f;
         }
+
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
         
-    nav {
-        background: #000;
-        width: 100%;
-        padding: 15px 0;
-        display: flex;
-        justify-content: center;
-        gap: 30px;
-        border-bottom: 2px solid #333; 
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-    }        nav a { color: #888; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
-            nav a:hover, nav a.active { color: var(--accent); }
+        nav {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            border-bottom: 2px solid #333; 
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }        nav a { color: #888; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+                nav a:hover, nav a.active { color: var(--accent); }
 
-    .page {
-        display: none; 
-        width: 100%;
-        padding: 30px 40px 40px 40px; 
-        box-sizing: border-box;
-    }
+        .page {
+            display: none; width: 100%; padding: 30px 40px 40px 40px; box-sizing: border-box;}
 
+        .page.active {display: block; }
 
-    .page.active {
-        display: block; 
-    }
+        .main-layout { 
+            display: flex; 
+            flex-direction: row; 
+            gap: 30px; 
+            width: 100%; 
+            max-width: 1600px; 
+            margin: 0 auto;    
+            align-items: flex-start; 
+        }
 
-    .main-layout { 
-        display: flex; 
-        flex-direction: row; 
-        gap: 30px; 
-        width: 100%; 
-        max-width: 1600px; 
-        margin: 0 auto;    
-        align-items: flex-start; 
-    }
+        .board-container { 
+            flex-shrink: 0; 
+            background: #004d40; 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 4px solid #00332a; 
+            display: grid; 
+            gap: 4px; 
+            position: sticky; 
+            top: 80px; 
+            align-self: stretch;     
+            margin-left: 0; 
+        }
 
-    .board-container { 
-        flex-shrink: 0; 
-        background: #004d40; 
-        padding: 15px; 
-        border-radius: 12px; 
-        border: 4px solid #00332a; 
-        display: grid; 
-        gap: 4px; 
-        position: sticky; 
-        top: 80px; 
-        align-self: stretch;     
-        margin-left: 0; 
-    }
-            .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
-    .board-zero { 
-        display: grid !important;
-        grid-template-columns: repeat(7, 45px) !important; 
-        gap: 8px; 
-        width: fit-content;
-        padding: 25px;
-    }
+        .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
+
+        .board-zero { 
+            display: grid !important;
+            grid-template-columns: repeat(7, 45px) !important; 
+            gap: 8px; 
+            width: fit-content;
+            padding: 25px;
+        }
 
         .pin { width: 45px; height: 26px; background: var(--gpio-default); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #333; font-weight: bold; transition: 0.1s; border: 1px solid rgba(0,0,0,0.1); }
         .pin.spacer { visibility: hidden; pointer-events: none; }
@@ -82,7 +78,7 @@
         .pin.audio-reserved { background: var(--audio-res) !important; color: #fff !important; border: 2px solid #fff; }
         .pin.gnd-pin { background: var(--gnd); color: white; cursor: default; }
         .pin.pwr-pin { background: var(--pwr); color: white; cursor: default; }
-        
+            
         .main-layout { display: flex; gap: 30px; width: 100%; max-width: 1600px; margin: 0 auto; align-items: flex-start; }
 
         .config-area { 
@@ -93,440 +89,397 @@
             align-items: stretch; 
         }
 
-        .panel { 
-            background: var(--panel); padding: 20px; border-radius: 8px; 
-            border: 1px solid #333; display: flex; flex-direction: column; 
-        }
+        .panel { background: var(--panel); padding: 20px; border-radius: 8px; border: 1px solid #333; display: flex; flex-direction: column; }
 
         h3 { margin: 0 0 15px 0; border-bottom: 1px solid #444; padding-bottom: 5px; color: var(--accent); font-size: 14px; text-transform: uppercase; }
 
         .top-row-tools { grid-column: span 2; display: flex; gap: 20px; }
+
         .top-row-tools .panel { flex: 1; }
 
-        .active-components-panel {
-            grid-column: span 2;
-            grid-row: 2;
+        .active-components-panel { grid-column: span 2; grid-row: 2; display: flex; flex-direction: column;}
+
+            /* Analog / ADC = Orange */
+            .pin.assigned-adc { 
+                background: var(--adc) !important; 
+                color: #000 !important; 
+            }
+            
+            /* Digital Inputs (Buttons) = Green */
+            .pin.assigned-input { 
+                background: var(--input-clr) !important; 
+                color: #fff !important; 
+            }
+            
+            /* LEDs = Pink/Red */
+            .pin.assigned-led { 
+                background: var(--led-clr) !important; 
+                color: #fff !important; 
+            }
+        
+        .comp-groups {display: flex; gap: 15px; flex: 1; align-items: stretch;}
+        
+        .group-box {
+            flex: 1; 
+            background: #111; 
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
         }
-
         
-        /* Analog / ADC = Orange */
-        .pin.assigned-adc { 
-            background: var(--adc) !important; 
-            color: #000 !important; 
+        .group-box h4 {
+            margin: 0 0 10px 0;
+            font-size: 10px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #222;
+            padding-bottom: 5px;
         }
         
-        /* Digital Inputs (Buttons) = Green */
-        .pin.assigned-input { 
-            background: var(--input-clr) !important; 
-            color: #fff !important; 
+        .comp-list {flex: 1; min-height: 100px; overflow-y: auto;}
+               
+        .settings-column {
+            grid-column: 3; grid-row: 1 / span 2;
+            display: flex; flex-direction: column; gap: 20px;
         }
-        
-        /* LEDs = Pink/Red */
-        .pin.assigned-led { 
-            background: var(--led-clr) !important; 
-            color: #fff !important; 
-        }
-    
 
-    .comp-groups {
-        display: flex;
-        gap: 15px;
-        flex: 1;
-        align-items: stretch;
-    }
+        .settings-column .panel { flex: 1; }
     
- 
-    .group-box {
-        flex: 1; 
-        background: #111; 
-        border: 1px solid #333;
-        border-radius: 6px;
-        padding: 12px;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .group-box h4 {
-        margin: 0 0 10px 0;
-        font-size: 10px;
-        color: var(--accent);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        border-bottom: 1px solid #222;
-        padding-bottom: 5px;
-    }
-    
-    .comp-list {
-        flex: 1;
-        min-height: 100px;
-        overflow-y: auto;
-    }        
-            .settings-column {
-                grid-column: 3; grid-row: 1 / span 2;
-                display: flex; flex-direction: column; gap: 20px;
-            }
-
-            .settings-column .panel { flex: 1; }
-    
-            .json-panel { grid-column: 4; grid-row: 1 / span 2; }
-    
-            .comp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-grow: 1; }
+        .comp-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; flex-grow: 1; }
             
-            .group-box {
+        .group-box {
                 background: #151515; border: 1px solid #222; padding: 12px;
                 height: 400px; overflow-y: auto; overflow-x: hidden;
                 display: flex; flex-direction: column; align-items: center;
-            }
+        }
     
-            .comp-item { 
+        .comp-item { 
                 width: 100%; box-sizing: border-box; padding: 8px; 
                 background: #222; border-radius: 4px; margin-bottom: 8px;
                 font-size: 11px; border-left: 4px solid var(--accent); 
-            }
-    
-            #json-preview {
+        }
+
+        .json-panel { grid-column: 4; grid-row: 1 / span 2; }
+
+        #json-preview {
                 background: #000; color: var(--accent); padding: 15px; flex-grow: 1;
                 font-size: 11px; border: 1px solid #333; border-radius: 6px;
                 overflow-y: auto; white-space: pre-wrap; margin: 10px 0;
-            }
+        }
     
-            select, input[type="text"], input[type="number"] { 
-                width: 100%; padding: 6px; background: #2d2d2d; border: 1px solid #444; 
-                color: white; border-radius: 4px; font-size: 11px; margin-bottom: 10px; 
-            }
+        select, input[type="text"], input[type="number"] { 
+            width: 100%; padding: 6px; background: #2d2d2d; border: 1px solid #444; 
+             color: white; border-radius: 4px; font-size: 11px; margin-bottom: 10px; 
+        }
     
-            .compact-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-            .compact-row label { margin: 0; }
-            label { font-size: 10px; color: #888; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .compact-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .compact-row label { margin: 0; }
+        label { font-size: 10px; color: #888; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 4px; }
     
-            button { 
-                background: var(--accent); border: none; padding: 12px; border-radius: 4px; 
-                font-weight: bold; cursor: pointer; transition: 0.2s; 
-            }
-            button:hover { opacity: 0.8; }
+        button { 
+            background: var(--accent); border: none; padding: 12px; border-radius: 4px; 
+            font-weight: bold; cursor: pointer; transition: 0.2s; 
+        }
+
+        button:hover { opacity: 0.8; }
     
-            /* --- Custom Scrollbar --- */
-            ::-webkit-scrollbar { width: 5px; }
-            ::-webkit-scrollbar-track { background: #0a0a0a; }
-            ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-            ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
     
     
-            .comp-item { display: flex; flex-direction: column; padding: 8px; border-radius: 4px; margin-bottom: 8px; background: #222; font-size: 11px; border-left: 4px solid #444; }
-            .comp-item input { background: transparent; border: none; color: var(--accent); font-weight: bold; margin-bottom: 4px; padding: 2px; width: 80%; font-size: 12px; }
-            .comp-header { display: flex; justify-content: space-between; align-items: center; }
-            .group-box.drag-target { border: 1px dashed var(--accent); background: #1a2a1a; }
+        .comp-item { display: flex; flex-direction: column; padding: 8px; border-radius: 4px; margin-bottom: 8px; background: #222; font-size: 11px; border-left: 4px solid #444; }
+        .comp-item input { background: transparent; border: none; color: var(--accent); font-weight: bold; margin-bottom: 4px; padding: 2px; width: 80%; font-size: 12px; }
+        .comp-header { display: flex; justify-content: space-between; align-items: center; }
+        .group-box.drag-target { border: 1px dashed var(--accent); background: #1a2a1a; }
     
-            pre { background: #000; padding: 15px; border-radius: 6px; font-size: 11px; color: #00ff00; height: 320px; overflow-y: auto; border: 1px solid #333; margin: 0; }
-            .del-btn { color: #ff5555; cursor: pointer; font-weight: bold; padding: 4px; }
-            button { background: var(--accent); border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; color: #000; transition: 0.2s; }
-            select, input { width: 100%; padding: 4px; background: #2d2d2d; border: 1px solid #444; color: white; border-radius: 4px; font-size: 11px; margin-bottom: 5px; box-sizing: border-box; }
-            label { display: block; font-size: 10px; color: #888; margin-bottom: 4px; font-weight: bold; }
+        pre { background: #000; padding: 15px; border-radius: 6px; font-size: 11px; color: #00ff00; height: 320px; overflow-y: auto; border: 1px solid #333; margin: 0; }
+        .del-btn { color: #ff5555; cursor: pointer; font-weight: bold; padding: 4px; }
+        button { background: var(--accent); border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; color: #000; transition: 0.2s; }
+        select, input { width: 100%; padding: 4px; background: #2d2d2d; border: 1px solid #444; color: white; border-radius: 4px; font-size: 11px; margin-bottom: 5px; box-sizing: border-box; }
+        label { display: block; font-size: 10px; color: #888; margin-bottom: 4px; font-weight: bold; }
             
-            .pd-tag { display: inline-block; background: #333; color: var(--accent); padding: 5px 12px; border-radius: 15px; font-size: 11px; margin: 3px; cursor: grab; border: 1px solid #444; user-select: none; }
+        .pd-tag { display: inline-block; background: #333; color: var(--accent); padding: 5px 12px; border-radius: 15px; font-size: 11px; margin: 3px; cursor: grab; border: 1px solid #444; user-select: none; }
             
-            .content-wrap { max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        .content-wrap { max-width: 800px; margin: 0 auto; line-height: 1.6; }
            
-        #blog-container {
-        flex: 1;
-        margin-top: 15px;
-        padding-bottom: 80vh;
-    }
-         .blog-post { 
-        scroll-margin-top: 80px; 
-        border-bottom: 1px solid #333; 
-        padding-bottom: 20px; 
-        margin-bottom: 20px; 
-    }
-            .blog-post h2 { color: var(--accent); margin-bottom: 5px; }
-            .date { font-size: 11px; color: #666; font-weight: bold; }
-    
-       #markdown-viewer h1, #markdown-viewer h2 {
-        color: var(--accent);
-        margin-top: 30px;
-    }
-    
-    #markdown-viewer h3 {
-        color: #fff;
-        border-bottom: 1px solid #333;
-        padding-bottom: 5px;
-    }
-    
-    #markdown-viewer :not(pre) > code {
-        background: #1a1a1a;
-        color: var(--accent);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
-        font-size: 0.9em;
-    }
-    
-    #markdown-viewer pre {
-        background: #000;
-        border: 1px solid #444;
-        padding: 15px;
-        border-radius: 8px;
-        overflow-x: auto;
-        height: auto !important; 
-        margin: 15px 0;
-    }
-    
+        #blog-container {flex: 1; margin-top: 15px; padding-bottom: 80vh;}
 
-    #markdown-viewer pre code {
-        background: transparent;
-        padding: 0;
-        color: #00ff88; 
-        font-size: 12px;
-        border: none;
-    }
+        .blog-post { scroll-margin-top: 80px; border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+
+        .blog-post h2 { color: var(--accent); margin-bottom: 5px; }
+
+        .date { font-size: 11px; color: #666; font-weight: bold; }
     
-    #markdown-viewer table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 20px 0;
-    }
+        #markdown-viewer h1, #markdown-viewer h2 {color: var(--accent); margin-top: 30px;}
     
-    #markdown-viewer th, #markdown-viewer td {
-        padding: 10px;
-        border: 1px solid #333;
-        text-align: left;
-        font-size: 13px;
-    }
+        #markdown-viewer h3 {color: #fff; border-bottom: 1px solid #333; padding-bottom: 5px;}
     
-    #markdown-viewer th {
-        background: #222;
-        color: var(--accent);
-    }
-    
-    .date { 
-        font-size: 12px; /* Smaller date */
-        color: var(--adc); 
-        font-weight: bold; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        width: 100%;
-        margin-bottom: 10px;
-    }
-    
-    
-    .date .pd-tag { 
-        font-size: 9px; /* Smaller tags */
-        padding: 2px 6px; 
-        margin-left: 5px;
-        height: fit-content;
-        text-transform: uppercase;
-    }
-    #blog-calendar {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 5px;
-        text-align: center;
+        #markdown-viewer :not(pre) > code {background: #1a1a1a; color: var(--accent); padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em;}
         
-    }
-    .cal-day {
-        font-size: 10px;
-        padding: 8px 0;
-        background: #151515;
-        border-radius: 4px;
-        color: #555;
-    }
-    .cal-day.has-post {
-        background: var(--accent);
-        color: #000;
-        font-weight: bold;
-        cursor: pointer;
-    }
-    .cal-header {
-        font-size: 9px;
-        color: var(--adc);
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
+        #markdown-viewer pre {
+            background: #000;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            height: auto !important; 
+            margin: 15px 0;
+        }
     
-    
-    
-    .index-year-header {
-        font-size: 14px;
-        color: var(--accent);
-        font-weight: bold;
-        margin-top: 15px;
-        border-bottom: 1px solid #444;
-        padding-bottom: 3px;
-    }
-    
-    .index-month-header {
-        font-size: 9px;
-        color: var(--adc);
-        letter-spacing: 1.5px;
-        margin: 10px 0 5px 5px;
-        font-weight: bold;
-    }
-    
-    .title-link-item {
-        padding: 6px 10px;
-        font-size: 11px;
-        color: #bbb;
-        cursor: pointer;
-        border-left: 1px solid #333;
-        margin-left: 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        transition: 0.1s;
-    }
-    
-    .title-link-item:hover {
-        color: white;
-        border-left: 2px solid var(--accent);
-        background: rgba(255,255,255,0.05);
-        padding-left: 12px;
-    }
-    
-    .side-column, #blog-title-list { 
-        scrollbar-width: none; 
-    }
-    .side-column::-webkit-scrollbar, #blog-title-list::-webkit-scrollbar { 
-        display: none; 
-    }
-    
-    
-    #docs-index-list .title-link-item {
-        padding: 4px 8px;
-        border-left: 1px solid #333;
-        margin-bottom: 2px;
-        cursor: pointer;
-        transition: 0.1s;
-    }
-    
-    #docs-index-list .title-link-item:hover {
-        border-left: 2px solid var(--accent);
-        color: white;
-        background: rgba(255,255,255,0.05);
-    }
-    
-    #docs-index-list {
-        scrollbar-width: none;
-    }
-    #docs-index-list::-webkit-scrollbar {
-        display: none;
-    }
-    
-    .link-card {
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        border: 1px solid #333 !important; /* Force border to show */
-        position: relative;
-        top: 0;
-    }
-    
-    .link-card:hover {
-        top: -5px; /* Physical lift */
-        border-color: var(--accent) !important;
-        background: #252525 !important;
-        box-shadow: 0 10px 20px rgba(0, 255, 136, 0.1);
-    }
-    
-    .contact-item {
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border: 1px solid #222 !important;
-    }
-    
-    .contact-item:hover {
-        border-color: var(--accent) !important;
-        background: #1a1a1a !important;
-    }
-
+        #markdown-viewer pre code {
+            background: transparent;
+            padding: 0;
+            color: #00ff88; 
+            font-size: 12px;
+            border: none;
+        }
         
-    .card-thumb-wrap {
-        height: 140px; 
-        width: 100%;
-        background: #151515; 
-        border-radius: 4px; 
-        margin-bottom: 12px; 
-        overflow: hidden; 
-        position: relative;
-        border: 1px solid #333;
-    }
-    
+        #markdown-viewer table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        #markdown-viewer th, #markdown-viewer td {
+            padding: 10px;
+            border: 1px solid #333;
+            text-align: left;
+            font-size: 13px;
+        }
+        
+        #markdown-viewer th {
+            background: #222;
+            color: var(--accent);
+        }
+        
+        .date { 
+            font-size: 12px; 
+            color: var(--adc); 
+            font-weight: bold; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .date .pd-tag { 
+            font-size: 9px; 
+            padding: 2px 6px; 
+            margin-left: 5px;
+            height: fit-content;
+            text-transform: uppercase;
+        }
 
-    .card-img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover; 
-        display: block;
-        transition: transform 0.4s ease-in-out; /* The zoom speed */
-    }
-    
+        #blog-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+            
+        }
 
-    .link-card:hover .card-img {
-        transform: scale(1.15); /* Grows by 15% */
-    }
-    
+        .cal-day {
+            font-size: 10px;
+            padding: 8px 0;
+            background: #151515;
+            border-radius: 4px;
+            color: #555;
+        }
 
-    .link-card {
-        cursor: pointer;
-        transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-    
-    .link-card:hover {
-        transform: translateY(-5px); 
-        border-color: var(--accent) !important;
-    }
-    
-    
-    .role-badge {
-        font-size: 10px;      
-        font-weight: 500;      
-        color: #666;           
-        background: none;     
-        padding: 0;           
-        border: none;        
-        text-transform: uppercase;
-        letter-spacing: 0.8px; 
-        white-space: nowrap;
-        opacity: 0.8;
-    }
-    
-    .hw-checkbox {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 14px;
-        height: 14px;
-        background: #111;          
-        border: 1px solid #444;    
-        border-radius: 2px;
-        cursor: pointer;
-        position: relative;
-        transition: all 0.2s ease;
-        margin: 0;
-    }
-    
-    .hw-checkbox:checked {
-        background: var(--accent); 
-        border-color: var(--accent);
-    }
-    
-    .hw-checkbox:checked::after {
-        content: '';
-        position: absolute;
-        left: 4px;
-        top: 1px;
-        width: 3px;
-        height: 7px;
-        border: solid #000; 
-        border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
-    }
-    
-    .hw-checkbox:hover {
-        border-color: #666;
-    }
-    
+        .cal-day.has-post {
+            background: var(--accent);
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
+        .cal-header {
+            font-size: 9px;
+            color: var(--adc);
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .index-year-header {
+            font-size: 14px;
+            color: var(--accent);
+            font-weight: bold;
+            margin-top: 15px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 3px;
+        }
+    
+        .index-month-header {
+            font-size: 9px;
+            color: var(--adc);
+            letter-spacing: 1.5px;
+            margin: 10px 0 5px 5px;
+            font-weight: bold;
+        }
+        
+        .title-link-item {
+            padding: 6px 10px;
+            font-size: 11px;
+            color: #bbb;
+            cursor: pointer;
+            border-left: 1px solid #333;
+            margin-left: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: 0.1s;
+        }
+        
+        .title-link-item:hover {
+            color: white;
+            border-left: 2px solid var(--accent);
+            background: rgba(255,255,255,0.05);
+            padding-left: 12px;
+        }
+        
+        .side-column, #blog-title-list { 
+            scrollbar-width: none; 
+        }
+
+        .side-column::-webkit-scrollbar, #blog-title-list::-webkit-scrollbar { 
+            display: none; 
+        }
+        
+        #docs-index-list .title-link-item {
+            padding: 4px 8px;
+            border-left: 1px solid #333;
+            margin-bottom: 2px;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        
+        #docs-index-list .title-link-item:hover {
+            border-left: 2px solid var(--accent);
+            color: white;
+            background: rgba(255,255,255,0.05);
+        }
+        
+        #docs-index-list {
+            scrollbar-width: none;
+        }
+
+        #docs-index-list::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .link-card {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #333 !important; 
+            position: relative;
+            top: 0;
+        }
+        
+        .link-card:hover {
+            top: -5px; 
+            border-color: var(--accent) !important;
+            background: #252525 !important;
+            box-shadow: 0 10px 20px rgba(0, 255, 136, 0.1);
+        }
+        
+        .contact-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #222 !important;
+        }
+        
+        .contact-item:hover {
+            border-color: var(--accent) !important;
+            background: #1a1a1a !important;
+        }
+            
+        .card-thumb-wrap {
+            height: 140px; 
+            width: 100%;
+            background: #151515; 
+            border-radius: 4px; 
+            margin-bottom: 12px; 
+            overflow: hidden; 
+            position: relative;
+            border: 1px solid #333;
+        }
+        
+        .card-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; 
+            display: block;
+            transition: transform 0.4s ease-in-out; 
+        }
+        
+        .link-card:hover .card-img {
+            transform: scale(1.15); 
+        }
+
+        .link-card {
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        
+        .link-card:hover {
+            transform: translateY(-5px); 
+            border-color: var(--accent) !important;
+        }
+        
+        .role-badge {
+            font-size: 10px;      
+            font-weight: 500;      
+            color: #666;           
+            background: none;     
+            padding: 0;           
+            border: none;        
+            text-transform: uppercase;
+            letter-spacing: 0.8px; 
+            white-space: nowrap;
+            opacity: 0.8;
+        }
+        
+        .hw-checkbox {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #111;          
+            border: 1px solid #444;    
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+            margin: 0;
+        }
+        
+        .hw-checkbox:checked {
+            background: var(--accent); 
+            border-color: var(--accent);
+        }
+        
+        .hw-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 3px;
+            height: 7px;
+            border: solid #000; 
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        
+        .hw-checkbox:hover {
+            border-color: #666;
+        }
+    
     </style>
 </head>
 <body>
@@ -915,15 +868,12 @@ async function fetchGitHubManual() {
     }
 }
 
-// Switch this to 'true' when working locally, 'false' when uploading to GitHub
-const IS_LOCAL_TEST = true; 
+const IS_LOCAL_TEST = false; 
 let blogLoaded = false;
-// --- GLOBAL STATE ---
 let blogPostsData = []; 
 let currentViewDate = new Date();
 let currentFilter = 'all';
 
-// --- 1. DATA FETCHING ---
 async function fetchBlogPosts() {
     const container = document.getElementById('blog-container');
     if (!container) return;
@@ -991,7 +941,6 @@ async function fetchBlogPosts() {
 
         container.replaceChildren(...temp.childNodes);
 
-        // UI updates AFTER render
         updateCategoryUI();
         updateTitleIndex(blogPostsData);
 
@@ -1007,7 +956,6 @@ async function fetchBlogPosts() {
     }
 }
 
-// --- 3. UI COMPONENTS ---
 function updateCategoryUI() {
     const container = document.getElementById('blog-categories');
     if (!container) return;
@@ -1017,7 +965,6 @@ function updateCategoryUI() {
 
     container.innerHTML = '';
 
-    // Create "ALL" toggle
     const allBtn = document.createElement('span');
     allBtn.className = 'pd-tag';
     allBtn.innerText = 'ALL';
@@ -1026,7 +973,6 @@ function updateCategoryUI() {
     allBtn.onclick = () => filterByCategory('all');
     container.appendChild(allBtn);
 
-    // Create Dynamic Tags
     allTags.forEach(tag => {
         const span = document.createElement('span');
         span.className = 'pd-tag';
@@ -1068,7 +1014,6 @@ function renderCalendar(viewDate) {
     for(let d=1; d<=daysInMonth; d++) {
         const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         
-        // Highlight logic: only highlight if post exists AND matches current filter
         const hasPost = blogPostsData.some(p => {
             const dateMatch = p.date === dateStr;
             const filterMatch = (currentFilter === 'all' || p.tags.includes(currentFilter));
@@ -1118,7 +1063,6 @@ function updateTitleIndex(posts) {
         archive[year][month].push(post);
     });
 
-    // 2. Build the HTML structure
     for (const year in archive) {
         // Year Header
         const yearHeader = document.createElement('div');
@@ -1145,27 +1089,22 @@ function updateTitleIndex(posts) {
     }
 }
 
-// Navigation Helper
 function showPage(id) {
-    // 1. Hide all pages using the .page class
     document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
-        p.style.display = 'none'; // Force hide
+        p.style.display = 'none';
     });
 
-    // 2. Show the selected page
     const targetPage = document.getElementById(id);
     if (targetPage) {
         targetPage.classList.add('active');
-        targetPage.style.display = 'block'; // Force show
+        targetPage.style.display = 'block'; 
     }
 
-    // 3. Reset all Navigation Highlights
     document.querySelectorAll('nav a').forEach(a => {
         a.classList.remove('active');
     });
     
-    // 4. Match the ID: 'config-page' -> 'nav-config'
     const navId = 'nav-' + id.replace('-page', '');
     const activeNavLink = document.getElementById(navId);
     if (activeNavLink) {
@@ -1212,15 +1151,15 @@ function showPage(id) {
 
         const picoPins = [0, "VBUS", 1, "VSYS", "GND", "GND", 2, "EN", 3, "3V3", 4, "ADC_V", 5, 28, "GND", "GND", 6, 27, 7, 26, 8, "GND", 9, 22, "GND", "GND", 10, 21, 11, 20, 12, 19, 13, 18, "GND", "GND", 14, 17, 15, 16];
         const zeroPins = [
-            "5V",  null, null, null, null, null, 0,    // Row 1
-            "GND", null, null, null, null, null, 1,    // Row 2
-            "3V3", null, null, null, null, null, 2,    // Row 3
-            29,    null, null, null, null, null, 3,    // Row 4
-            28,    null, null, null, null, null, 4,    // Row 5
-            27,    null, null, null, null, null, 5,    // Row 6
-            26,    null, null, null, null, null, 6,    // Row 7
-            15,    null, null, null, null, null, 7,    // Row 8
-            14,    13,   12,   11,   10,   9,    8     // Row 9: 14 under 15, 8 under 7
+            "5V",  null, null, null, null, null, 0,    
+            "GND", null, null, null, null, null, 1,   
+            "3V3", null, null, null, null, null, 2,    
+            29,    null, null, null, null, null, 3,    
+            28,    null, null, null, null, null, 4,    
+            27,    null, null, null, null, null, 5,    
+            26,    null, null, null, null, null, 6,    
+            15,    null, null, null, null, null, 7,    
+            14,    13,   12,   11,   10,   9,    8     
         ];
 
         let selectedPin = null;
@@ -1297,23 +1236,18 @@ function showPage(id) {
             if (!parameters.includes(m[1])) parameters.push(m[1]);
         }
 
-        // 2. Strict Voice Counting
-        // Finds: obj [x] [y] r NOTE[any digit]
-        // This ignores 'notein' and text comments.
+       
         const noteRxRegex = /obj\s+\d+\s+\d+\s+r\s+NOTE\d+/g;
         const noteMatches = content.match(noteRxRegex);
         
-        // 3. Set Voice Count: Use count if found, otherwise exactly 1
         const voiceCount = noteMatches ? noteMatches.length : 1;
 
-        // 4. Update Config and UI
         config.voice_count = voiceCount;
         config.name = file.name.split('.').slice(0, -1).join('.');
 
         document.getElementById('patch-name').value = config.name;
         document.getElementById('voice-count').value = voiceCount;
 
-        // 5. Render Draggable Tags
         document.getElementById('pd-found-tags').innerHTML = parameters.map(p => 
             `<span class="pd-tag" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${p}')">${p}</span>`
         ).join('');
@@ -1341,7 +1275,6 @@ function showPage(id) {
       function isNameDuplicate(newName) {
     if (!newName) return false;
     
-    // Gather all names from all possible categories
     const categories = [
         ...config.inputs.adc_pins,
         ...config.inputs.buttons,
@@ -1351,7 +1284,6 @@ function showPage(id) {
         ...config.leds
     ];
 
-    // Check if any object in that list has the same name
     return categories.some(item => 
         item.name && item.name.toLowerCase() === newName.toLowerCase()
     );
@@ -1383,7 +1315,6 @@ function showPage(id) {
         return;
     }
 
-    // 1. Logic & Data Assignment
     try {
         let secondPin = null;
 
@@ -1397,16 +1328,13 @@ function showPage(id) {
                 break;
 
             case "cny70":
-            // Ensure the sensors object exists
             if (!config.inputs.sensors) config.inputs.sensors = { cny70: [] };
             
-            // Add to config (using adc_pin to match your standard)
             config.inputs.sensors.cny70.push({ 
                 name: name || `CNY70_${pin}`, 
                 adc_pin: pin 
             });
             
-            // Immediate visual feedback (Orange)
             document.getElementById(`pin-${pin}`)?.classList.add('assigned-adc');
             break;
 
@@ -1436,7 +1364,7 @@ function showPage(id) {
                     return;
                 }
 
-                secondPin = pinY; // Track this for the visual update
+                secondPin = pinY; 
                 removeCompByPin(pinX);
                 removeCompByPin(pinY);
                 
@@ -1457,10 +1385,8 @@ function showPage(id) {
                 break;
         }
 
-        // 2. Refresh the Data and UI lists
         refreshUI();
         
-        // 3. Reset the input field
         document.getElementById('comp-name').value = ""; 
         
     } catch (err) {
@@ -1481,12 +1407,8 @@ function showPage(id) {
 
      
 function refreshUI() {
-    // 1. Update JSON Preview & Render the Sidebar Lists
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
     renderLists();
-    
-    // 2. Reset ALL pins to default state before re-applying colors
-    // Added 'assigned-adc' to the removal list so colors don't "stick" after deletion
     document.querySelectorAll('.pin').forEach(p => {
         p.classList.remove(
             'assigned-input', 
@@ -1497,7 +1419,6 @@ function refreshUI() {
         );
     });
 
-    // 3. Highlight Audio & MIDI UART (Cyan / Reserved)
     if (config.audio_mode === "I2S") {
         [config.i2s_data_pin, config.i2s_bclk_pin, config.i2s_lrck_pin].forEach(p => {
             document.getElementById(`pin-${p}`)?.classList.add('audio-reserved');
@@ -1512,13 +1433,10 @@ function refreshUI() {
         [0, 1].forEach(p => document.getElementById(`pin-${p}`)?.classList.add('audio-reserved'));
     }
 
-    // 4. Highlight Analog Components (ORANGE)
-    // Standard ADC Pins
     config.inputs.adc_pins.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-adc');
     });
 
-    // Joysticks (X and Y pins)
     if (config.inputs.joystick) {
         config.inputs.joystick.forEach(i => {
             document.getElementById(`pin-${i.joy_x}`)?.classList.add('assigned-adc');
@@ -1526,37 +1444,30 @@ function refreshUI() {
         });
     }
 
-    // CNY70 Sensors
     if (config.inputs.sensors?.cny70) {
         config.inputs.sensors.cny70.forEach(i => {
             document.getElementById(`pin-${i.adc_pin}`)?.classList.add('assigned-adc');
         });
     }
 
-    // 5. Highlight Digital Inputs (GREEN)
-    // Buttons
     config.inputs.buttons.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-input');
     });
 
-    // Encoders (Pin A and Pin B)
     config.inputs.encoders.forEach(i => { 
         [i.pin_a, i.pin_b].forEach(p => {
             document.getElementById(`pin-${p}`)?.classList.add('assigned-input');
         });
     });
 
-    // Gate Inputs
     config.inputs.gate_in.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-input');
     });
 
-    // 6. Highlight Outputs (BLUE)
     config.outputs.gate_out.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-output');
     });
 
-    // 7. Highlight LEDs (PINK/RED)
     config.leds.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-led');
     });
@@ -1575,10 +1486,9 @@ function refreshUI() {
         pinList = [26, 27, 28, 29];
     }
         
-        // Get Full Role Name
         let roleText = (item.type || item.mode || cat.replace('_pins', '')).toUpperCase();
-        if (cat === 'joystick') roleText = "JOYSTICK" + (item.midi_range ? " (MIDI)" : "");
-        if (cat === 'cny70') roleText = "CNY70 SENSOR";
+        if (cat === 'joystick') roleText = "JOYSTICK";
+        if (cat === 'cny70') roleText = "CNY70";
 
         return `<div class="comp-item">
             <div class="comp-header">
@@ -1592,22 +1502,18 @@ function refreshUI() {
         </div>`;
     };
 
-    // Inputs
     config.inputs.adc_pins.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'adc_pins', i, it.pin)));
     config.inputs.buttons.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'buttons', i, it.pin)));
     config.inputs.encoders.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'encoders', i, it.pin_a)));
     
-    // Fix: Joystick List
     if (config.inputs.joystick) {
         config.inputs.joystick.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'joystick', i, it.joy_x)));
     }
     
-    // Fix: Nested CNY70 List
     if (config.inputs.sensors?.cny70) {
         config.inputs.sensors.cny70.forEach((it, i) => containers['list-inputs'].push(createRow(it, 'cny70', i, it.adc_pin)));
     }
 
-    // Outputs & LEDs
     config.outputs.gate_out.forEach((it, i) => containers['list-outputs'].push(createRow(it, 'gate_out', i, it.pin)));
     config.leds.forEach((it, i) => containers['list-leds'].push(createRow(it, 'leds', i, it.pin)));
 
@@ -1626,7 +1532,7 @@ function renameComp(cat, i, val) {
     } else {
         config.inputs[cat][i].name = val;
     }
-    // Update JSON preview immediately without full UI refresh (prevents input focus loss)
+
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
 }
 
@@ -1634,7 +1540,6 @@ function renameComp(cat, i, val) {
     const p = parseInt(pinId);
     if (isNaN(p)) return;
 
-    // Helper to filter arrays by checking all possible pin keys
     const filterPins = (arr) => arr.filter(item => 
         item.pin !== p && 
         item.pin_a !== p && 
@@ -1644,19 +1549,16 @@ function renameComp(cat, i, val) {
         item.adc_pin !== p
     );
 
-    // 1. Inputs
     config.inputs.adc_pins = filterPins(config.inputs.adc_pins);
     config.inputs.buttons = filterPins(config.inputs.buttons);
     config.inputs.gate_in = filterPins(config.inputs.gate_in);
     config.inputs.encoders = filterPins(config.inputs.encoders);
     config.inputs.joystick = filterPins(config.inputs.joystick);
 
-    // 2. Nested Sensors (CNY70)
     if (config.inputs.sensors?.cny70) {
         config.inputs.sensors.cny70 = filterPins(config.inputs.sensors.cny70);
     }
 
-    // 3. LEDs & Outputs
     config.leds = filterPins(config.leds);
     config.outputs.gate_out = filterPins(config.outputs.gate_out);
 }
@@ -1676,14 +1578,13 @@ function renameComp(cat, i, val) {
 // 2. Fix the Copy Error
 async function copyJson() {
     const jsonArea = document.getElementById('json-preview');
-    // Find the button that was clicked
+
     const btn = document.querySelector('button[onclick="copyJson()"]');
     
     if (!jsonArea) return;
 
     const text = jsonArea.innerText;
 
-    // 1. Attempt Modern Copy
     let success = false;
     if (navigator.clipboard && window.isSecureContext) {
         try {
@@ -1694,7 +1595,6 @@ async function copyJson() {
         }
     }
 
-    // 2. Fallback if Modern API fails
     if (!success) {
         const textArea = document.createElement("textarea");
         textArea.value = text;
@@ -1708,7 +1608,6 @@ async function copyJson() {
         document.body.removeChild(textArea);
     }
 
-    // 3. SILENT VISUAL FEEDBACK (No more Alert!)
     if (success && btn) {
         const originalText = btn.innerText;
         const originalBg = btn.style.background;
@@ -1723,7 +1622,6 @@ async function copyJson() {
             btn.style.color = "white";
         }, 1200);
     } else if (!success) {
-        // Only show alert if it actually fails completely
         alert("Copy failed. Please select manually.");
     }
 }
@@ -1748,7 +1646,6 @@ function showCopySuccess(btn) {
     } else if (cat === 'gate_out') {
         config.outputs.gate_out.splice(i, 1);
     } else if (cat === 'cny70') {
-        // Fix for nested sensor path
         if (config.inputs.sensors && config.inputs.sensors.cny70) {
             config.inputs.sensors.cny70.splice(i, 1);
         }
@@ -1757,7 +1654,6 @@ function showCopySuccess(btn) {
             config.inputs.joystick.splice(i, 1);
         }
     } else {
-        // Default for adc_pins, buttons, encoders, gate_in
         config.inputs[cat].splice(i, 1);
     }
     refreshUI();
