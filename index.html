@@ -46,83 +46,83 @@
         }
 
        .board-container { 
-            flex-shrink: 0; 
-            background: #004d40; 
-            padding: 15px; 
-            border-radius: 12px; 
-            border: 4px solid #00332a; 
-            display: grid; 
-            gap: 4px; 
-            position: sticky; 
-            top: 80px; 
-            margin-left: 0; 
-            }
+    flex-shrink: 0; 
+    background: #004d40; 
+    padding: 15px; 
+    border-radius: 12px; 
+    border: 4px solid #00332a; 
+    display: grid; 
+    gap: 4px; 
+    position: sticky; 
+    top: 80px; 
+    margin-left: 0; 
+}
+    .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
+
+    .board-zero { 
+        display: grid !important;
+        grid-template-columns: repeat(7, 38px) !important; 
+        gap: 6px !important; 
+        width: fit-content;
+        padding: 18px !important; 
+        background: #004d40;
+        border-radius: 8px;
+        margin: 0;
+    }
+
+    .board-zero .pin { 
+        width: 38px !important; 
+        height: 26px !important; 
         
-        .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
-    
-        .board-zero { 
-            display: grid !important;
-            grid-template-columns: repeat(7, 38px) !important; 
-            gap: 6px !important; 
-            width: fit-content;
-            padding: 18px !important; 
-            background: #004d40;
-            border-radius: 8px;
-            margin: 0;
-        }
+        background: var(--gpio-default) !important; 
+        border: 1px solid rgba(0,0,0,0.1) !important; 
+        border-radius: 4px !important; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
+        font-size: 9px !important; 
+        color: #333 !important; 
+        font-weight: bold !important; 
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important; 
+        padding: 2px 4px !important; 
+        box-sizing: border-box !important; 
+        cursor: pointer; 
+        transition: 0.1s; 
+    }
 
-        .board-zero .pin { 
-            width: 38px !important; 
-            height: 26px !important; 
-            
-            background: var(--gpio-default) !important; 
-            border: 1px solid rgba(0,0,0,0.1) !important; 
-            border-radius: 4px !important; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
-            font-size: 9px !important; 
-            color: #333 !important; 
-            font-weight: bold !important; 
-            display: flex !important; 
-            align-items: center !important; 
-            justify-content: center !important; 
-            padding: 2px 4px !important; 
-            box-sizing: border-box !important; 
-            cursor: pointer; 
-            transition: 0.1s; 
-        }
 
-        /* --- Power Pins (Red/Orange) --- */
-        .board-zero .pin.pwr-pin {
-            background: var(--pwr) !important;
-            color: white !important;
-        }
-    
-        /* --- Ground Pins (Black) --- */
-        .board-zero .pin.gnd-pin {
-            background: var(--gnd) !important;
-            color: white !important;
-        }
-    
-        /* --- Active/Assigned Pins (Inputs/Outputs/LEDs) --- */
-        .board-zero .pin.assigned-input { 
-            background: var(--input-clr) !important; 
-            color: #fff !important; 
-        }
-        .board-zero .pin.assigned-output { 
-            background: var(--output-clr) !important; 
-            color: #fff !important; 
-        }
-        .board-zero .pin.assigned-led { 
-            background: var(--led-clr) !important; 
-            color: #fff !important; 
-        }
-    
-        /* --- Audio Reserved --- */
-        .board-zero .pin.audio-reserved { 
-            background: var(--audio-res) !important; 
-            color: #fff !important; 
-            border: 2px solid #fff !important; 
-        }
+    /* --- Power Pins (Red/Orange) --- */
+    .board-zero .pin.pwr-pin {
+        background: var(--pwr) !important;
+        color: white !important;
+    }
+
+    /* --- Ground Pins (Black) --- */
+    .board-zero .pin.gnd-pin {
+        background: var(--gnd) !important;
+        color: white !important;
+    }
+
+    /* --- Active/Assigned Pins (Inputs/Outputs/LEDs) --- */
+    .board-zero .pin.assigned-input { 
+        background: var(--input-clr) !important; 
+        color: #fff !important; 
+    }
+    .board-zero .pin.assigned-output { 
+        background: var(--output-clr) !important; 
+        color: #fff !important; 
+    }
+    .board-zero .pin.assigned-led { 
+        background: var(--led-clr) !important; 
+        color: #fff !important; 
+    }
+
+    /* --- Audio Reserved --- */
+    .board-zero .pin.audio-reserved { 
+        background: var(--audio-res) !important; 
+        color: #fff !important; 
+        border: 2px solid #fff !important; 
+    }
 
         .pin { width: 45px; height: 26px; background: var(--gpio-default); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #333; font-weight: bold; transition: 0.1s; border: 1px solid rgba(0,0,0,0.1); }
         .pin.spacer { visibility: hidden; pointer-events: none; }
@@ -413,6 +413,14 @@
             background: rgba(255,255,255,0.05);
             padding-left: 12px;
         }
+
+        .side-column {
+        position: sticky;
+        top: 80px; 
+        align-self: flex-start; 
+        flex-shrink: 0;
+        width: 280px; 
+}
         
         .side-column, #blog-title-list { 
             scrollbar-width: none; 
@@ -428,7 +436,10 @@
             margin-bottom: 2px;
             cursor: pointer;
             transition: 0.1s;
-        }
+            font-size: 14px !important; 
+            line-height: 1.2 !important;
+            display: block !important; 
+                }
         
         #docs-index-list .title-link-item:hover {
             border-left: 2px solid var(--accent);
@@ -438,6 +449,7 @@
         
         #docs-index-list {
             scrollbar-width: none;
+           
         }
 
         #docs-index-list::-webkit-scrollbar {
@@ -551,82 +563,82 @@
             border-color: #666;
         }
 
-    
-    
-    /* --- MOBILE OPTIMIZATION (@media) --- */
-    @media screen and (max-width: 1100px) {
-        .main-layout {
-            flex-direction: column !important;
-            align-items: center !important;
-            padding: 10px !important;
-            gap: 10px !important;
-        }
-        .board-container {
-            position: relative !important; 
-            top: 0 !important;
-            transform: scale(0.85); 
-            transform-origin: center top;
-            margin-bottom: -40px !important; 
-            flex-shrink: 1 !important;
-        }
-        .config-area {
-            display: flex !important;
-            flex-direction: column !important; 
-            width: 100% !important;
-            gap: 15px !important;
-        }
-        .panel, 
-        .settings-column, 
-        .json-panel, 
-        .active-components-panel,
-        .top-row-tools {
-            width: 100% !important;
-            max-width: 100% !important;
-            grid-column: span 1 !important; /
-            box-sizing: border-box !important;
-        }
-        .comp-groups {
-            grid-template-columns: 1fr !important; 
-            gap: 10px !important;
-        }
-        .group-box {
-            height: auto !important; 
-            min-height: 150px;
-        }
-        #json-preview {
-            height: 250px !important;
-            font-size: 10px !important;
-        }
-        select, 
-        input[type="text"], 
-        button {
-            height: 44px !important; 
-            font-size: 16px !important; 
-        }
-        .pin {
-            width: 40px !important; 
-            height: 24px !important;
-        }
-        .board-pico {
-            column-gap: 80px !important; /
-        }
+
+
+/* --- MOBILE OPTIMIZATION (@media) --- */
+@media screen and (max-width: 1100px) {
+    .main-layout {
+        flex-direction: column !important;
+        align-items: center !important;
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+    .board-container {
+        position: relative !important; 
+        top: 0 !important;
+        transform: scale(0.85); 
+        transform-origin: center top;
+        margin-bottom: -40px !important; 
+        flex-shrink: 1 !important;
+    }
+    .config-area {
+        display: flex !important;
+        flex-direction: column !important; 
+        width: 100% !important;
+        gap: 15px !important;
+    }
+    .panel, 
+    .settings-column, 
+    .json-panel, 
+    .active-components-panel,
+    .top-row-tools {
+        width: 100% !important;
+        max-width: 100% !important;
+        grid-column: span 1 !important; /
+        box-sizing: border-box !important;
+    }
+    .comp-groups {
+        grid-template-columns: 1fr !important; 
+        gap: 10px !important;
+    }
+    .group-box {
+        height: auto !important; 
+        min-height: 150px;
+    }
+    #json-preview {
+        height: 250px !important;
+        font-size: 10px !important;
+    }
+    select, 
+    input[type="text"], 
+    button {
+        height: 44px !important; 
+        font-size: 16px !important; 
+    }
+    .pin {
+        width: 40px !important; 
+        height: 24px !important;
+    }
+    .board-pico {
+        column-gap: 80px !important; /
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .board-container {
+        transform: scale(0.7);
+        margin-bottom: -100px !important;
     }
     
-    @media screen and (max-width: 480px) {
-        .board-container {
-            transform: scale(0.7);
-            margin-bottom: -100px !important;
-        }
-        
-        nav {
-            gap: 10px;
-            padding: 10px 0;
-        }
-        
-        nav a {
-            font-size: 10px;
-        }
+    nav {
+        gap: 10px;
+        padding: 10px 0;
     }
+    
+    nav a {
+        font-size: 10px;
+    }
+}
     
     </style>
 </head>
@@ -835,7 +847,7 @@
                 <h2>Documentation & Setup</h2>
                 <p>Welcome to the <strong>pikoPD</strong> project hardware configuration tool. Here you can map Pure Data parameters to the Raspberry Pico hardware.</p>
                 <h3>Getting Started</h3>
-                <ul style="font-size: 13px; color: #bbb;">
+                <ul style="font-size: 15px; color: #bbb;">
                     <li>Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).</li>
                     <li>Upload your <code>.pd</code> patch to see available parameters or load board.json configuration file.</li>
                     <li>Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.</li>
