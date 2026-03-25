@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
     <title>pikoPD | Config tool DEMO</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -37,14 +38,14 @@
         .main-layout { 
             display: flex; 
             flex-direction: row; 
-            gap: 30px; 
+            gap: 10px; 
             width: 100%; 
             max-width: 1600px; 
             margin: 0 auto;    
             align-items: flex-start; 
         }
 
-        .board-container { 
+       .board-container { 
             flex-shrink: 0; 
             background: #004d40; 
             padding: 15px; 
@@ -54,18 +55,73 @@
             gap: 4px; 
             position: sticky; 
             top: 80px; 
-            align-self: stretch;     
             margin-left: 0; 
-        }
-
+            }
+        
         .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
-
+    
         .board-zero { 
             display: grid !important;
-            grid-template-columns: repeat(7, 45px) !important; 
-            gap: 8px; 
+            grid-template-columns: repeat(7, 38px) !important; 
+            gap: 6px !important; 
             width: fit-content;
-            padding: 25px;
+            padding: 18px !important; 
+            background: #004d40;
+            border-radius: 8px;
+            margin: 0;
+        }
+
+        .board-zero .pin { 
+            width: 38px !important; 
+            height: 26px !important; 
+            
+            background: var(--gpio-default) !important; 
+            border: 1px solid rgba(0,0,0,0.1) !important; 
+            border-radius: 4px !important; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
+            font-size: 9px !important; 
+            color: #333 !important; 
+            font-weight: bold !important; 
+            display: flex !important; 
+            align-items: center !important; 
+            justify-content: center !important; 
+            padding: 2px 4px !important; 
+            box-sizing: border-box !important; 
+            cursor: pointer; 
+            transition: 0.1s; 
+        }
+
+        /* --- Power Pins (Red/Orange) --- */
+        .board-zero .pin.pwr-pin {
+            background: var(--pwr) !important;
+            color: white !important;
+        }
+    
+        /* --- Ground Pins (Black) --- */
+        .board-zero .pin.gnd-pin {
+            background: var(--gnd) !important;
+            color: white !important;
+        }
+    
+        /* --- Active/Assigned Pins (Inputs/Outputs/LEDs) --- */
+        .board-zero .pin.assigned-input { 
+            background: var(--input-clr) !important; 
+            color: #fff !important; 
+        }
+        .board-zero .pin.assigned-output { 
+            background: var(--output-clr) !important; 
+            color: #fff !important; 
+        }
+        .board-zero .pin.assigned-led { 
+            background: var(--led-clr) !important; 
+            color: #fff !important; 
+        }
+    
+        /* --- Audio Reserved --- */
+        .board-zero .pin.audio-reserved { 
+            background: var(--audio-res) !important; 
+            color: #fff !important; 
+            border: 2px solid #fff !important; 
         }
 
         .pin { width: 45px; height: 26px; background: var(--gpio-default); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #333; font-weight: bold; transition: 0.1s; border: 1px solid rgba(0,0,0,0.1); }
@@ -495,8 +551,9 @@
             border-color: #666;
         }
 
-        
-/* --- MOBILE SCREEN (@media) --- */
+    
+    
+    /* --- MOBILE OPTIMIZATION (@media) --- */
     @media screen and (max-width: 1100px) {
         .main-layout {
             flex-direction: column !important;
@@ -504,25 +561,20 @@
             padding: 10px !important;
             gap: 10px !important;
         }
-    
         .board-container {
             position: relative !important; 
             top: 0 !important;
             transform: scale(0.85); 
             transform-origin: center top;
             margin-bottom: -40px !important; 
-            width: fit-content !important;
             flex-shrink: 1 !important;
         }
-    
         .config-area {
             display: flex !important;
             flex-direction: column !important; 
             width: 100% !important;
             gap: 15px !important;
         }
-    
-     
         .panel, 
         .settings-column, 
         .json-panel, 
@@ -530,41 +582,33 @@
         .top-row-tools {
             width: 100% !important;
             max-width: 100% !important;
-            grid-column: span 1 !important; 
+            grid-column: span 1 !important; /
             box-sizing: border-box !important;
         }
-    
         .comp-groups {
             grid-template-columns: 1fr !important; 
             gap: 10px !important;
         }
-    
         .group-box {
             height: auto !important; 
             min-height: 150px;
         }
-    
-       
         #json-preview {
             height: 250px !important;
             font-size: 10px !important;
         }
-    
-      
         select, 
         input[type="text"], 
         button {
             height: 44px !important; 
             font-size: 16px !important; 
         }
-    
         .pin {
             width: 40px !important; 
             height: 24px !important;
         }
-    
         .board-pico {
-            column-gap: 80px !important; 
+            column-gap: 80px !important; /
         }
     }
     
@@ -855,14 +899,15 @@
             
             <div style="flex: 1;">
                 <h2 style="margin-top: 0; color: var(--accent);">About the Developer</h2>
-                <p></p>
-                <p><strong></strong></p>
+                <p>I am an independent developer focused on the intersection of music technology and embedded systems.</p>
+                <p><strong>pikoPD</strong> was designed to remove the friction of hardware configuration for musicians and artists.</p>
                 
                 <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
                     <a href="https://www.buymeacoffee.com/ledlaux" target="_blank" style="transition: 0.2s; opacity: 0.9;">
                         <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFFFFF?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Coffee">
                     </a>
                     <span style="font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px;">
+                        📍 Latvia
                     </span>
                 </div>
             </div>
@@ -881,8 +926,9 @@
                 <label>Youtube</label>
                 <div class="contact-val">@ledlaux</div>
             </div>
-        </div>  
+        </div>
 
+    
 <h3 style="margin: 30px 0 15px 0; font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 2px;">Projects</h3>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
