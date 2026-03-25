@@ -10,7 +10,7 @@ Feel free to join the Discussions section to share your feedback!
 
 1. Upload your `.pd` patch to view available [@hv_params] parameters, or load an existing board configuration file.
 2. Select your board model (Raspberry Pico, Pico W, Zero, or Pico 2).
-3. Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.
+3. Click a pin on the board and add a component, or drag an object tag directly onto a pin.
 4. Objects with the category names like btn, led or enc are recognized and mapped to the category automatically.
 5. Export the `config.json` file and place it in your project root.
 
