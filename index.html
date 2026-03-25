@@ -675,6 +675,7 @@
             <label>Core Clock</label>
             <select id="core-freq" onchange="config.core_freq = parseInt(this.value); refreshUI()">
                 <option value="133000">133MHz</option>
+                <option value="150000">150MHz</option>
                 <option value="240000" selected>240MHz</option>
             </select>
 
@@ -682,7 +683,7 @@
             <select id="midi-mode" onchange="config.midi_mode = this.value; refreshUI()">
                 <option value="usb" selected>USB</option>
                 <option value="uart">UART</option>
-                <option value="host">Host</option>
+                <option value="host">HOST</option>
             </select>
         </div>
 
@@ -699,8 +700,11 @@
         <div style="flex-grow: 1;"> 
             <label>Sample Rate (Hz)</label>
             <select id="sample-rate" onchange="config.sample_rate = parseInt(this.value); refreshUI()">
+                <option value="22050">22050</option>
+                <option value="32000">32000</option>
                 <option value="44100">44100</option>
                 <option value="48000" selected>48000</option>
+                <option value="96000" selected>96000</option>
             </select>
             
             <label>Audio Mode</label>
@@ -888,7 +892,6 @@ async function fetchGitHubManual() {
     const indexList = document.getElementById('docs-index-list');
     if (!viewer || !indexList) return;
 
-    // ✅ Prevent re-fetch + re-render
     if (manualLoaded) return;
 
     manualLoaded = true;
@@ -903,7 +906,6 @@ async function fetchGitHubManual() {
 
         if (typeof marked !== 'undefined') {
 
-            // ✅ Build OFFSCREEN (no flicker)
             const temp = document.createElement('div');
             temp.innerHTML = marked.parse(markdown);
 
@@ -957,7 +959,6 @@ async function fetchBlogPosts() {
     const container = document.getElementById('blog-container');
     if (!container) return;
 
-    // ✅ Prevent re-fetch + re-render
     if (blogLoaded) return;
     blogLoaded = true;
 
@@ -1007,7 +1008,6 @@ async function fetchBlogPosts() {
 
         blogPostsData = loadedPosts.sort((a, b) => b.date.localeCompare(a.date));
 
-        // ✅ BUILD OFFSCREEN
         const temp = document.createElement('div');
         temp.innerHTML = blogPostsData.map(post => `
             <div class="panel blog-post" id="post-${post.date}">
