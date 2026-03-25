@@ -1,10 +1,12 @@
 # pikoPD Web Configuration Tool
 
-This tool allows you to map your Pure Data project parameters to Raspberry Pico hardware and export board.json file. It is currently under active development, and you can try the first demo below.
+This tool allows you to map your Pure Data patch parameters to Raspberry Pico hardware and export board.json file. It is currently under active development, and you can try the first demo below.
 
 [Live Demo](https://ledlaux.github.io/pikoPD)
 
 Feel free to join the Discussions section to share your feedback!
+
+![UI Preview](./docs/images/pikoPD-tool.png)
 
 ## Getting Started
 
