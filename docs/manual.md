@@ -107,7 +107,7 @@ This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mappe
   "i2s_data_pin": 9,
   "i2s_bclk_pin": 10
 ```
-Besides DATA and BCLK pin, LRCK pin is asigned automatically as next after the BCLK.
+LRCK pin is asigned automatically as next after the BCLK.
 
 - PWM 
   
