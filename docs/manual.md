@@ -209,7 +209,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
 
-## Polyphonic input
+# Polyphonic input
 
 The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
 
