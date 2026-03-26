@@ -5,6 +5,9 @@
 #include <atomic>
 #include <cmath>
 
+#include "MPR121.h"
+
+
 #ifdef MIDI_HOST
     #ifndef CFG_TUH_ENABLED
         #define CFG_TUH_ENABLED 1
