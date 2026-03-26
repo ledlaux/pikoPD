@@ -425,6 +425,10 @@ int main() {
     #endif
     {%- endif %}
 
+    // MPR121 Test
+    i2c_init(i2c0, 400*1000);
+    i2c_init(i2c1, 400*1000);
+
     {%- if board.pico_board == 'zero' %}
     Pico::init_neopixel();
     {%- endif %}
@@ -455,6 +459,29 @@ int main() {
         0,  // second pin is unused
         {{ board.buffer_size }});
     {%- endif %}
+
+
+    // ------------- MPR121 Test ---------------
+
+    Pico::MPR121Config cfg[NUM_SENSORS] = {
+        { i2c0, 4, 5, 3, 0,  }, 
+        { i2c1, 6, 7, 8, 0,  }  
+    };
+    
+    // Create sensor objects
+    Pico::MPR121 sensor_array[NUM_SENSORS] = {
+        Pico::MPR121(cfg[0]),
+        Pico::MPR121(cfg[1])
+    };
+    
+    // Assign sensors to the static array and set the count
+    Pico::MPR121::_num_sensors = NUM_SENSORS;
+    for (int i = 0; i < NUM_SENSORS; ++i) {
+        Pico::MPR121::sensors[i] = &sensor_array[i];
+    }
+    
+    // ------------------------------------------
+
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -510,6 +537,19 @@ int main() {
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
         midi_task();
+
+      // ------------- MPR121 Test ---------------
+       for (int i = 0; i < NUM_SENSORS; ++i) {
+            if (!sensor_array[i].initialized()) {
+                if (sensor_array[i].tryInit()) {
+                    printf("Sensor #%d initialized!\n", i);
+                }
+            } else {
+                sensor_array[i].processMPR121();  // prints touches/releases
+            }
+        }
+     // ------------------------------------------
+
         {% if board.midi_mode == 'usb' %}
         process_usb_queue();
         {%- endif %}
