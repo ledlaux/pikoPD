@@ -52,7 +52,8 @@ I also created an interactive web configuration tool. You can try it here: [Live
       - uart (pins tx 0, rx 1 )
     - debug console
     - sensors
-      - cny70 
+      - cny70
+      - mpr121
     - masterfx (delay, limiter)
       
 - Copies hardware config files into project folder from `/src`
