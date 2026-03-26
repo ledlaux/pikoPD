@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
     <title>pikoPD | Config tool DEMO</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -46,83 +45,83 @@
         }
 
        .board-container { 
-    flex-shrink: 0; 
-    background: #004d40; 
-    padding: 15px; 
-    border-radius: 12px; 
-    border: 4px solid #00332a; 
-    display: grid; 
-    gap: 4px; 
-    position: sticky; 
-    top: 80px; 
-    margin-left: 0; 
-}
-    .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
-
-    .board-zero { 
-        display: grid !important;
-        grid-template-columns: repeat(7, 38px) !important; 
-        gap: 6px !important; 
-        width: fit-content;
-        padding: 18px !important; 
-        background: #004d40;
-        border-radius: 8px;
-        margin: 0;
-    }
-
-    .board-zero .pin { 
-        width: 38px !important; 
-        height: 26px !important; 
+            flex-shrink: 0; 
+            background: #004d40; 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 4px solid #00332a; 
+            display: grid; 
+            gap: 4px; 
+            position: sticky; 
+            top: 80px; 
+            margin-left: 0; 
+        }
+        .board-pico { grid-template-columns: 1fr 1fr; column-gap: 140px; }
         
-        background: var(--gpio-default) !important; 
-        border: 1px solid rgba(0,0,0,0.1) !important; 
-        border-radius: 4px !important; 
-        box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
-        font-size: 9px !important; 
-        color: #333 !important; 
-        font-weight: bold !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important; 
-        padding: 2px 4px !important; 
-        box-sizing: border-box !important; 
-        cursor: pointer; 
-        transition: 0.1s; 
-    }
+        .board-zero { 
+            display: grid !important;
+            grid-template-columns: repeat(7, 38px) !important; 
+            gap: 6px !important; 
+            width: fit-content;
+            padding: 18px !important; 
+            background: #004d40;
+            border-radius: 8px;
+            margin: 0;
+            }
 
-
-    /* --- Power Pins (Red/Orange) --- */
-    .board-zero .pin.pwr-pin {
-        background: var(--pwr) !important;
-        color: white !important;
-    }
-
-    /* --- Ground Pins (Black) --- */
-    .board-zero .pin.gnd-pin {
-        background: var(--gnd) !important;
-        color: white !important;
-    }
-
-    /* --- Active/Assigned Pins (Inputs/Outputs/LEDs) --- */
-    .board-zero .pin.assigned-input { 
-        background: var(--input-clr) !important; 
-        color: #fff !important; 
-    }
-    .board-zero .pin.assigned-output { 
-        background: var(--output-clr) !important; 
-        color: #fff !important; 
-    }
-    .board-zero .pin.assigned-led { 
-        background: var(--led-clr) !important; 
-        color: #fff !important; 
-    }
-
-    /* --- Audio Reserved --- */
-    .board-zero .pin.audio-reserved { 
-        background: var(--audio-res) !important; 
-        color: #fff !important; 
-        border: 2px solid #fff !important; 
-    }
+        .board-zero .pin { 
+            width: 38px !important; 
+            height: 26px !important; 
+            
+            background: var(--gpio-default) !important; 
+            border: 1px solid rgba(0,0,0,0.1) !important; 
+            border-radius: 4px !important; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15); 
+            font-size: 9px !important; 
+            color: #333 !important; 
+            font-weight: bold !important; 
+            display: flex !important; 
+            align-items: center !important; 
+            justify-content: center !important; 
+            padding: 2px 4px !important; 
+            box-sizing: border-box !important; 
+            cursor: pointer; 
+            transition: 0.1s; 
+            }
+    
+    
+        /* --- Power Pins (Red/Orange) --- */
+        .board-zero .pin.pwr-pin {
+            background: var(--pwr) !important;
+            color: white !important;
+        }
+    
+        /* --- Ground Pins (Black) --- */
+        .board-zero .pin.gnd-pin {
+            background: var(--gnd) !important;
+            color: white !important;
+        }
+    
+        /* --- Active/Assigned Pins (Inputs/Outputs/LEDs) --- */
+        .board-zero .pin.assigned-input { 
+            background: var(--input-clr) !important; 
+            color: #fff !important; 
+        }
+        .board-zero .pin.assigned-output { 
+            background: var(--output-clr) !important; 
+            color: #fff !important; 
+        }
+        .board-zero .pin.assigned-led { 
+            background: var(--led-clr) !important; 
+            color: #fff !important; 
+        }
+    
+        /* --- Audio Reserved --- */
+        .board-zero .pin.audio-reserved { 
+            background: var(--audio-res) !important; 
+            color: #fff !important; 
+            border: 2px solid #fff !important; 
+        }
 
         .pin { width: 45px; height: 26px; background: var(--gpio-default); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #333; font-weight: bold; transition: 0.1s; border: 1px solid rgba(0,0,0,0.1); }
         .pin.spacer { visibility: hidden; pointer-events: none; }
@@ -155,29 +154,29 @@
 
         .active-components-panel { grid-column: span 2; grid-row: 2; display: flex; flex-direction: column;}
 
-            /* Analog / ADC = Orange */
-            .pin.assigned-adc { 
-                background: var(--adc) !important; 
-                color: #000 !important; 
-            }
+        /* Analog / ADC = Orange */
+        .pin.assigned-adc { 
+            background: var(--adc) !important; 
+            color: #000 !important; 
+        }
             
-            /* Digital Inputs (Buttons) = Green */
-            .pin.assigned-input { 
-                background: var(--input-clr) !important; 
-                color: #fff !important; 
-            }
+        /* Digital Inputs (Buttons) = Green */
+        .pin.assigned-input { 
+            background: var(--input-clr) !important; 
+            color: #fff !important; 
+        }
             
-            /* LEDs = Pink/Red */
-            .pin.assigned-led { 
-                background: var(--led-clr) !important; 
-                color: #fff !important; 
-            }
+        /* LEDs = Pink/Red */
+        .pin.assigned-led { 
+            background: var(--led-clr) !important; 
+            color: #fff !important; 
+        }
 
-            .pin.assigned-encoder { 
-                background: var(--enc-clr) !important; 
-                color: #fff !important; 
-                box-shadow: 0 0 8px rgba(0, 136, 255, 0.4);
-}
+        .pin.assigned-encoder { 
+            background: var(--enc-clr) !important; 
+            color: #fff !important; 
+            box-shadow: 0 0 8px rgba(0, 136, 255, 0.4);
+        }
         
         .comp-groups {display: flex; gap: 15px; flex: 1; align-items: stretch;}
         
@@ -200,7 +199,6 @@
             border-bottom: 1px solid #222;
             padding-bottom: 5px;
         }
-
 
         .comp-item {
             border-left: 5px solid transparent; 
@@ -419,7 +417,7 @@
         align-self: flex-start; 
         flex-shrink: 0;
         width: 280px; 
-}
+        }
         
         .side-column, #blog-title-list { 
             scrollbar-width: none; 
@@ -638,30 +636,25 @@
         font-size: 10px;
     }
 }
-    
     </style>
 </head>
 <body>
-
  <nav>
     <div style="flex: 1; display: flex; align-items: center; padding-left: 20px; cursor: pointer;" >
         <span style="color: var(--accent); font-weight: bold; font-size: 13px; letter-spacing: 1px;">
             pikoPD <span style="color: #666; font-size: 10px; margin-left: 5px;">demo</span>
         </span>
     </div>
-
     <div style="display: flex; gap: 30px;">
         <a onclick="showPage('config-page')" id="nav-config" class="nav-item">Config Tool</a>
         <a onclick="showPage('docs-page')" id="nav-docs" class="nav-item">Manual</a>
         <!-- <a onclick="showPage('blog-page')" id="nav-blog" class="nav-item">Dev Blog</a>
         <a onclick="showPage('about-page')" id="nav-about" class="nav-item">About</a> -->
     </div>
-
     <div style="flex: 1; display: flex; justify-content: flex-end; padding-right: 20px;">
         <a href="https://github.com/ledlaux/pikoPD" target="_blank" class="github-link">GitHub Repository</a>
     </div>
 </nav>
-
 <!-- <div id="home-page" >
     <div class="panel" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 60px; padding: 80px 10%; background: #151515; min-height: 70vh;">
         
@@ -675,23 +668,18 @@
                 <button onclick="showPage('docs-page')" style="width: auto; padding: 16px 40px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 8px; cursor: pointer; font-weight: 600;">Manual</button>
             </div>
         </div>
-
         <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center;">
             <div style="width: 100%; max-width: 500px; position: relative;">
                 <img src="main.png" alt="pikoPD hardware interface" 
                      style="width: 100%; height: auto; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 30px 80px rgba(0,0,0,0.8); display: block;">
             </div>
         </div>
-
     </div>
 </div> -->
-
 <div id="config-page" class="page active">
     <div class="main-layout">
         <div id="pico-board" class="board-container"></div>
-
         <div class="config-area">
-            
             <div class="top-row-tools">
                 <div class="panel">
                     <h3>Integration</h3>
@@ -701,12 +689,10 @@
                     <label style="margin-top: 20px;">Load Existing Config (.json)</label>
                     <input type="file" id="json-input" accept=".json" onchange="loadJSON(event)">
                 </div>
-
                 <div class="panel">
                    <h3>Manual Entry</h3>
     <label>Selected Pin: <span id="pin-display" style="color:var(--accent)">None</span></label>
     <input type="text" id="comp-name" placeholder="Label / Name" style="margin-bottom: 10px;">
-    
     <label>Category</label>
     <select id="comp-type" onchange="updateModeUI()">
         <option value="adc_pins">Analog (Knob/CV)</option>
@@ -718,16 +704,12 @@
         <option value="gate_in">Gate In</option>
         <option value="gate_out">Gate Out</option>
     </select>
-
     <div id="mode-ui-container" style="min-height: 70px; margin-top: 12px; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;">
     </div>
-
     <button onclick="addComponent()" style="margin-top: 15px; width: 100%;">Add Component</button>
-    
     <div id="error-msg" style="color: #ff4444; font-size: 11px; margin-top: 8px; height: 14px; font-weight: bold;"></div>
 </div>
             </div>
-
             <div class="panel active-components-panel">
                 <h3>Active Components</h3>
                 <div class="comp-groups">
@@ -742,14 +724,12 @@
                     </div>
                 </div>
             </div>
-
           <div class="settings-column">
     <div class="panel">
         <h3>System Settings</h3>
         <div style="flex-grow: 1;"> 
             <label>Patch Name</label>
             <input type="text" id="patch-name" value="heavy" oninput="config.name = this.value; refreshUI()">
-
             <label>Pico Model</label>
             <select id="pico-model" onchange="config.pico_board = this.value; initBoard(); refreshUI();">
                 <option value="pico">Pico</option>
@@ -757,14 +737,12 @@
                 <option value="zero">Zero</option>
                 <option value="pico2" selected>Pico 2</option>
             </select>
-
             <label>Core Clock</label>
             <select id="core-freq" onchange="config.core_freq = parseInt(this.value); refreshUI()">
                 <option value="133000">133MHz</option>
                 <option value="150000">150MHz</option>
                 <option value="240000" selected>240MHz</option>
             </select>
-
             <label>MIDI Mode</label>
             <select id="midi-mode" onchange="config.midi_mode = this.value; refreshUI()">
                 <option value="usb" selected>USB</option>
@@ -772,15 +750,11 @@
                 <option value="host">HOST</option>
             </select>
         </div>
-
    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-top: 1px solid #333; padding-top: 12px; margin-top: auto;">
     <span style="font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Debug Console</span>
     <input type="checkbox" id="debug-mode" onchange="config.debug = this.checked; refreshUI()" class="hw-checkbox">
 </div>
-
-
     </div>
-
     <div class="panel">
         <h3>Audio Engine & FX</h3>
         <div style="flex-grow: 1;"> 
@@ -792,18 +766,14 @@
                 <option value="48000" selected>48000</option>
                 <option value="96000">96000</option>
             </select>
-            
             <label>Audio Mode</label>
             <select id="audio-mode" onchange="config.audio_mode = this.value; refreshUI()">
                 <option value="I2S">I2S</option>
                 <option value="PWM">PWM</option>
             </select>
-            
             <label>Voice Count</label>
             <input type="number" id="voice-count" value="4" min="1" max="16" oninput="config.voice_count = parseInt(this.value); refreshUI()">
         </div>
-
-    
    <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 12px; margin-top: auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Master Limiter</span>
@@ -816,7 +786,6 @@
 </div>
 </div>
 </div>
-
             <div class="panel json-panel">
                 <div class="json-header">
                     <h3 style="margin: 0;">board.json</h3>
@@ -840,7 +809,6 @@
                     </div>
             </div>
         </div>
-
         <div class="content-wrap" style="flex: 1;">
             <div class="panel">
                 <h2>Documentation & Setup</h2>
@@ -853,19 +821,16 @@
                     <li>Export the <code>board.json</code> and place it in the pikoPD folder.</li>
                 </ul>
             </div>
-
             <div class="panel">
                 <div id="markdown-viewer"></div>
             </div>
         </div>
     </div>
 </div>
-
     <div id="blog-page" class="page">
     <div class="main-layout" style="align-items: stretch;">
         <div class="content-wrap" id="blog-container" style="flex: 1;">
             </div>
-        
         <div class="side-column">
             <div class="panel">
                 <h3>Post Calendar</h3>
@@ -880,7 +845,6 @@
                     Days with updates
                 </div>
             </div>
-
             <div class="panel">
         <h3>Categories</h3>
         <div id="blog-categories" style="display: flex; flex-wrap: wrap; gap: 8px;">
@@ -896,12 +860,9 @@
         <div id="blog-title-list" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
             </div>
         </div>
-        
     </div>
 </div>
-
 </div>
-
 <div id="about-page" class="page">
     <div class="content-wrap" style="max-width: 900px; margin: 20px auto;">
         <div class="panel" style="display: flex; align-items: flex-start; gap: 30px; margin-bottom: 20px;">
@@ -923,7 +884,6 @@
                 </div>
             </div>
         </div>
-
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 30px;">
             <div class="panel contact-item" onclick="location.href='mailto:ledlaux@gmail.com'">
                 <label>Email</label>
@@ -938,8 +898,6 @@
                 <div class="contact-val">@ledlaux</div>
             </div>
         </div>
-
-    
 <h3 style="margin: 30px 0 15px 0; font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 2px;">Projects</h3>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
@@ -967,11 +925,10 @@
         <h4 style="margin: 0; color: var(--accent);">Shrutitone - digital shrutibox</h4>
         <p style="font-size: 11px; color: #aaa;">Hardware prototype using Pure Data, Buildroot,  Raspberry Pi Zero 2 W, and air bellows. </p>
     </div>
-
 </div>
-    </div>
 </div>
-    <script>
+</div
+<script>
 let manualLoaded = false;
 async function fetchGitHubManual() {
     const viewer = document.getElementById('markdown-viewer');
@@ -1120,8 +1077,6 @@ async function fetchBlogPosts() {
     }
 }
 
-
-
 function updateCategoryUI() {
     const container = document.getElementById('blog-categories');
     if (!container) return;
@@ -1206,6 +1161,53 @@ function scrollToPost(dateStr) {
     }
 }
 
+function filterByCategory(tag) {
+    currentFilter = tag.toLowerCase();
+    
+    const filtered = (currentFilter === 'all') 
+        ? blogPostsData 
+        : blogPostsData.filter(p => p.tags.includes(currentFilter));
+
+    renderBlogList(filtered);
+    updateCategoryUI();
+    updateTitleIndex(filtered);
+
+    if (filtered.length > 0) {
+   
+        const latestPostDate = new Date(filtered[0].date);
+        
+        renderCalendar(latestPostDate);
+    } else {
+        renderCalendar(currentViewDate);
+    }
+}
+
+function renderBlogList(posts) {
+    const container = document.getElementById('blog-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    if (posts.length === 0) {
+        container.innerHTML = '<p style="color:#666;">No posts found for this tag.</p>';
+        return;
+    }
+
+    posts.forEach(post => {
+        const postDiv = document.createElement('div');
+        postDiv.className = 'panel blog-post';
+        postDiv.id = `post-${post.date}`;
+        
+        const displayDate = new Date(post.date).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        }).toUpperCase();
+
+        postDiv.innerHTML = `
+            <div class="date">${displayDate}</div>
+            <div class="markdown-content">${marked.parse(post.content)}</div>
+        `;
+        container.appendChild(postDiv);
+    });
+}
 
 function updateTitleIndex(posts) {
     const container = document.getElementById('blog-title-list');
@@ -1456,7 +1458,6 @@ function saveSettingsAsDefault() {
     }
 }
 
-
 function clearConfig() {
     if (!confirm("Are you sure you want to clear all components?")) return;
 
@@ -1476,13 +1477,11 @@ function clearConfig() {
     refreshUI(); 
 }
 
-
 function getPinColor(pinNumber) {
     const pinEl = document.getElementById(`pin-${pinNumber}`);
     if (!pinEl) return 'var(--accent)'; // fallback
     return window.getComputedStyle(pinEl).backgroundColor;
 }
-
 
 function autoFillAndAdd(val) {
     const nameInput = document.getElementById('comp-name');
@@ -1521,8 +1520,6 @@ function autoFillAndAdd(val) {
     }, 50); 
 }
 
-
-
 function isNameDuplicate(newName) {
     if (!newName) return false;
     
@@ -1539,7 +1536,6 @@ function isNameDuplicate(newName) {
         item.name && item.name.toLowerCase() === newName.toLowerCase()
     );
 }
-
 
 function addComponent() {
     const errorEl = document.getElementById('error-msg');
@@ -1657,7 +1653,6 @@ function updateCompPin(cat, idx, newPin) {
     refreshUI();
 }
 
-
 function renderLists() {
     const containers = { 'list-inputs': [], 'list-outputs': [], 'list-leds': [] };
 
@@ -1743,7 +1738,6 @@ function renderLists() {
     }
 }
 
-     
 function refreshUI() {
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
     renderLists();
@@ -1813,8 +1807,6 @@ function refreshUI() {
  
 }
 
-
-
 function renameComp(cat, i, val) {
     if (cat === 'leds') {
         config.leds[i].name = val;
@@ -1868,7 +1860,6 @@ function removeCompByPin(pinId) {
 //     }
 // }
 
-
 async function copyJson() {
     const jsonArea = document.getElementById('json-preview');
 
@@ -1919,7 +1910,6 @@ async function copyJson() {
     }
 }
 
-
 function showCopySuccess(btn) {
     const originalText = btn.innerText;
     btn.innerText = "COPIED!";
@@ -1932,7 +1922,7 @@ function showCopySuccess(btn) {
     }, 1200);
 }
 
-      function removeComp(cat, i) {
+function removeComp(cat, i) {
     if (cat === 'leds') {
         config.leds.splice(i, 1);
     } else if (cat === 'gate_out') {
@@ -1956,7 +1946,6 @@ function updateModeUI() {
     const container = document.getElementById('mode-ui-container');
     let html = '';
 
-    // Logic for dynamic content
     if (type === "leds") {
         html = `
             <select id="comp-mode" style="margin-bottom: 12px;">
