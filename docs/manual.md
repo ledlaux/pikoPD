@@ -1,3 +1,22 @@
+## Table of Contents
+
+- [Toolchain Setup](#toolchain-setup)
+- [Hardware Configuration](#hardware-configuration)
+  - [Audio Setup](#audio-setup)
+  - [Buttons](#buttons)
+  - [ADC Inputs](#adc-inputs)
+  - [LED Configuration](#led-configuration)
+  - [Joystick](#joystick)
+  - [Encoder](#encoder)
+- [Sensors](#sensors)
+  - [MPR121](#mpr121)
+  - [CNY70](#cny70)
+- [Polyphonic Input](#polyphonic-input)
+- [MIDI CC](#midi-cc)
+- [Sample Loading](#sample-loading)
+- [Useful Links](#useful-links)
+
+
 # Toolchain setup 
 
 ### Python 3.10+ 
