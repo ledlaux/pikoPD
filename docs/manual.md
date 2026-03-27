@@ -232,6 +232,33 @@ I decided to use IRQ pin as obligatory to make polling more efficient.
 
 To use this sensor in the PD  patch create [r pad1 @hv_param] object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
+
+## CNY70
+
+**Support for this device is experimental!**
+
+```
+"sensors": {
+      "cny70": [
+        { "name": "cny", "adc_pin": 28 }
+      ]
+    }
+```
+The CNY70 is a short-range reflective optical sensor (often called an optoisolator or phototransistor). Unlike a button that you physically click, this sensor detects how close an object is by bouncing light off it.
+
+The sensor contains two main parts inside its square plastic housing:
+
+- Infrared (IR) Emitter: An LED that constantly sends out invisible light.
+- Phototransistor (Receiver): A light-sensitive component that "looks" for that IR light.
+
+When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected.
+
+There are many tutorials in the internet which shows different ways how to wire that thing. I use [this](https://github.com/ledlaux/pikoPD/blob/mpr121/docs/images/cny70.png) which works for my cny70 sensor. 
+
+To read this device connect it to the ADC pin and add [r cny@hv_param] object in the PD patch. 
+
+
+
 # Polyphonic input
 
 The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
