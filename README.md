@@ -24,9 +24,9 @@ I also created an interactive **web config tool**. You can try it here: [Live De
 - [x] gate in/out
 - [x] midi clock
 - [x] pwm audio
+- [x] sensors
 - [ ] sd card
 - [ ] screen
-- [ ] sensors
 - [ ] usb audio
 - [ ] bluetooth midi
       
