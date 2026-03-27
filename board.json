@@ -32,7 +32,7 @@
     ],
 
     "encoders": [
-      { "name": "enc", "pin_a": 5, "pin_b": 6 }
+      { "name": "enc", "pin_a": 14, "pin_b": 15 }
     ],
 
     "joystick": [
@@ -42,9 +42,11 @@
      "sensors": {
       "cny70": [
         { "name": "cny", "adc_pin": 28 }
+      ],
+       "mpr121": [
+        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
       ]
     }
-    
   },
 
   "outputs": {
