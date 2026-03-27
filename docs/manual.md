@@ -5,7 +5,7 @@
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
   - [ADC Inputs](#adc-inputs)
-  - [LED Configuration](#led-configuration)
+  - [LED](#led)
   - [Joystick](#joystick)
   - [Encoder](#encoder)
 - [Sensors](#sensors)
@@ -166,7 +166,7 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `cv_in` | Control voltage input for external analog signals       |
 
 
-## LED configuration
+## LED 
 
 PikoPD boards support 4 LED modes.
 
