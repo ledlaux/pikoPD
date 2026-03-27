@@ -253,7 +253,7 @@ The sensor contains two main parts inside its square plastic housing:
 
 When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected.
 
-There are many tutorials in the internet which shows different ways how to wire that thing. I use [this](https://github.com/ledlaux/pikoPD/blob/mpr121/docs/images/cny70.png) which works for my cny70 sensor. 
+There are many tutorials in the internet which shows different ways how to wire that thing. 
 
 To read this device connect it to the ADC pin and add `[r cny@hv_param] ` object in the PD patch. 
 
