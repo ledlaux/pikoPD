@@ -461,7 +461,7 @@ int main() {
 
     {% if board.inputs.sensors.mpr121 -%}
     i2c_init(i2c0, 400 * 1000);
-    {% if board.inputs.sensors.mpr121|length > 1 %}
+    {% if board.inputs.sensors.mpr121 | selectattr("i2c_bus", "equalto", "i2c1") | list %}
     i2c_init(i2c1, 400 * 1000);
     {% endif %}
     {%- endif %}
@@ -507,11 +507,7 @@ int main() {
     Pico::MPR121Config cfg[NUM_SENSORS] = {
     {%- for sensor in board.inputs.sensors.mpr121 %}
         { 
-            {% if sensor.addr_index == 0 -%}
-                {{ 'i2c0' if loop.index0 == 0 else 'i2c1' }},
-            {%- else -%}
-                {{ sensor.i2c_bus | default('i2c0') }},
-            {%- endif %}
+            {{ sensor.i2c_bus }}, 
             {{ sensor.sda }}, 
             {{ sensor.scl }}, 
             {{ sensor.irq }}, 
@@ -533,10 +529,9 @@ int main() {
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-    {%- endif %}
+{%- endif %}
 
 // -----------------------------------
-
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
