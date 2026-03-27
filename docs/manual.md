@@ -1,3 +1,22 @@
+## Table of Contents
+
+- [Toolchain Setup](#toolchain-setup)
+- [Hardware Configuration](#hardware-configuration)
+  - [Audio Setup](#audio-setup)
+  - [Buttons](#buttons)
+  - [ADC Inputs](#adc-inputs)
+  - [LED](#led)
+  - [Joystick](#joystick)
+  - [Encoder](#encoder)
+- [Sensors](#sensors)
+  - [MPR121](#mpr121)
+  - [CNY70](#cny70)
+- [Polyphonic Input](#polyphonic-input)
+- [MIDI CC](#midi-cc)
+- [Sample Loading](#sample-loading)
+- [Useful Links](#useful-links)
+
+
 # Toolchain setup 
 
 ### Python 3.10+ 
@@ -147,7 +166,7 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `cv_in` | Control voltage input for external analog signals       |
 
 
-## LED configuration
+## LED 
 
 PikoPD boards support 4 LED modes.
 
@@ -177,7 +196,7 @@ Code supports up to 12 different led connection.
 
 
 **RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
-Use [pack f f] object before [s ledRGB] to send 2 values. 
+Use `[pack f f]` object before `[s ledRGB]` to send 2 values. 
 
 
 ## Joystick 
@@ -207,6 +226,52 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - The value is accumulated using `[f]` and `[+]`
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
+
+# Sensors
+
+
+## MPR121
+
+```json
+"sensors": {
+      "mpr121": [
+        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
+        { "name": "mpr2", "i2c_bus": "i2c1", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
+      ]
+    }
+```
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+
+1. 0x5A,
+2. 0x5B,
+3. 0x5C,
+4. 0x5D
+
+I decided to use IRQ pin as obligatory to make polling more efficient. 
+
+To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
+
+
+## CNY70
+
+
+```json
+"sensors": {
+      "cny70": [
+        { "name": "cny", "adc_pin": 28 }
+      ]
+    }
+```
+The CNY70 is a short-range reflective optical sensor (often called an optoisolator or phototransistor). 
+
+Sensor contains two main parts inside its square plastic housing:
+
+- Infrared (IR) Emitter – An LED that continuously emits invisible infrared light
+- Phototransistor (Receiver) – A light-sensitive component that detects reflected IR light
+
+When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected. Since the CNY70 is produced by multiple manufacturers, many wiring variations and tutorials are available online.
+
+To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
 
 # Polyphonic input
