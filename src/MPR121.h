@@ -43,7 +43,8 @@ public:
 
     bool initialized() const { return _initialized; }
     void set_irq_flag() { _irq_flag = true; }
-
+    
+uint16_t getTouched() { return read_touched(); }
 
     bool tryInit() {
         if (_initialized) return true;
@@ -101,18 +102,18 @@ public:
 
         if (touched != _last_touched) {
             // Print bus pointer + address to uniquely identify the sensor
-            printf("Sensor on bus %p addr 0x%02X Mask: %04X\n",
-                   _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], touched);
+        //    printf("Sensor on bus %p addr 0x%02X Mask: %04X\n",
+                //    _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], touched);
 
             for (int i = 0; i < 12; i++) {
                 bool now = touched & (1 << i);
                 bool before = _last_touched & (1 << i);
-                if (now && !before)
-                    printf("Sensor bus %p addr 0x%02X PAD %d TOUCH\n",
-                           _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], i);
-                if (!now && before)
-                    printf("Sensor bus %p addr 0x%02X PAD %d RELEASE\n",
-                           _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], i);
+                // if (now && !before)
+                //     printf("Sensor bus %p addr 0x%02X PAD %d TOUCH\n",
+                //            _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], i);
+                // if (!now && before)
+                //     printf("Sensor bus %p addr 0x%02X PAD %d RELEASE\n",
+                //            _cfg.i2c_port, ADDR_TABLE[_cfg.addr_index], i);
             }
             _last_touched = touched;
         }
