@@ -177,7 +177,7 @@ Code supports up to 12 different led connection.
 
 
 **RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
-Use [pack f f] object before [s ledRGB] to send 2 values. 
+Use `[pack f f]` object before `[s ledRGB]` to send 2 values. 
 
 
 ## Joystick 
@@ -230,7 +230,7 @@ PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2
 
 I decided to use IRQ pin as obligatory to make polling more efficient. 
 
-To use this sensor in the PD  patch create [r pad1 @hv_param] object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
+To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
 ## CNY70
@@ -255,7 +255,7 @@ When you place a finger or an object in front of the sensor (within a few millim
 
 There are many tutorials in the internet which shows different ways how to wire that thing. I use [this](https://github.com/ledlaux/pikoPD/blob/mpr121/docs/images/cny70.png) which works for my cny70 sensor. 
 
-To read this device connect it to the ADC pin and add [r cny@hv_param] object in the PD patch. 
+To read this device connect it to the ADC pin and add `[r cny@hv_param] ` object in the PD patch. 
 
 
 
