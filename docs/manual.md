@@ -216,12 +216,12 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ```json
 "sensors": {
       "mpr121": [
-        { "name": "mpr1", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
-        { "name": "mpr2", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
+        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
+        { "name": "mpr2", "i2c_bus": "i2c1", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
       ]
     }
 ```
-PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c bus. "addr_index" is set to 0 by default which puts each device on the seperate bus automatically. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c bus. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
 
 1. 0x5A,
 2. 0x5B,
