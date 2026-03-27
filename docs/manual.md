@@ -237,7 +237,7 @@ To use this sensor in the PD  patch create [r pad1 @hv_param] object for each pa
 
 **Support for this device is experimental!**
 
-```
+```json
 "sensors": {
       "cny70": [
         { "name": "cny", "adc_pin": 28 }
