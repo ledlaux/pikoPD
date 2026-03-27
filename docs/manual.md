@@ -208,6 +208,29 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
+# Sensors
+
+
+## MPR121
+
+```json
+"sensors": {
+      "mpr121": [
+        { "name": "mpr1", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
+        { "name": "mpr2", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
+      ]
+    }
+```
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c bus. "addr_index" is set to 0 by default which puts each device on the seperate bus automatically. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+
+1. 0x5A,
+2. 0x5B,
+3. 0x5C,
+4. 0x5D
+
+I decided to use IRQ pin as obligatory to make polling more efficient. 
+
+To use this sensor in the PD  patch create [r pad1 @hv_param] object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 # Polyphonic input
 
