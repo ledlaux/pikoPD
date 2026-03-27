@@ -164,12 +164,12 @@ struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char
 {% set mpr_count = board.inputs.sensors.mpr121|length -%}
 
 MprPad active_mpr_pads[] = {
-{#- Range covers up to 4 sensors (11 * 4 = 44) -#}
-{%- for i in range(1, 45) %}
+{#- Range covers up to 8 sensors -#}
+{%- for i in range(1, 97) %}
     {%- set p_name = "pad" ~ i %}
     {%- for p in hv_manifest.receives if p.name == p_name %}
-        {%- set s_idx = (i - 1) // 11 -%}
-        {%- set p_idx = (i - 1) % 11 -%}
+        {%- set s_idx = (i - 1) // 12 -%}
+        {%- set p_idx = (i - 1) % 12 -%}
         {%- if s_idx < mpr_count %}
     { "{{ board.inputs.sensors.mpr121[s_idx].name }}", {{ s_idx }}, {{ p_idx }}, "{{ p.name }}", {{ p.hash }} },
             {%- set active_count.value = active_count.value + 1 -%}
@@ -507,7 +507,7 @@ int main() {
     Pico::MPR121Config cfg[NUM_SENSORS] = {
     {%- for sensor in board.inputs.sensors.mpr121 %}
         { 
-            {% if sensor.address_index == 0 -%}
+            {% if sensor.addr_index == 0 -%}
                 {{ 'i2c0' if loop.index0 == 0 else 'i2c1' }},
             {%- else -%}
                 {{ sensor.i2c_bus | default('i2c0') }},
@@ -515,7 +515,7 @@ int main() {
             {{ sensor.sda }}, 
             {{ sensor.scl }}, 
             {{ sensor.irq }}, 
-            {{ sensor.address_index }} 
+            {{ sensor.addr_index }} 
         }{{ "," if not loop.last }}
     {%- endfor %}
     };
@@ -630,7 +630,6 @@ int main() {
             }
         }
         {%- endif %}
-            
 // -----------------------------
 
 
