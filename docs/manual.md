@@ -240,7 +240,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
       ]
     }
 ```
-PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c bus. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
 
 1. 0x5A,
 2. 0x5B,
@@ -254,7 +254,6 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 
 ## CNY70
 
-**Support for this device is experimental!**
 
 ```json
 "sensors": {
@@ -263,19 +262,16 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
       ]
     }
 ```
-The CNY70 is a short-range reflective optical sensor (often called an optoisolator or phototransistor). Unlike a button that you physically click, this sensor detects how close an object is by bouncing light off it.
+The CNY70 is a short-range reflective optical sensor (often called an optoisolator or phototransistor). 
 
-The sensor contains two main parts inside its square plastic housing:
+Sensor contains two main parts inside its square plastic housing:
 
-- Infrared (IR) Emitter: An LED that constantly sends out invisible light.
-- Phototransistor (Receiver): A light-sensitive component that "looks" for that IR light.
+- Infrared (IR) Emitter – An LED that continuously emits invisible infrared light
+- Phototransistor (Receiver) – A light-sensitive component that detects reflected IR light
 
-When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected.
+When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected. Since the CNY70 is produced by multiple manufacturers, many wiring variations and tutorials are available online.
 
-There are many tutorials in the internet which shows different ways how to wire that thing. 
-
-To read this device connect it to the ADC pin and add `[r cny@hv_param] ` object in the PD patch. 
-
+To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
 
 # Polyphonic input
