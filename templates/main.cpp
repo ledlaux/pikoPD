@@ -128,7 +128,6 @@
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
-
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
@@ -141,6 +140,7 @@ static bool clock_running = false;
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
+// ---- NOTE receives ----
 
 {% set note_receives = [] -%}
 {% for r in hv_manifest.receives if r.name.lower().startswith("note") -%}
@@ -154,6 +154,34 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 {%- endfor %}
 };
 {% endif %}
+
+// ---- MPR121 pad objects ----
+
+{% if board.inputs.sensors.mpr121 -%}
+struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
+
+{% set active_count = namespace(value=0) -%}
+{% set mpr_count = board.inputs.sensors.mpr121|length -%}
+
+MprPad active_mpr_pads[] = {
+{#- Range covers up to 4 sensors (11 * 4 = 44) -#}
+{%- for i in range(1, 45) %}
+    {%- set p_name = "pad" ~ i %}
+    {%- for p in hv_manifest.receives if p.name == p_name %}
+        {%- set s_idx = (i - 1) // 11 -%}
+        {%- set p_idx = (i - 1) % 11 -%}
+        {%- if s_idx < mpr_count %}
+    { "{{ board.inputs.sensors.mpr121[s_idx].name }}", {{ s_idx }}, {{ p_idx }}, "{{ p.name }}", {{ p.hash }} },
+            {%- set active_count.value = active_count.value + 1 -%}
+        {%- endif %}
+    {%- endfor %}
+{%- endfor %}
+};
+
+constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
+{%- endif %}
+
+// ---------------------------
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
@@ -287,17 +315,20 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
         default: return;
     }
 
+// ---- UART MIDI ----
+
     {%- if board.midi_mode == 'uart' %}
-    // --- UART MIDI ---
     uart_write_blocking(uart0, midiMsg, 3);
     {%- endif %}
-
     {%- if board.midi_mode == 'host' %}
-    // --- USB HOST ---
+
+// ---- USB HOST ----
+
     tuh_midi_stream_write(1, 0, midiMsg, 3);
     {%- endif %}
 
-    // --- USB MIDI ---
+// ---- USB MIDI ----
+
     {%- if board.midi_mode == 'usb' %}
     uint8_t status = midiMsg[0];
     uint8_t type   = status & 0xF0;
@@ -418,6 +449,7 @@ void audioFunc(float* buffer, int frames) {
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
+    sleep_ms(1000);
 
     {%- if board.console %}
     #ifndef MIDI_HOST
@@ -425,9 +457,16 @@ int main() {
     #endif
     {%- endif %}
 
-    // MPR121 Test
-    i2c_init(i2c0, 400*1000);
-    i2c_init(i2c1, 400*1000);
+ // --- I2C Initialization ---
+
+    {% if board.inputs.sensors.mpr121 -%}
+    i2c_init(i2c0, 400 * 1000);
+    {% if board.inputs.sensors.mpr121|length > 1 %}
+    i2c_init(i2c1, 400 * 1000);
+    {% endif %}
+    {%- endif %}
+
+ // --------------------------
 
     {%- if board.pico_board == 'zero' %}
     Pico::init_neopixel();
@@ -460,27 +499,43 @@ int main() {
         {{ board.buffer_size }});
     {%- endif %}
 
+// ---- MPR121 init ----
 
-    // ------------- MPR121 Test ---------------
+{% if board.inputs.sensors.mpr121 -%}
+#define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
 
     Pico::MPR121Config cfg[NUM_SENSORS] = {
-        { i2c0, 4, 5, 3, 0,  }, 
-        { i2c1, 6, 7, 8, 0,  }  
+    {%- for sensor in board.inputs.sensors.mpr121 %}
+        { 
+            {% if sensor.address_index == 0 -%}
+                {{ 'i2c0' if loop.index0 == 0 else 'i2c1' }},
+            {%- else -%}
+                {{ sensor.i2c_bus | default('i2c0') }},
+            {%- endif %}
+            {{ sensor.sda }}, 
+            {{ sensor.scl }}, 
+            {{ sensor.irq }}, 
+            {{ sensor.address_index }} 
+        }{{ "," if not loop.last }}
+    {%- endfor %}
     };
-    
-    // Create sensor objects
+
     Pico::MPR121 sensor_array[NUM_SENSORS] = {
-        Pico::MPR121(cfg[0]),
-        Pico::MPR121(cfg[1])
+        {%- for i in range(board.inputs.sensors.mpr121|length) %}
+        Pico::MPR121(cfg[{{ i }}])
+        {%- if not loop.last %},{% endif %}
+        {%- endfor %}
     };
-    
-    // Assign sensors to the static array and set the count
+
     Pico::MPR121::_num_sensors = NUM_SENSORS;
     for (int i = 0; i < NUM_SENSORS; ++i) {
         Pico::MPR121::sensors[i] = &sensor_array[i];
     }
-    
-    // ------------------------------------------
+
+    static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
+    {%- endif %}
+
+// -----------------------------------
 
 
     {%- for btn in active_btns %}
@@ -531,25 +586,13 @@ int main() {
     bool send;
     float target_val; 
     int led_idx;
+
  
     while (true) {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
         midi_task();
-
-      // ------------- MPR121 Test ---------------
-       for (int i = 0; i < NUM_SENSORS; ++i) {
-            if (!sensor_array[i].initialized()) {
-                if (sensor_array[i].tryInit()) {
-                    printf("Sensor #%d initialized!\n", i);
-                }
-            } else {
-                sensor_array[i].processMPR121();  // prints touches/releases
-            }
-        }
-     // ------------------------------------------
-
         {% if board.midi_mode == 'usb' %}
         process_usb_queue();
         {%- endif %}
@@ -559,7 +602,37 @@ int main() {
         {% else %}
         sleep_ms(1); 
         {%- endif %}
-        
+
+// ---- MPR121 Processing ----
+
+        {% if board.inputs.sensors.mpr121 -%}
+        for (int i = 0; i < NUM_SENSORS; ++i) {
+            if (!sensor_array[i].initialized()) {
+                if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
+                continue;
+            }
+
+            sensor_array[i].processMPR121();
+            uint16_t touched = sensor_array[i].getTouched(); 
+
+            if (touched != last_touched_state[i]) {
+                for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
+                    MprPad& pad = active_mpr_pads[p]; 
+                    if (pad.sensor_idx == i) {
+                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
+                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
+                        if (isTouched != wasTouched) {
+                            hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
+                        }
+                    }
+                }
+                last_touched_state[i] = touched;
+            }
+        }
+        {%- endif %}
+            
+// -----------------------------
+
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
@@ -570,8 +643,7 @@ int main() {
             float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
             float clock_val = (now < midi_clock_timer) ? 1.0f : 0.0f;
 
-            
-             // --- LED ---
+// ---- LED ----
 
                 {% for led in active_leds -%}
                     {%- set idx = loop.index0 -%}
@@ -615,7 +687,9 @@ int main() {
                 #endif
             
             {% for btn in active_btns %}
-            // --- Buttons & Gates ---
+
+// ---- Buttons & Gates ----
+
             Pico::processPin({{ loop.index0 }}, val, send); 
             if (send) hv_sendFloatToReceiver(&pd_prog, {{ btn.hash }}, val);
             {%- endfor %}
@@ -626,17 +700,21 @@ int main() {
             {%- endfor %}
     
             {%- for knob in active_knobs %}
-            // --- Knobs  ---
+
+// ---- Knobs  ----
+
             if (Pico::processKnob({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ knob.hash }}, v);
             {%- endfor %}
-
             {%- for enc in active_encoders %}
-            // --- Encoder ---
+
+// ---- Encoder ----
+
             if (Pico::processEnc({{ loop.index0 }}, v)) hv_sendFloatToReceiver(&pd_prog, {{ enc.hash }}, v);
             {%- endfor %}
-            
             {%- for joy in active_joystick %}
-            // --- Joysticks ---
+
+// ---- Joysticks ----
+
             {
                 float vx = 0.0f, vy = 0.0f;
                 bool cX = false, cY = false;
@@ -646,6 +724,8 @@ int main() {
                 }
             }
             {%- endfor %}
+
+// ---- CNY70 sensor ----
 
             {%- for cny in active_cny70 %}
             {
@@ -657,7 +737,7 @@ int main() {
                 }
             }
             {%- endfor %}
-          
+
         } 
         tight_loop_contents();
     } 
