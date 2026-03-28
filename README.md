@@ -27,7 +27,6 @@ I also created an interactive **web config tool**. You can try it here: [Live De
 - [x] sensors
 - [ ] sd card
 - [ ] screen
-- [ ] usb audio
 - [ ] bluetooth midi
       
 
