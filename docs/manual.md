@@ -249,7 +249,7 @@ PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2
 
 IRQ pin is used by default to make polling more efficient. 
 
-IRQ use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
+To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
 ## CNY70
