@@ -247,7 +247,7 @@ PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2
 3. 0x5C,
 4. 0x5D
 
-IRQ pin is used by default to make polling more efficient. 
+IRQ pin is used by default to make processing more efficient. 
 
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
