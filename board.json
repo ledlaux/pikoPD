@@ -14,37 +14,28 @@
   "console": false,
 
   "inputs": {
-
     "adc_pins": [
       { "name": "knob", "pin": 26, "type": "knob" },
-      { "name": "pot", "pin": 27, "type": "knob" },
-      { "name": "cv1", "pin": 28, "type": "cv_in" }
     ],
 
     "buttons": [
       { "name": "btn1", "pin": 23, "mode": "switch" },
-      { "name": "btn2", "pin": 11, "mode": "switch" },
       { "name": "btn3", "pin": 14, "mode": "bang" }
     ],
 
     "gate_in": [
-      { "name": "gate_in", "pin": 15 }
     ],
 
     "encoders": [
-      { "name": "enc", "pin_a": 14, "pin_b": 15 }
     ],
 
     "joystick": [
-      { "name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true }
     ],
 
      "sensors": {
       "cny70": [
-        { "name": "cny", "adc_pin": 28 }
       ],
        "mpr121": [
-        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 }
       ],
        "hc-sr04": [
         { "name": "distance", "echo": 2, "trigger": 3}
@@ -55,17 +46,11 @@
   "outputs": {
     
     "gate_out": [
-      { "name": "gate", "pin": 2, "mode": "gate" },
-      { "name": "trigger", "pin": 3, "mode": "trigger" }
     ]
   },
 
   "leds": [
-    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "pd" },
-    { "name": "led1", "pin": 25, "mode": "pd" },
-    { "name": "midi", "pin": 24, "mode": "midi" },
-    { "name": "clock", "pin": 23, "mode": "clock" }
-   
+    { "name": "led1", "pin": 25, "mode": "pd" }
   ], 
 
   "masterfx": {
