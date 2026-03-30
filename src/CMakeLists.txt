@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 project(pikopd C CXX ASM)
 
 add_compile_definitions(HV_BARE_METAL)
@@ -17,7 +20,6 @@ else()
 endif()
 
 add_definitions(-DMAX_VOICES=${MAX_VOICES})
-
 
 if(MIDI_HOST_ENABLED)
     set(USB_LIB "tinyusb_host")
@@ -38,10 +40,7 @@ else()
     )
 endif()
 
-
-
 pico_sdk_init()
-
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
@@ -63,11 +62,18 @@ target_compile_definitions(pikopd.elf PRIVATE
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
+set(DISTANCE_SENSOR_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor")
+
+add_subdirectory(${DISTANCE_SENSOR_PATH} pico_distance_sensor)
+
+pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor/src/sensor.pio)
+
 target_include_directories(pikopd.elf PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/src"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc"
     "${PICO_SDK_PATH}/lib/tinyusb/src"
     "${PICO_EXTRAS_PATH}/tinyusb"
+    "${DISTANCE_SENSOR_PATH}/include"
 )
 
 target_link_libraries(pikopd.elf PRIVATE
@@ -81,6 +87,7 @@ target_link_libraries(pikopd.elf PRIVATE
     hardware_pwm
     pico_multicore
     hardware_i2c
+    distance-sensor
 )
 
 if(PICO_ZERO_BOARD)
@@ -94,11 +101,8 @@ if("${PICO_BOARD}" STREQUAL "pico_w")
     target_compile_definitions(pikopd.elf PRIVATE PICO_W=1)
 endif()
 
-# 8. Standard Pico Configuration
 pico_enable_stdio_usb(pikopd.elf 0)
 pico_enable_stdio_uart(pikopd.elf 0)
 pico_add_extra_outputs(pikopd.elf)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 target_compile_options(pikopd.elf PRIVATE -O3 -ffast-math)
