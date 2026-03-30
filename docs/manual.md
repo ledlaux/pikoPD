@@ -12,7 +12,7 @@
   - [MPR121](#mpr121)
   - [CNY70](#cny70)
 - [Polyphonic Input](#polyphonic-input)
-- [MIDI CC](#midi-cc)
+- [MIDI](#midi)
 - [Sample Loading](#sample-loading)
 - [Useful Links](#useful-links)
 
@@ -288,7 +288,14 @@ To use the custom system:
 Check example in the patch folder. 
 
 
-# MIDI CC
+# MIDI 
+
+```json
+"midi_mode": "usb"     // Usb midi device "PikoPD"
+"midi_mode": "uart"    // Default pins tx 0, rx 1 
+"midi_mode": "host"    // Use otg cable to power pico and usb midi device
+```
+Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 
 | CC Number | Parameter              | 
 |-----------|------------------------|
@@ -299,7 +306,6 @@ Check example in the patch folder.
 | 92        | Delay Feedback Amount  |
 | 93        | Delay Bypass           | 
 | 120       | Debug Toggle           | 
-
 
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
 
