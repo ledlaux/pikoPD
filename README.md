@@ -114,8 +114,9 @@ To use safe volume it is recomended to keep limiter on. I added a simple delay u
 
 ## Sample loading
 
-Sample loading works despite the limitations (a link to the tutorial is in the last section). By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
+Sample loading works despite the limitations. Here is a link to sample loading tutorial using [Plugdata](https://www.youtube.com/watch?v=0qgkYWsYdTo). 
 
+By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
 ## Default Patch
 
@@ -189,8 +190,6 @@ optional arguments:
   https://wasted-audio.github.io/hvcc/
 - Supported vanilla objects  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
-- Tutorial of how to load samples into the pd patch for the HVCC compiler  
-  https://www.youtube.com/watch?v=0qgkYWsYdTo
 
 
 ## Licence
