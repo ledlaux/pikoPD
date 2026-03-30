@@ -7,8 +7,8 @@
 #include <cmath>
 #include <cstdio> 
 
-
-class DistanceSensorHandler {
+namespace Pico {
+class SonicSensor {
 private:
     float current_val = 0.0f;
     int last_reported = -1;
@@ -16,7 +16,7 @@ private:
     struct repeating_timer timer;
 
     static bool timer_callback(struct repeating_timer *t) {
-        auto* self = (DistanceSensorHandler*)t->user_data;
+        auto* self = (SonicSensor*)t->user_data;
         if (self->hw && !self->hw->is_sensing) {
             self->hw->TriggerRead();
         }
@@ -53,3 +53,7 @@ public:
 
     float getDistance() const { return current_val; }
 };
+
+extern SonicSensor dist_sensor;
+void addDistanceSensor(uint32_t trig, uint32_t echo);
+}
