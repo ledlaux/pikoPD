@@ -114,11 +114,7 @@ To use safe volume it is recomended to keep limiter on. I added a simple delay u
 
 ## Sample loading
 
-Sample loading works despite the limitations (link to tutorial is in the last section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
-
-_float table -> const float table_
-
-Then run command with -x flag to skip file rebuilding. 
+Sample loading works despite the limitations (a link to the tutorial is in the last section). By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
 
 ## Default Patch
