@@ -1,0 +1,4 @@
+#N canvas 827 239 734 565 12;
+#X obj 215 319 r distance @hv_param;
+#X obj 257 375 print;
+#X connect 0 0 1 0;
