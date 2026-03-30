@@ -13,6 +13,7 @@
 #include <cstdio>
 #include "tusb.h"
 #include "delayline.h"
+#include "HC-SR04.h"
 #ifdef PICO_ZERO
 #include "ws2812.pio.h" 
 #endif
@@ -297,6 +298,7 @@ namespace Pico {
     Encoder encoder[4];
     Joystick joystick[2];
     CNY70 cny70[1];
+    DistanceSensorHandler dist_sensor;
 
     int n_btn = 0;
     int n_knob = 0;
@@ -425,12 +427,14 @@ namespace Pico {
         s.alpha = alpha;
         s.dead_zone = dead_zone;
         s.output_id = output_id;
-        s.last_val = -1.0f; // Flag for first-run init
+        s.last_val = -1.0f; 
         s.smooth_value = 0.0f;
-
         n_cny70++;
     }
 
+    void addDistanceSensor(uint32_t trig, uint32_t echo, pio_hw_t* pio, int sm) {
+            dist_sensor.init(trig, echo, pio, sm);
+        }
 
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
@@ -825,11 +829,18 @@ namespace Pico {
         return false;
     }
 
+    bool processDistanceSensor() {
+            return dist_sensor.changed();
+        }
 
-    // -----------Audio-----------
+    float getDistance() {
+            return dist_sensor.getDistance();
+        }
 
 
-    // Stereo Tape-Emulator Delay
+// -----------Audio-----------
+
+// Stereo Tape-Emulator Delay
     void applyStereoDelay(float* buffer, int frames) {
         if (delay_bypass) return;
 
@@ -860,7 +871,7 @@ namespace Pico {
     }
 
 
-    // --- MASTER LIMITER ---
+// --- MASTER LIMITER ---
     void applyLimiter(float* buffer, int frames) {
         if (limiter_bypass) return;
         for (int i = 0; i < frames * 2; i++) {
