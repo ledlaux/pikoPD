@@ -158,8 +158,6 @@ namespace Pico {
     void addCNY70(int pin, int threshold, int max_sensor, 
               float alpha, int dead_zone, int output_id);
 
-    
-  
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
     bool processEnc(int index, float &val);
@@ -195,7 +193,6 @@ namespace Pico {
    
 }
 
- 
     #define MIDI_IN_BUF 256
 
     struct MidiInputBuffer {
