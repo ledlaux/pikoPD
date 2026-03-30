@@ -210,7 +210,6 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 
 # Sensors
 
-
 ## MPR121
 
 ```json
@@ -234,7 +233,6 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 
 
 ## CNY70
-
 
 ```json
 "sensors": {
@@ -269,7 +267,14 @@ To use the custom system:
 Check example in the patch folder. 
 
 
-# MIDI CC
+# MIDI 
+
+```json
+"midi_mode": "usb"     // Usb midi device "PikoPD"
+"midi_mode": "uart"    // Default pins tx 0, rx 1 
+"midi_mode": "host"    // Use otg cable to power pico and usb midi device
+```
+Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 
 | CC Number | Parameter              | 
 |-----------|------------------------|
@@ -281,7 +286,6 @@ Check example in the patch folder.
 | 93        | Delay Bypass           | 
 | 120       | Debug Toggle           | 
 
-
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
 
 
@@ -290,6 +294,7 @@ You can enable the masterFX in the board.json. To use safe volume it is recomend
 Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
+
 
 # Useful links
 
