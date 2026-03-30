@@ -169,6 +169,31 @@ class PicoUF2Generator:
 
             shutil.rmtree(subdir, ignore_errors=True)
 
+    def samples_inflash(self):
+        """Finds generated Heavy tables and adds 'static const' to move them to Flash."""
+        # Find the main generated C++ file (usually Heavy_patchname.cpp)
+        cpp_file = os.path.join(self.hvcc_dir, f"Heavy_{self.patch_name}.cpp")
+        
+        if not os.path.exists(cpp_file):
+            if self.verbose: print(f"Warning: {cpp_file} not found for patching.")
+            return
+
+        with open(cpp_file, 'r') as f:
+            lines = f.readlines()
+
+        patched = False
+        with open(cpp_file, 'w') as f:
+            for line in lines:
+                # Target the hTable definitions
+                if line.startswith("float hTable") and "[" in line:
+                    f.write("static const " + line)
+                    patched = True
+                else:
+                    f.write(line)
+        
+        if patched and self.verbose:
+            print(f"  -> Patched {cpp_file}: Tables moved to Flash memory.")
+
     def run_all(self, flash=False, board_config=None, serial=False, skip_hvcc=False, midi_host=None):
         self.print_logo()
         start_time = time.time()
@@ -194,6 +219,7 @@ class PicoUF2Generator:
             ]
             self.run_cmd(hvcc_cmd, step_name="HVCC")
             self.flatten_hvcc_output()
+            self.samples_inflash()
         else:
             print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
 
