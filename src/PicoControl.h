@@ -121,14 +121,15 @@ namespace Pico {
         int output_id;       // optional ID for PD or USB
     };
 
+
     extern Button btns[12];
     extern Knob knobs[4];
     extern Led leds[12];
     extern Encoder encoder[4];
     extern Joystick joystick[2];
     extern CNY70 cny70[1];
-    extern DistanceSensorHandler dist_sensor;
-
+    extern SonicSensor dist_sensor;
+    
     extern int n_btn;
     extern int n_knob;
     extern int n_led;
@@ -156,6 +157,8 @@ namespace Pico {
     void addJoystick(int index, uint32_t pinX, uint32_t pinY);
     void addCNY70(int pin, int threshold, int max_sensor, 
               float alpha, int dead_zone, int output_id);
+
+    
   
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
