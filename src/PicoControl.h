@@ -127,6 +127,7 @@ namespace Pico {
     extern Encoder encoder[4];
     extern Joystick joystick[2];
     extern CNY70 cny70[1];
+    extern DistanceSensorHandler dist_sensor;
 
     extern int n_btn;
     extern int n_knob;
