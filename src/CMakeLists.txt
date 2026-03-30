@@ -80,6 +80,7 @@ target_link_libraries(pikopd.elf PRIVATE
     hardware_adc
     hardware_pwm
     pico_multicore
+    hardware_i2c
 )
 
 if(PICO_ZERO_BOARD)
