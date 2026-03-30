@@ -45,6 +45,9 @@
       ],
        "mpr121": [
         { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 }
+      ],
+       "hc-sr04": [
+        { "name": "distance", "echo": 2, "trigger": 3}
       ]
     }
   },
