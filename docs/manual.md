@@ -287,12 +287,9 @@ You can enable the masterFX in the board.json. To use safe volume it is recomend
 
 # Sample loading
 
-Sample loading works despite the limitations (link to tutorial is in the next section). Pico stores sample data into the ram, so to load it to the flash we need to manually set tables to *const* in Heavy_patchname.cpp:
+Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
-_float table -> const float table_
-
-Then run command with -x flag to skip file rebuilding. 
-
+By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
 # Useful links
 
