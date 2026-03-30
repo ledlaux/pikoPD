@@ -297,7 +297,7 @@ namespace Pico {
     Encoder encoder[4];
     Joystick joystick[2];
     CNY70 cny70[1];
-    DistanceSensorHandler dist_sensor;
+    SonicSensor dist_sensor;
 
     int n_btn = 0;
     int n_knob = 0;
@@ -431,9 +431,9 @@ namespace Pico {
         n_cny70++;
     }
 
-    void addDistanceSensor(uint32_t trig, uint32_t echo, pio_hw_t* pio, int sm) {
-            dist_sensor.init(trig, echo, pio1, 3);
-        }
+    void addDistanceSensor(uint32_t trig, uint32_t echo) {
+    dist_sensor.init(trig, echo, pio1, 3);
+}
 
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
