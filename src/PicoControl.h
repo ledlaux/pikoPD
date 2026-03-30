@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "MPR121.h"
-
+#include "HC-SR04.h"
 
 #ifdef MIDI_HOST
     #ifndef CFG_TUH_ENABLED
