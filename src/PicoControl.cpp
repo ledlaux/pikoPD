@@ -13,7 +13,6 @@
 #include <cstdio>
 #include "tusb.h"
 #include "delayline.h"
-#include "HC-SR04.h"
 #ifdef PICO_ZERO
 #include "ws2812.pio.h" 
 #endif
