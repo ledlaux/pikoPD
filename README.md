@@ -114,7 +114,7 @@ To use safe volume it is recomended to keep limiter on. I added a simple delay u
 
 ## Sample loading
 
-Sample loading works despite the limitations. Here is a link to sample loading tutorial using [Plugdata](https://www.youtube.com/watch?v=0qgkYWsYdTo). 
+Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
