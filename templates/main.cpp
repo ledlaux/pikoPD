@@ -126,6 +126,17 @@
     {%- set _ = active_cny70.append({'adc_pin': cny.adc_pin, 'hash': receives[cny.name]}) -%}
 {%- endfor -%}
 
+{%- set active_dist = [] -%}
+{%- if board.inputs.sensors['hc-sr04'] -%}
+    {%- for d in board.inputs.sensors['hc-sr04'] if d.name in receives -%}
+        {%- set _ = active_dist.append({
+            'trig': d.trigger, 
+            'echo': d.echo, 
+            'hash': receives[d.name]
+        }) -%}
+    {%- endfor -%}
+{%- endif -%}
+
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 #define FLASH_DURATION_MS 40
@@ -574,6 +585,10 @@ int main() {
     Pico::addCNY70({{ cny.adc_pin }}, 380, 750, 0.6f, 2, {{ loop.index0 }});
     {% endfor %}
 
+    {%- for d in active_dist %}
+    Pico::addDistanceSensor({{ d.trig }}, {{ d.echo }});
+    {%- endfor %}
+
     multicore_launch_core1(Pico::core1_audio_entry);
 
     float val, v; 
@@ -730,8 +745,17 @@ int main() {
                 }
             }
             {%- endfor %}
+                
+// ---- HC-SR04 Distance sensor ----
 
-        } 
+            {%- for d in active_dist %}
+            if (Pico::dist_sensor.changed()) {
+                hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, Pico::dist_sensor.getDistance());
+            //    printf("[Distance] Sensor: %s | Val: %.2f cm\n", "distance", dist_cm);
+            }
+            {%- endfor %}
+                
+            } 
         tight_loop_contents();
     } 
 
