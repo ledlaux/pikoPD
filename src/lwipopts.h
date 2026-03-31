@@ -1,11 +1,9 @@
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)]
 
-// allow override in some examples
 #ifndef NO_SYS
 #define NO_SYS                      1
 #endif
-// allow override in some examples
 #ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 0
 #endif
@@ -16,7 +14,10 @@
 #define MEM_LIBC_MALLOC             0
 #endif
 #define MEM_ALIGNMENT               4
-#define MEM_SIZE                    4000
+#define MEM_SIZE                    16384 
+#define MEMP_NUM_TCP_PCB 10      // Allow more simultaneous connections
+#define MEMP_NUM_SYS_TIMEOUT 15  // mDNS and HTTPD both need their own timers
+
 #define MEMP_NUM_TCP_SEG            32
 #define MEMP_NUM_ARP_QUEUE          10
 #define PBUF_POOL_SIZE              24
@@ -83,8 +84,14 @@
 #define SLIP_DEBUG                  LWIP_DBG_OFF
 #define DHCP_DEBUG                  LWIP_DBG_OFF
 
-// This section enables HTTPD server with SSI, SGI
-// and tells server which converted HTML files to use
+#define LWIP_MDNS_RESPONDER          1
+#define LWIP_NUM_NETIF_CLIENT_DATA   1 
+#define LWIP_IGMP                    1 
+#define MEMP_NUM_UDP_PCB            10 
+
+#define LWIP_HTTPD_DYNAMIC_HEADERS 1
+#define LWIP_HTTPD_SUPPORT_V09     1
+#define LWIP_HTTPD_SUPPORT_11_KEEPALIVE 1
 #define LWIP_HTTPD 1
 #define LWIP_HTTPD_SSI 1
 #define LWIP_HTTPD_CGI 1
