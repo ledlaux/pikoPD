@@ -1,0 +1,126 @@
+; MIT License
+; 
+; Copyright (c) 2022 Daniel Garcia-Briseno
+; 
+; Permission is hereby granted, free of charge, to any person obtaining a copy
+; of this software and associated documentation files (the "Software"), to deal
+; in the Software without restriction, including without limitation the rights
+; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+; copies of the Software, and to permit persons to whom the Software is
+; furnished to do so, subject to the following conditions:
+; 
+; The above copyright notice and this permission notice shall be included in all
+; copies or substantial portions of the Software.
+; 
+; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+; SOFTWARE.
+
+; Usage:
+;  1. Write 0xFFFFFFFF to TX FIFO with pio_sm_put
+;  2. Register IRQ handler to be notified when sense is done (optional)
+;  3. Read from RX fifo, bitwise NOT it, and multiply it by 2. This is
+;     the number of microseconds that the echo pin was high.
+;  4. For HC-SR04, divide this value by 58 to get the measurement in cm
+
+.program distance_sensor
+.side_set 1 ; side set will be used to drive the trigger pin high.
+
+; Stall on OSR. Wait for software to send a signal to continue
+; by writing to the OSR. Software is required to write 0xFFFFFFFF
+; for the counter to work properly
+out x, 32              side 0
+; Use side set to set the trigger pin high
+; It must remain high for 10us. In this case the clock
+; divider should be set to achieve 1MHz (1 tick per microsecond)
+; Also use this instruction to set the input shift register to 0xFFFFFFFF
+; We'll use this as a counter for the number of microseconds
+; that have passed since echo went high
+nop                    side 1 [10]
+; Wait for the echo signal to go high on the echo pin
+wait 1 pin 0           side 0
+update_counter:
+; add 1 to the counter and back to sample pin, else fall to completion
+; sense x is non zero, jump back to sampling the echo pin, which is just
+; the next instruction.
+jmp x-- sample_echo    side 0
+
+sample_echo:
+; if pin is high, go back to counter update
+; The counter is updated every 2 clock cycles (2us)
+; so software needs to take that into account. It means the measurement
+; will always be off by 1 microsecond (1/58cm) assuming the sensor
+; is even that accurate.
+; The init function below sets the jump pin to the echo pin at pin + 1
+jmp pin update_counter side 0
+
+; The above jmps will loop updating the counter in scratch x until
+; the sensor drives the echo pin low.
+
+return:
+; Move the counter result into the RX FIFO
+; the sdk function below will enable autopush
+in x 32                side 0
+; Notify the software via irq that the measurement is done.
+irq 0 rel              side 0
+
+% c-sdk {
+    #include "hardware/pio.h"
+    #include "hardware/clocks.h"
+
+    /**
+     * Initializer for the above program
+     * @param[in] pio the PIO instance to use
+     * @param[in] sm state machine to use for the PIO instance
+     * @param[in] offset Offset into PIO memory to place the program into
+     * @param[in] pins the first of 2 sequential gpios to use. pins = trigger pin, pins + 1 = echo pin.
+     * @param[in] isr Routine executed when the distance sensing starts and ends
+     *            Can be null if you want to enable interrupts yourself.
+     *            check interrupt source sm for sense start and (sm + 1) for sense end.
+     *            the distance measured in centimeters is microseconds between start and end divided by 58 for the HC-SR04
+     */
+    static inline void distance_sensor_program_init(PIO pio, uint sm, uint offset, uint pins, irq_handler_t isr) {
+        // Set the trigger pin and echo pin as gpio pins
+        pio_gpio_init(pio, pins);
+        pio_gpio_init(pio, pins + 1);
+        // Set the trigger pin as an output pin
+        pio_sm_set_consecutive_pindirs(pio, sm, pins, 1, true);
+        // Set the echo pin as an input pin
+        pio_sm_set_consecutive_pindirs(pio, sm, pins + 1, 1, false);
+        // Enable the IRQ source. 0 for echo high, 1 for echo low
+        pio_set_irq0_source_enabled(pio, (enum pio_interrupt_source)(pis_interrupt0 + sm), true);
+        if (isr != NULL) {
+            // Set the function to be executed for the isr.
+            irq_set_exclusive_handler(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0, isr);
+            // Enable the ISR
+            irq_set_enabled(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_1, true);
+            pio_interrupt_clear(pio, sm);
+        }
+
+        // Build the configuration for the state machine
+        pio_sm_config config = distance_sensor_program_get_default_config(offset);
+        // Set the trigger pin as a sideset pin
+        sm_config_set_sideset_pins(&config, pins);
+        // Set the in pin to pins + 1, the echo pin.
+        sm_config_set_in_pins(&config, pins + 1);
+        // Set up autopull to pull the TX Fifo into the OSR so assembly
+        // does not need to waste an instruction with PULL
+        sm_config_set_out_shift(&config, true, true, 32);
+        sm_config_set_in_shift(&config, true, true, 32);
+        // Set the jump pin for the counter to work
+        sm_config_set_jmp_pin(&config, pins + 1);
+
+        // Desired frequency is 1MHz, or 1 microsecond per cycle.
+        float freq = 1000000;
+        float div = clock_get_hz(clk_sys) / (freq);
+        sm_config_set_clkdiv(&config, div);
+
+        // Load the config and execute the state machine
+        pio_sm_init(pio, sm, offset, &config);
+        pio_sm_set_enabled(pio, sm, true);
+    }
+%}
