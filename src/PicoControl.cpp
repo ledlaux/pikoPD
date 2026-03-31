@@ -789,6 +789,7 @@ namespace Pico {
             sum += adc_read();
         }
         
+        // 10bit adc read
         float raw10 = (float)sum / 64.0f; 
         rawOut = raw10; 
 
