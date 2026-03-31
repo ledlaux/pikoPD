@@ -16,7 +16,7 @@ Code expect echo pin to be trigger pin +1.
 
 ## Patch
 
-In the patches folder there is a patch distance_sensor.pd with [r distance @hv_param] object which should send 0-1.0 values from the sensor. 
+In the patches folder there is a patch distance_sensor.pd with `[r distance @hv_param]` object which should send 0-1.0 values from the sensor. 
 
 ## Template
 Template will populate PD object hash and include the functions:
