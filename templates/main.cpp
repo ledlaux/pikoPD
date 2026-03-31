@@ -463,12 +463,19 @@ void audioFunc(float* buffer, int frames) {
 
 
 const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
-    if (iNumParams > 0 && strcmp(pcParam[0], "v") == 0) {
-        float raw_val = atof(pcValue[0]); 
-        hv_sendFloatToReceiver(&pd_prog, 0x65400F82, raw_val);
-
+    for (int i = 0; i < iNumParams; i++) {
+        float raw_val = atof(pcValue[i]);
+        
+        if (strcmp(pcParam[i], "v") == 0) {
+            hv_sendFloatToReceiver(&pd_prog, 0x65400F82, raw_val);
+        } else if (strcmp(pcParam[i], "t") == 0) {
+            hv_sendFloatToReceiver(&pd_prog, 0x99AABBCC, raw_val);
+        } else if (strcmp(pcParam[i], "s") == 0) {
+            hv_sendFloatToReceiver(&pd_prog, 0x22FF3344, raw_val);
+        }
     }
-    return "/index.shtml";
+    
+    return NULL; 
 }
 
 static const tCGI cgi_handlers[] = {
