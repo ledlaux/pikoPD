@@ -1,5 +1,5 @@
 This is a test branch for the **HC-SR04** distance sensor reading and processing with pikoPD.  
-Since I do not own this device, the code is theoretical and requires hardware testing.
+**Since I do not own this device, the code is theoretical and requires hardware testing.**
 I do not guarantee that it will work.
 
 To implement the sensor reading I included this library in /lib:
