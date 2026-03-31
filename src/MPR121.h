@@ -15,8 +15,7 @@
 */
 
 
-#ifndef PICO_MPR121_HPP
-#define PICO_MPR121_HPP
+#pragma once
 
 #include <stdio.h>
 #include "pico/stdlib.h"
@@ -157,4 +156,3 @@ public:
 
 } // namespace Pico
 
-#endif
