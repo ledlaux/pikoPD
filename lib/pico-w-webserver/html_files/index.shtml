@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PikoPD Control</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #222; color: #eee; }
+        .slider { width: 300px; margin: 20px; }
+    </style>
+</head>
+<body>
+    <h1>PikoPD Web Console</h1>
+    <div class="control-group">
+        <h2>Master Control</h2>
+        <label>Value: <span id="master_val">64</span></label><br>
+        <input type="range" id="master_slider" class="slider" 
+               min="0" max="127" value="64" 
+               oninput="updatePD(this.value)">
+    </div>
+
+    <script>
+    function updatePD(val) {
+        // Update the number label immediately
+        document.getElementById('master_val').innerText = val;
+        
+        // Send data in background (no page reload)
+        fetch(`/update_pd.cgi?v=${val}`)
+            .catch(err => console.error("Communication error"));
+    }
+    </script>
+</body>
+</html>
