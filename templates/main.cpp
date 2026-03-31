@@ -510,7 +510,7 @@ int main() {
     } else {
       //  printf("Connected! IP: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
         
-        // 3. DISABLE Power Save - This is the secret to a stable Web Server
+        // 3. DISABLE Power Save for stable Web Server
         // Without this, the Pico W sleeps and misses incoming HTTP requests.
         cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
     }
@@ -520,7 +520,6 @@ int main() {
     http_set_cgi_handlers(cgi_handlers, 1); 
     ssi_init();
     
-  
 
     // 6. The Background Loop
     while (true) {
