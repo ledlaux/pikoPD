@@ -433,7 +433,7 @@ namespace Pico {
 
     void addDistanceSensor(uint32_t trig, uint32_t echo) {
     dist_sensor.init(trig, echo, pio1, 3);
-}
+    }
 
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
