@@ -1,6 +1,6 @@
 # Pure Data → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **Raspberry Pi Pico UF2** firmware using **hvcc** compiler and **pico-sdk**. 
+This project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
 
 The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, and sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
 
