@@ -1,6 +1,6 @@
 {
   "name": "heavy",
-  "pico_board": "pico_w",
+  "pico_board": "pico2",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
