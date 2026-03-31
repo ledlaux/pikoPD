@@ -21,6 +21,21 @@ In the patches folder there is a patch distance_sensor.pd with `[r distance @hv_
 ## Template
 Template will populate PD object hash and include the functions:
 
+Check for active HC-SR04 object name in the board.json and receives in manifest.json.
+
+```
+{%- set active_dist = [] -%}
+{%- if board.inputs.sensors['hc-sr04'] -%}
+    {%- for d in board.inputs.sensors['hc-sr04'] if d.name in receives -%}
+        {%- set _ = active_dist.append({
+            'trig': d.trigger, 
+            'echo': d.echo, 
+            'hash': receives[d.name]
+        }) -%}
+    {%- endfor -%}
+{%- endif -%}
+```
+
 **Init**  
 ```
   {%- for d in active_dist %}
