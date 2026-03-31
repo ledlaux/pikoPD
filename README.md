@@ -2,7 +2,7 @@
 
 This project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
 
-The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, and sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
+The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
 
 It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. Future plans include adding an automated project builder using arduino-cli workflow.
 
