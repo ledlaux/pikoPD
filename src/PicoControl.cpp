@@ -1,0 +1,1078 @@
+#include "PicoControl.h"
+#include "hardware/dma.h"
+#include "hardware/adc.h"
+#include "hardware/pwm.h"
+#include "hardware/gpio.h"
+#include "pico/audio_i2s.h"
+#include "pico/multicore.h"
+#include "pico/audio_pwm.h"
+#include "hardware/pio.h"
+#include "pico/time.h"
+#include <atomic>
+#include <cmath>
+#include <cstdio>
+#include "tusb.h"
+#include "delayline.h"
+#ifdef PICO_ZERO
+#include "ws2812.pio.h" 
+#endif
+
+    // ----------- Voice -----------
+
+
+    Voice voices[MAX_VOICES];
+    uint32_t voiceCounter = 0;
+
+#ifndef MAX_VOICES
+#define MAX_VOICES 1
+#endif
+
+
+
+    // ----------- MIDI ------------
+
+
+    MidiOutputBuffer midi_out_rb;
+    MidiInputBuffer  midi_in_rb;
+
+
+    void midi_push(uint8_t byte) {
+        uint32_t h = midi_in_rb.head.load(std::memory_order_relaxed);
+        uint32_t t = midi_in_rb.tail.load(std::memory_order_acquire);
+        if ((h - t) < MIDI_IN_BUF) {
+            midi_in_rb.data[h & (MIDI_IN_BUF - 1)] = byte;
+            midi_in_rb.head.store(h + 1, std::memory_order_release);
+        }
+    }
+
+
+    bool midi_pop(uint8_t &byte) {
+        uint32_t t = midi_in_rb.tail.load(std::memory_order_relaxed);
+        uint32_t h = midi_in_rb.head.load(std::memory_order_acquire);
+        if (t == h) return false; 
+        byte = midi_in_rb.data[t & (MIDI_IN_BUF - 1)];
+        midi_in_rb.tail.store(t + 1, std::memory_order_release);
+        return true;
+    }
+
+
+    void parse_raw_midi_byte(uint8_t byte, void (*handler)(uint8_t, uint8_t, uint8_t)) {
+    
+        if (byte >= 0xF8) { 
+            handler(byte, 0, 0);
+            return;
+        }
+    
+        static uint8_t msg[3];
+        static int idx = 0;
+        static int expected = 0;
+        
+        if (byte & 0x80) { 
+            msg[0] = byte; 
+            idx = 1;
+            uint8_t type = byte & 0xF0;
+    
+            if (type == 0xC0 || type == 0xD0) expected = 2; 
+            else if (byte == 0xF2) expected = 3;          
+            else if (byte == 0xF1 || byte == 0xF3) expected = 2; 
+            else if (byte < 0xF0) expected = 3;            
+            else {
+                idx = 0;
+                expected = 0; 
+            }
+        } 
+    
+        else if (idx > 0 && idx < 3) { 
+            msg[idx++] = byte;
+        }
+    
+        if (idx != 0 && idx == expected) {
+            handler(msg[0], msg[1], (expected == 3) ? msg[2] : 0);
+            
+            if (msg[0] < 0xF0) {
+                idx = 1; 
+            } else {
+                idx = 0;
+                expected = 0;
+            }
+        }
+    }
+
+
+    int allocateVoice(uint8_t note) {
+
+        int existing = findVoiceByNote(note);
+        if (existing >= 0) {
+            voices[existing].age = voiceCounter++;
+            return existing;
+        }
+
+        int oldestIndex = 0;
+        uint32_t oldestAge = UINT32_MAX;
+
+        for (int i = 0; i < MAX_VOICES; i++) {
+
+            if (!voices[i].active) {
+                voices[i].note = note;
+                voices[i].active = true;
+                voices[i].age = voiceCounter++;
+                return i;
+            }
+
+            if (voices[i].age < oldestAge) {
+                oldestAge = voices[i].age;
+                oldestIndex = i;
+            }
+        }
+
+        // If all voices busy, steal the oldest one
+        int v = oldestIndex;
+
+        sendVoiceNoteOff(v, voices[v].note);
+
+        voices[v].note = note;
+        voices[v].active = true;
+        voices[v].age = voiceCounter++;
+
+        return v;
+    }
+
+
+    static int usb_midi_dev0 = -1;
+    static int usb_midi_dev1 = -1;
+
+    void usb_init() {
+   
+        usb_midi_dev0 = -1;
+        usb_midi_dev1 = -1;
+
+        #ifdef MIDI_HOST
+            tusb_init(0, NULL);
+        #else
+            tusb_init(); 
+        #endif
+    }
+
+
+    void midi_task() {
+        #ifdef MIDI_HOST
+            tuh_task();
+        #else
+            tud_task();  
+        #endif
+            uint8_t b;
+            while (midi_pop(b)) {
+                parse_raw_midi_byte(b, handle_midi_message);
+            }
+        }
+
+
+    extern "C" void on_uart_rx() {
+        while (uart_is_readable(uart0)) {
+            midi_push(uart_getc(uart0));
+        }
+    }
+
+
+    void uart_midi_init() {
+        uart_deinit(uart0);
+        uart_init(uart0, 31250); 
+        gpio_set_function(0, GPIO_FUNC_UART); 
+        gpio_set_function(1, GPIO_FUNC_UART); 
+        uart_set_format(uart0, 8, 1, UART_PARITY_NONE);
+        uart_set_hw_flow(uart0, false, false);
+        uart_set_fifo_enabled(uart0, true);
+        irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
+        uart_set_irq_enables(uart0, true, false); 
+        irq_set_enabled(UART0_IRQ, true);
+    }
+
+
+     // ----------- PD PRINT ------------
+
+#ifndef ENABLE_DEBUG
+    #define ENABLE_DEBUG 0 
+#endif
+
+    PrintMsg         print_pool[PRINT_POOL_SIZE];
+
+
+#ifndef MIDI_HOST
+    void print_queue(const char** names, int num_names, bool debug) {
+        constexpr int MAX_PRINTS_PER_CALL = 8;
+
+        for (int i = 0; i < MAX_PRINTS_PER_CALL; ++i) {
+            if (!multicore_fifo_rvalid()) break;
+
+            uint32_t idx;
+            if (!multicore_fifo_pop_timeout_us(0, &idx)) break;
+            if (idx >= PRINT_POOL_SIZE) continue;
+
+            PrintMsg* m = &print_pool[idx];
+
+            #if ENABLE_DEBUG
+            if (tud_cdc_connected() && debug) {
+                const char* name = (m->id >= 0 && m->id < num_names)
+                                ? names[m->id]
+                                : "print";
+
+                if (m->is_float) {
+                    printf("[%s] %.3f\n", name, m->val);
+                }
+            }
+            #endif
+
+            m->busy.store(false, std::memory_order_release);
+        } 
+    } 
+
+
+    void process_usb_queue() {
+        if (!tud_midi_mounted()) return;
+
+        uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
+        uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
+
+        while (t != h) {
+            uint32_t msg = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
+            
+            uint8_t len    = (msg >> 24) & 0xFF; 
+            uint8_t status = (msg >> 16) & 0xFF;
+            uint8_t d1     = (msg >> 8)  & 0xFF;
+            uint8_t d2     = msg         & 0xFF;
+            
+            uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, (uint8_t)(len == 3 ? d2 : 0) };
+
+            if (tud_midi_packet_write(packet)) {
+                t++; 
+                midi_out_rb.tail.store(t, std::memory_order_release);
+            } else {
+                break; 
+            }
+        }
+    }
+    
+#endif
+
+
+
+
+namespace Pico {
+
+    
+    std::atomic<float> led_vals[12];
+    std::atomic<float> led_hue[12];        
+    std::atomic<float> led_intensity[12];
+    static uint32_t led_framebuffer[12] = {0};
+    static float smooth_hue[12] = {0.0f};
+
+    // --- MASTER FX ---
+    daisysp::DelayLine<float, 16000> echoL, echoR;
+    float delay_level = 0.0f;
+    float delay_feedback = 0.0f;
+    float target_delay_samples = 0.0f;
+    float current_delay_samples = 0.0f;
+    bool delay_bypass = false;
+    bool limiter_bypass = false;
+    float master_gain = 1.0f;
+    float master_volume = 0.8f;
+    float last_out_L = 0.0f, last_out_R = 0.0f;
+
+    const float release_coeff = 0.0005f; // Smaller = Slower release
+
+    static bool adc_initialized = false;
+
+    inline void start_adc() {
+        if (!adc_initialized) {
+            adc_init();
+            adc_initialized = true;
+            }
+        }
+    
+
+
+    Button btns[12];
+    Led leds[12];
+    Knob knobs[4];
+    Encoder encoder[4];
+    Joystick joystick[2];
+    CNY70 cny70[1];
+
+    int n_btn = 0;
+    int n_knob = 0;
+    int n_led = 0;
+    int n_encoder = 0; 
+    int n_joystick = 0;
+    int n_cny70 = 0;
+
+    void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration) {
+        gpio_init(pin);
+        btns[index].pin = pin;
+        btns[index].mode = mode;
+        btns[index].mask = (1u << pin);
+        btns[index].pulse_duration = duration;
+
+        if (mode == GATE_OUT) {
+            gpio_set_dir(pin, GPIO_OUT);
+            gpio_put(pin, 0);
+            btns[index].state.store(false, std::memory_order_relaxed);
+            btns[index].last = false;
+            
+        } else {
+            gpio_set_dir(pin, GPIO_IN);
+            gpio_pull_up(pin);
+            
+            bool is_pressed = !gpio_get(pin);
+            btns[index].state.store(is_pressed, std::memory_order_relaxed);
+            btns[index].last = is_pressed;
+            btns[index].raw_prev = is_pressed;
+        }
+
+        btns[index].last_time = 0;
+        btns[index].toggle_state = false;
+        btns[index].reset_at = 0;
+
+        if (index >= n_btn) n_btn = index + 1;
+    }
+
+
+    void addKnob(int index, uint32_t pin) {
+        start_adc();
+        adc_gpio_init(pin);
+        knobs[index].adc_ch = pin - 26;
+        knobs[index].value.store(0.0f, std::memory_order_relaxed);
+        knobs[index].last_val = 0.0f;
+        knobs[index].coeff = 0.1f; 
+        if (index >= n_knob) n_knob = index + 1;
+    }
+
+
+    void addCV(int index, uint32_t pin) {
+        addKnob(index, pin); 
+        knobs[index].coeff = 1.0f; 
+    }
+
+
+    void addEncoder(int index, uint32_t pinA, uint32_t pinB) {
+        gpio_init(pinA);
+        gpio_set_dir(pinA, GPIO_IN);
+        gpio_pull_up(pinA);
+
+        gpio_init(pinB);
+        gpio_set_dir(pinB, GPIO_IN);
+        gpio_pull_up(pinB);
+
+        encoder[index].pinA = pinA;
+        encoder[index].pinB = pinB;
+        
+        encoder[index].last_clk = gpio_get(pinA);
+        encoder[index].last_dt  = gpio_get(pinB);
+        
+        encoder[index].value.store(0, std::memory_order_relaxed);
+        encoder[index].last_sent_count = 0;
+
+        if (index >= n_encoder) n_encoder = index + 1;
+    }
+
+
+    void addLed(int index, uint32_t pin) {
+        gpio_set_function(pin, GPIO_FUNC_PWM);
+        uint slice = pwm_gpio_to_slice_num(pin);
+        uint chan = pwm_gpio_to_channel(pin);
+        pwm_set_wrap(slice, 255);
+        pwm_set_enabled(slice, true);
+        
+        leds[index].pin = pin;
+        leds[index].slice = slice;
+        leds[index].chan = chan;
+        leds[index].is_rgb = false;
+        
+        if (index >= n_led) n_led = index + 1;
+    }
+
+
+    void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
+        start_adc();
+        adc_gpio_init(pinX);
+        adc_gpio_init(pinY);
+        
+        joystick[index].adcX = pinX - 26;
+        joystick[index].adcY = pinY - 26;
+
+        adc_select_input(joystick[index].adcX);
+        joystick[index].centerX = adc_read();
+        adc_select_input(joystick[index].adcY);
+        joystick[index].centerY = adc_read();
+
+        joystick[index].smoothX = (float)joystick[index].centerX;
+        joystick[index].smoothY = (float)joystick[index].centerY;
+        joystick[index].x.store(0, std::memory_order_relaxed);
+        joystick[index].y.store(0, std::memory_order_relaxed);
+
+        if (index >= n_joystick) n_joystick = index + 1;
+    }
+
+
+    void addCNY70(int pin, int threshold, int max_sensor, float alpha, int dead_zone, int output_id) {
+     
+        start_adc();
+        adc_gpio_init(pin);
+
+        auto &s = cny70[0];
+        s.adc_ch = pin - 26;
+        s.threshold = threshold;
+        s.max_sensor = max_sensor;
+        s.alpha = alpha;
+        s.dead_zone = dead_zone;
+        s.output_id = output_id;
+        s.last_val = -1.0f; // Flag for first-run init
+        s.smooth_value = 0.0f;
+
+        n_cny70++;
+    }
+
+
+    void update(uint32_t now) {
+        uint32_t all_pins = gpio_get_all(); 
+            
+        // --- Buttons ---
+        for (int i = 0; i < n_btn; i++) {
+            if (btns[i].mode == GATE_OUT) {
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    gpio_put(btns[i].pin, 0);
+                    btns[i].state.store(false, std::memory_order_relaxed);
+                    btns[i].reset_at = 0; 
+                }
+                continue; 
+            }
+    
+            bool r = (all_pins & btns[i].mask) == 0;
+            if (btns[i].mode == GATE_IN) {
+                btns[i].state.store(r, std::memory_order_relaxed);
+                } else {
+                    if (r != btns[i].raw_prev) {
+                        btns[i].last_time = now;
+                        btns[i].raw_prev = r;
+                    } else if ((now - btns[i].last_time) > 20) {  // debounce 20 ms
+                        btns[i].state.store(r, std::memory_order_relaxed);
+                    }
+                }
+        }
+
+        // --- Encoders ---
+        for (int i = 0; i < n_encoder; i++) {
+            bool clk = (all_pins & (1u << encoder[i].pinA)) != 0;
+            bool dt  = (all_pins & (1u << encoder[i].pinB)) != 0;
+    
+            if (clk != encoder[i].last_clk) {
+                if (clk) { 
+                    if (clk != dt) {
+                        encoder[i].value.fetch_sub(1, std::memory_order_relaxed);
+                    } else {
+                        encoder[i].value.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+                encoder[i].last_clk = clk;
+            }
+        }
+    
+        // --- Knobs ---
+        for (int i = 0; i < n_knob; i++) {
+            adc_select_input(knobs[i].adc_ch);
+            float raw = (float)adc_read() / 4095.0f;
+            float prev = knobs[i].value.load(std::memory_order_relaxed);
+            
+            if (fabsf(raw - prev) > 0.001f) {
+                float next_val = prev + (raw - prev) * knobs[i].coeff;
+                knobs[i].value.store(next_val, std::memory_order_relaxed);
+            }
+        }
+
+        // --- Joystic ---
+
+        for (int i = 0; i < n_joystick; i++) {
+            adc_select_input(joystick[i].adcX);
+            float rawX = (float)adc_read();
+            adc_select_input(joystick[i].adcY);
+            float rawY = (float)adc_read();
+
+            if (fabsf(rawX - joystick[i].smoothX) > 1.0f) {
+                joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f; 
+            }
+            if (fabsf(rawY - joystick[i].smoothY) > 1.0f) {
+                joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
+            }
+
+            int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
+            int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
+
+            joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
+            joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
+        }
+    }   
+
+
+    void updateGate(int index, float val) {
+        if (index < 12 && btns[index].mode == GATE_OUT) {
+            int state = (val > 0.5f) ? 1 : 0;
+            
+            uint32_t duration = btns[index].pulse_duration; 
+
+            switch (state) {
+                case 1:  // Trigger
+                    gpio_put(btns[index].pin, 1);
+                    btns[index].state.store(true, std::memory_order_relaxed);
+                    
+                    if (duration > 0) {
+                        uint32_t now = to_ms_since_boot(get_absolute_time());
+                        btns[index].reset_at = now + duration;
+                    }
+                    
+                    break;
+            case 0:    // Gate
+                if (duration == 0) {
+                    gpio_put(btns[index].pin, 0);
+                    btns[index].state.store(false, std::memory_order_relaxed);
+                }
+                break;
+            }
+        }
+    }
+   
+
+    bool buttonPressed(int i) {
+        bool s = btns[i].state.load(std::memory_order_relaxed);
+        if (s && !btns[i].last) {
+            btns[i].last = true;
+            return true;
+        }
+        if (!s) btns[i].last = false;
+        return false;
+    }
+
+
+    bool buttonToggled(int i, bool& outState) {
+        bool s = btns[i].state.load(std::memory_order_relaxed);
+        if (s && !btns[i].last) {
+            btns[i].last = true;
+            btns[i].toggle_state = !btns[i].toggle_state;
+            outState = btns[i].toggle_state;
+            return true;
+        }
+
+        if (!s) btns[i].last = false;
+        return false;
+    }
+
+
+    bool buttonChanged(int i, bool& outState) {
+        bool s = btns[i].state.load(std::memory_order_relaxed);
+        if (s != btns[i].last) {
+            btns[i].last = s;
+            outState = s;
+            return true;
+        }
+
+        return false;
+    }
+
+
+    bool processEnc(int index, float &val) {
+        int current_count = encoder[index].value.load(std::memory_order_relaxed);
+        int diff = current_count - encoder[index].last_sent_count;
+
+        if (abs(diff) >= 1) {
+            val = (diff > 0) ? 1.0f : -1.0f;
+            encoder[index].last_sent_count = current_count;
+            return true;
+        }
+        return false;
+    }
+
+
+    void processPin(int i, float &outVal, bool &shouldSend) {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        bool s;
+        shouldSend = false;
+
+        switch (btns[i].mode) {
+            case BANG:
+                if (buttonPressed(i)) {
+                    outVal = 1.0f;
+                    shouldSend = true;
+                    btns[i].reset_at = now + 10;  // reset after ms
+                } 
+                
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    btns[i].reset_at = 0; 
+                    outVal = 0.0f;
+                    shouldSend = true;    
+                }
+                break;
+
+            case TOGGLE:
+                if (buttonToggled(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                }
+                break;
+
+            case SWITCH:
+            case GATE_IN:
+                if (buttonChanged(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                }
+                break;
+
+            case GATE_OUT:
+                if (buttonChanged(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                    gpio_put(btns[i].pin, s); 
+                }
+                break;
+        }
+    }
+
+
+    bool processKnob(int i, float& outVal) {
+        float v = knobs[i].value.load(std::memory_order_relaxed);
+        if (std::abs(v - knobs[i].last_val) > 0.005f) {
+            knobs[i].last_val = v;
+            outVal = v;
+            return true;
+        }
+        return false;
+    }
+
+
+   bool processJoystick(int id, float &outX, float &outY, bool &cX, bool &cY, bool midi_range) {
+        if (id >= n_joystick) return false;
+
+        float newX = (float)joystick[id].x.load() / 2048.0f;
+        float newY = (float)joystick[id].y.load() / 2048.0f;
+
+        if (newX > 1.0f) newX = 1.0f; if (newX < -1.0f) newX = -1.0f;
+        if (newY > 1.0f) newY = 1.0f; if (newY < -1.0f) newY = -1.0f;
+
+        if (midi_range) {
+            float midiNormX = (newX + 1.0f) * 0.5f;
+            float midiNormY = (newY + 1.0f) * 0.5f;
+            newX = (float)((int)(midiNormX * 126.0f) + 1);
+            newY = (float)((int)(midiNormY * 126.0f) + 1);
+        }
+
+        float threshold = midi_range ? 2.0f : 0.05f; 
+
+        cX = (std::abs(newX - joystick[id].lastSentX) > threshold);
+        cY = (std::abs(newY - joystick[id].lastSentY) > threshold);
+
+        if (cX) { 
+            outX = newX; 
+            joystick[id].lastSentX = newX; 
+        }
+        if (cY) { 
+            outY = newY; 
+            joystick[id].lastSentY = newY; 
+        }
+
+        return (cX || cY);
+    }
+
+
+#ifdef PICO_ZERO
+
+    void init_neopixel() {
+        static bool initialized = false;
+        if (initialized) return;
+
+        PIO pio = pio1;
+        int sm = 0;
+        if (!pio_can_add_program(pio, &ws2812_program)) return;
+            
+        uint offset = pio_add_program(pio, &ws2812_program);
+        ws2812_program_init(pio, sm, offset, 16, 800000, false); 
+
+        pio_sm_set_enabled(pio, sm, true);
+            
+        initialized = true;
+    }
+
+
+    void addRgbLed(int index, uint32_t pin, uint8_t r, uint8_t g, uint8_t b) {
+        init_neopixel(); 
+        leds[index].pin = pin;
+        leds[index].is_rgb = true;
+        leds[index].r = r;
+        leds[index].g = g;
+        leds[index].b = b;
+
+        if (index >= n_led) n_led = index + 1;
+    }
+
+
+    void updateRGB(int index, float hue, float intensity) {
+        if (index < 0 || index >= 12) return;
+        float diff = hue - smooth_hue[index];
+        if (diff > 0.5f) diff -= 1.0f;
+        if (diff < -0.5f) diff += 1.0f;
+        smooth_hue[index] += diff * 0.15f; 
+
+        // Keep hue in 0..1 range
+        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
+        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
+
+        // 2. HSV to RGB Math
+        float r = 0, g = 0, b = 0;
+        float h = smooth_hue[index] * 6.0f;
+        int i = (int)h;
+        float f = h - i;
+        float q = 1.0f - f;
+
+        switch (i % 6) {
+            case 0: r = 1.0f; g = f;    b = 0.0f; break;
+            case 1: r = q;    g = 1.0f; b = 0.0f; break;
+            case 2: r = 0.0f; g = 1.0f; b = f;    break;
+            case 3: r = 0.0f; g = q;    b = 1.0f; break;
+            case 4: r = f;    g = 0.0f; b = 1.0f; break;
+            case 5: r = 1.0f; g = 0.0f; b = q;    break;
+        }
+
+        // 3. Gamma & Intensity
+        float gamma = intensity * intensity;
+        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
+        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
+        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
+
+        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
+    }
+
+
+   void showRGB() {
+        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
+        pio1->txf[0] = led_framebuffer[0];
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+        pio1->txf[0] = 0;
+    }
+
+#endif
+
+    void __not_in_flash_func(setLedHardware)(int index, float value) {
+        if (index >= 12) return;
+        float gamma = value * value;
+        if (leds[index].is_rgb) return; 
+        uint16_t level = (uint16_t)(gamma * 255.0f);
+        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
+    }
+
+
+    void updateLed(int index, float val) {
+        if (index < 12) {
+            led_vals[index].store(val, std::memory_order_relaxed);
+            if (!leds[index].is_rgb) {
+                setLedHardware(index, val);
+            }
+        }
+        }
+
+
+    bool processCNY70(int i, float &outVal, float &rawOut) {
+        if (i < 0 || i >= n_cny70) return false;
+        auto &s = cny70[i];
+
+        adc_select_input(s.adc_ch);
+        
+        uint32_t sum = 0;
+        for(int j = 0; j < 16; j++) {
+            sum += adc_read();
+        }
+        
+        float raw10 = (float)sum / 64.0f; 
+        rawOut = raw10; 
+
+        float current_norm = 0.0f;
+        
+        // SAFETY: If sensor is below threshold (e.g. 400.3 vs 450), 
+        // force it to exactly 0.0 to prevent crashing PD.
+        if (raw10 > (float)s.threshold) {
+            float range = (float)s.max_sensor - (float)s.threshold;
+            if (range < 1.0f) range = 1.0f;
+            current_norm = (raw10 - (float)s.threshold) / range;
+        } else {
+            current_norm = 0.0f; 
+        }
+        
+        if (current_norm > 1.0f) current_norm = 1.0f;
+
+        // Smoothing
+        if (s.last_val < -0.5f) {
+            s.smooth_value = current_norm;
+            s.last_val = 0.0f;
+        } else {
+            s.smooth_value += (current_norm - s.smooth_value) * s.alpha;
+        }
+
+        // Deadzone check
+        float dz = (float)s.dead_zone * 0.001f;
+        if (fabsf(s.smooth_value - s.last_val) > dz || s.smooth_value == 0.0f || s.smooth_value == 1.0f) {
+            s.last_val = s.smooth_value;
+            outVal = s.smooth_value;
+            return true;
+        }
+
+        return false;
+    }
+
+
+    // -----------Audio-----------
+
+
+    // Stereo Tape-Emulator Delay
+    void applyStereoDelay(float* buffer, int frames) {
+        if (delay_bypass) return;
+
+        current_delay_samples += (target_delay_samples - current_delay_samples) * 0.01f;
+
+        const float offset = 441.0f;
+
+        echoL.SetDelay(current_delay_samples);
+        echoR.SetDelay(current_delay_samples + offset);
+
+        for (int i = 0; i < frames * 2; i += 2) {
+            float inL = buffer[i];
+            float inR = buffer[i + 1];
+
+            float delL = echoL.Read();
+            float delR = echoR.Read();
+
+            float fbL = fmaxf(-1.0f, fminf(1.0f, inL * 0.5f + delR * delay_feedback));
+            float fbR = fmaxf(-1.0f, fminf(1.0f, inR * 0.5f + delL * delay_feedback));
+
+            echoL.Write(fbL);
+            echoR.Write(fbR);
+
+            // Mix dry/wet
+            buffer[i]     = fmaxf(-1.0f, fminf(1.0f, inL * 0.7f + delL * delay_level * 0.5f));
+            buffer[i + 1] = fmaxf(-1.0f, fminf(1.0f, inR * 0.7f + delR * delay_level * 0.5f));
+        }
+    }
+
+
+    // --- MASTER LIMITER ---
+    void applyLimiter(float* buffer, int frames) {
+        if (limiter_bypass) return;
+        for (int i = 0; i < frames * 2; i++) {
+            float sample = buffer[i] * master_volume;
+            float abs_v = fabsf(sample);
+            if (abs_v > 0.95f) {
+                float target_gain = 0.95f / abs_v;
+                if (target_gain < master_gain) master_gain = target_gain;
+            } else {
+                master_gain += (1.0f - master_gain) * release_coeff;
+            }
+
+            sample *= master_gain;
+
+            if (sample > 1.0f) sample = 1.0f;
+            if (sample < -1.0f) sample = -1.0f;
+
+            buffer[i] = sample;
+        }
+    }
+
+
+    void init_dsp_effects() {
+        echoL.Init();
+        echoR.Init();
+        master_volume = 0.8f;
+    }
+
+    #define MAX_BLOCK_SIZE 1024
+
+    static float heavy_buffer[MAX_BLOCK_SIZE * 2] __attribute__((aligned(4)));
+
+    static uint16_t static_pwm_buffers[2][MAX_BLOCK_SIZE] __attribute__((aligned(4)));
+
+    static AudioMode _mode;
+    static AudioProcessCallback _cb;
+    static int _srate, _bpin, _dpin, _bsize; 
+
+    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
+                        int sample_rate, uint data_pin, uint bclk_pin, int buffer_size) {
+            _mode = mode;
+            _cb = callback;
+            _srate = sample_rate;
+            _dpin = data_pin;
+            _bpin = bclk_pin;
+            _bsize = buffer_size;
+        }
+
+    void __not_in_flash_func(core1_audio_entry)() {
+        audio_format_t audio_format = {
+            .sample_freq   = (uint32_t)_srate,
+            .format        = AUDIO_BUFFER_FORMAT_PCM_S16,
+            .channel_count = (uint16_t)((_mode == I2S) ? 2 : 1) 
+        };
+
+        audio_buffer_format_t producer_format = {
+            .format        = &audio_format,
+            .sample_stride = (uint16_t)(audio_format.channel_count * sizeof(int16_t))
+        };
+
+
+    if (_mode == I2S) {
+            struct audio_i2s_config i2s_config = {
+                .data_pin       = (uint8_t)_dpin,
+                .clock_pin_base = (uint8_t)_bpin,
+                .dma_channel    = 0,
+                .pio_sm         = 0
+            };
+
+            struct audio_buffer_pool* ap = audio_new_producer_pool(&producer_format, 3, _bsize);
+            audio_i2s_setup(&audio_format, &i2s_config);
+            audio_i2s_connect(ap);
+            audio_i2s_set_enabled(true);
+
+            while (true) {
+                struct audio_buffer* buffer = take_audio_buffer(ap, false);
+                
+                if (buffer) {
+                    if (_cb) {
+                        int frames = buffer->max_sample_count;
+
+                        _cb(heavy_buffer, frames);
+                    
+                        int16_t* out = (int16_t*)buffer->buffer->bytes;
+                        for (int i = 0; i < frames * 2; i++) {
+                            float v = heavy_buffer[i];
+                            if (v > 1.0f) v = 1.0f; 
+                            else if (v < -1.0f) v = -1.0f;
+                            out[i] = (int16_t)(v * 32767.0f);
+                        }
+                    }
+                    
+                    buffer->sample_count = buffer->max_sample_count;
+                    give_audio_buffer(ap, buffer);
+                }       
+            }
+        }
+    else {
+            const uint pwm_pin = _dpin;
+            gpio_set_function(pwm_pin, GPIO_FUNC_PWM);
+            uint slice   = pwm_gpio_to_slice_num(pwm_pin);
+            uint channel = pwm_gpio_to_channel(pwm_pin);
+
+            const uint16_t wrap = 4095;  
+            pwm_set_wrap(slice, wrap);
+            pwm_set_enabled(slice, true);
+
+            uint16_t* pwm_buffers[2] = { static_pwm_buffers[0], static_pwm_buffers[1] };
+            int write_idx = 0;
+
+            int dma_chan = dma_claim_unused_channel(true);
+            dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
+            channel_config_set_transfer_data_size(&cfg, DMA_SIZE_16);
+            channel_config_set_read_increment(&cfg, true);
+            channel_config_set_write_increment(&cfg, false);
+            channel_config_set_dreq(&cfg, pwm_get_dreq(slice));
+
+            volatile uint16_t* pwm_cc_ptr = ((volatile uint16_t*)&pwm_hw->slice[slice].cc) + channel;
+
+            while (true) {
+                if (_cb) {
+                    _cb(heavy_buffer, _bsize);
+        
+                    for (int i = 0; i < _bsize; i++) {
+                        float v = (heavy_buffer[i*2] + heavy_buffer[i*2+1]) * 0.5f;
+                        if (v > 1.f) v = 1.f; else if (v < -1.f) v = -1.f;
+                        pwm_buffers[write_idx][i] = (uint16_t)((v * 0.5f + 0.5f) * wrap);
+                    }
+
+                    dma_channel_wait_for_finish_blocking(dma_chan);
+
+                    dma_channel_configure(
+                        dma_chan, &cfg, 
+                        pwm_cc_ptr,            
+                        pwm_buffers[write_idx], 
+                        _bsize, 
+                        true                 
+                    );
+
+                    write_idx = 1 - write_idx;
+                }
+            }
+        }
+
+    }
+    
+  
+
+}
+
+extern "C" {
+
+#if MIDI_HOST
+    void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t qt) {
+        (void)qt;
+        uint8_t packet[4];
+        while (tuh_midi_packet_read(dev_addr, packet)) {
+            uint8_t cin = packet[0] & 0x0F;
+            uint8_t len = 0;
+
+            switch (cin) {
+                case 0x05: case 0x0F: len = 1; break;
+                case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                case 0x03: case 0x04: case 0x07: case 0x08: 
+                case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+            }
+
+            for (uint8_t i = 0; i < len; i++) {
+                midi_push(packet[i + 1]);
+            }
+        }
+    }
+
+
+    void tuh_midi_mount_cb(uint8_t dev_addr, const tuh_midi_mount_cb_t *mount_cb_data) {
+        (void)mount_cb_data;
+        if (usb_midi_dev0 == -1) usb_midi_dev0 = dev_addr;
+        else if (usb_midi_dev1 == -1) usb_midi_dev1 = dev_addr;
+    }
+
+
+    void tuh_midi_umount_cb(uint8_t dev_addr) {
+        if (usb_midi_dev0 == dev_addr) usb_midi_dev0 = -1;
+        else if (usb_midi_dev1 == dev_addr) usb_midi_dev1 = -1;
+    }
+
+#else
+
+    void tud_midi_rx_cb(uint8_t itf) {
+        (void)itf;
+        uint8_t packet[4];
+        while (tud_midi_available()) {
+            if (tud_midi_packet_read(packet)) {
+                uint8_t cin = packet[0] & 0x0F;
+                uint8_t len = 0;
+
+                switch (cin) {
+                    case 0x05: case 0x0F: len = 1; break;
+                    case 0x02: case 0x06: case 0x0C: case 0x0D: len = 2; break;
+                    case 0x03: case 0x04: case 0x07: case 0x08: 
+                    case 0x09: case 0x0A: case 0x0B: case 0x0E: len = 3; break;
+                }
+
+                for (uint8_t i = 0; i < len; i++) {
+                    midi_push(packet[i + 1]);
+                }
+            }
+        }
+    }
+#endif
+
+   
+
+
+}
