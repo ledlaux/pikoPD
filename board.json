@@ -15,7 +15,7 @@
 
   "inputs": {
     "adc_pins": [
-      { "name": "knob", "pin": 26, "type": "knob" },
+      { "name": "knob", "pin": 26, "type": "knob" }
     ],
 
     "buttons": [
