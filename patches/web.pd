@@ -1,0 +1,13 @@
+#N canvas 827 239 734 565 12;
+#X text 40 477 https://github.com/ledlaux/pikoPD;
+#X text 49 448 This is default patch for testing;
+#X obj 523 67 r web1 @hv_param;
+#X obj 535 496 dac~;
+#X obj 436 219 mtof;
+#X obj 436 266 sig~;
+#X obj 436 315 hv.osc~ saw;
+#X connect 2 0 4 0;
+#X connect 4 0 5 0;
+#X connect 5 0 6 0;
+#X connect 6 0 3 0;
+#X connect 6 0 3 1;
