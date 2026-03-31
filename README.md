@@ -1,4 +1,4 @@
-This is a test branch for the **HC-SR04** distance sensor reading and processing with PD.  
+This is a test branch for the **HC-SR04** distance sensor reading and processing with pikoPD.  
 Since I do not own this device, the code is theoretical and requires hardware testing.
 I do not guarantee that it will work.
 
