@@ -136,3 +136,7 @@ float getDistance() {
 return dist_sensor.getDistance();
 }
 ```
+
+## Debug prints
+
+Enable debug console in board.json (set to true). Uncomment printf lines or connect `[r distance @hv_param]` object to `[print distance]` in PD patch. 
