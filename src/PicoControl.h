@@ -1,5 +1,4 @@
-#ifndef PICO_CONTROL_HPP
-#define PICO_CONTROL_HPP
+#pragma once
 
 #include "pico/stdlib.h"
 #include <atomic>
@@ -255,4 +254,4 @@ namespace Pico {
 
 
     
-#endif
+
