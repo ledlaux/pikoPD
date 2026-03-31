@@ -748,19 +748,17 @@ int main() {
                 
 // ---- HC-SR04 Distance sensor ----
 
-           {%- for d in active_dist %}
-             
+                {%- for d in active_dist %}
                 if (Pico::dist_sensor.changed()) {
-                // 1. Get the sensor data
-                float dist_cm = Pico::dist_sensor.getDistance();
-            
-                // 2. Send that stored value to Heavy/Pure Data
-                hv_sendFloatToReceiver(&pd_prog, 0x990209A9, dist_cm);
-            
-                // 3. Print raw sensor values in the serial monitor
-                printf("[Distance] Sensor: %s | Val: %.2f cm\n", "distance", dist_cm);
+                    // 1. Get the sensor data
+                    float dist_cm = Pico::dist_sensor.getDistance();
+                
+                    // 2. Send the captured value to the specific PD hash for this sensor
+                    hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, dist_cm);
+                
+                    // 3. Print raw sensor values to the serial monitor
+                    printf("[Distance] Sensor: %s | Val: %.2f cm\n", "{{ d.name }}", dist_cm);
                 }
-             
             {%- endfor %}
                 
             } 
