@@ -13,20 +13,15 @@
 {%- endif %}
 
 #include "lwip/apps/httpd.h"
-
+#include "lwip/apps/mdns.h"
+#include "lwip/netif.h"
 #include "lwip/apps/fs.h"
-#include <stddef.h> // Provides NULL
-
-// 2. Use extern "C" to include the data file
-// This prevents C++ from mangling the names
-extern "C" {
-    #include "htmldata.c"
-}
+#include <stddef.h> 
 #include "ssi.h"
 
 // Define your credentials
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
+#define WIFI_SSID "Redmi"
+#define WIFI_PASSWORD "12345678"
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
@@ -487,8 +482,7 @@ int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
 
-
-      // 5. Audio and Pure Data Setup
+    // 1. Audio and Pure Data Setup
     pd_prog.setSendHook(&sendHookHandler);
     {% if board.audio_mode == "I2S" %}
     Pico::setupAudio(I2S, audioFunc, {{ board.sample_rate }}, {{ board.i2s_data_pin }}, {{ board.i2s_bclk_pin }}, {{ board.buffer_size }});
@@ -496,45 +490,49 @@ int main() {
     Pico::setupAudio(PWM, audioFunc, {{ board.sample_rate }}, {{ board.pwm_pin }}, 0, {{ board.buffer_size }});
     {% endif %}
 
+    // Launch audio on Core 1 immediately to keep it stable
     multicore_launch_core1(Pico::core1_audio_entry);
     
-    // 1. Initialize Wi-Fi with a country code (important for regulatory domain/channels)
-    // Use CYW43_COUNTRY_USA, CYW43_COUNTRY_UK, etc.
+    // 2. Initialize Wi-Fi Hardware
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
-        printf("Wi-Fi init failed\n");
         return -1;
     }
 
     cyw43_arch_enable_sta_mode();
 
-   // printf("Connecting to Wi-Fi: %s...\n", WIFI_SSID);
-    
-    // 2. Attempt connection
+    // 3. Attempt Connection
     int connect_result = cyw43_arch_wifi_connect_blocking(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
     
-    if (connect_result != 0) {
-      //  printf("Failed to connect. Error code: %d\n", connect_result);
-    } else {
-      //  printf("Connected! IP: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+    if (connect_result == 0) {
+        // --- SUCCESSFUL CONNECTION ---
         
-        // 3. DISABLE Power Save for stable Web Server
-        // Without this, the Pico W sleeps and misses incoming HTTP requests.
+        // A. Disable Power Save immediately for stable web traffic
         cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
+
+        // B. Initialize Web Server Services
+        // We do this BEFORE mDNS so the HTTP port is ready
+        httpd_init();
+        http_set_cgi_handlers(cgi_handlers, 1); 
+        ssi_init();
+
+        // C. Initialize mDNS Responder
+        // This allows access via http://pikopd.local
+        mdns_resp_init();
+        mdns_resp_add_netif(netif_default, "pikopd");
+        mdns_resp_add_service(netif_default, "piko-control", "_http", DNSSD_PROTO_UDP, 80, NULL, NULL);
+
+        // Optional: Print IP to console for manual fallback
+        // printf("Web Server active at: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+    } else {
+        // Failed to connect - handle blinky error or retry logic here
     }
 
-    // 4. Initialize Networking Services
-    httpd_init();
-    http_set_cgi_handlers(cgi_handlers, 1); 
-    ssi_init();
-    
-
-    // 6. The Background Loop
+    // 4. The Background Loop
     while (true) {
-        // Keeps the Wi-Fi stack alive
+        // This is mandatory for the background Wi-Fi stack to process packets
         cyw43_arch_poll();
         
-        // Minor sleep to prevent Core 0 from 100% saturation 
-        // allowing the network background tasks to run smoother
+        // Give the processor a tiny break to let internal tasks catch up
         sleep_ms(1);
     } 
 
