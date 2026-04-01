@@ -26,15 +26,32 @@
 
 ### arm-none-eabi-gcc toolchain ###
 
-Mac:
+### Mac:
 ```bash
 brew install cmake
 brew install git  
 xcode-select --install  
 brew install arm-none-eabi-gcc
-```   
+```
 
-Linux:  
+If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version
+
+```bash
+brew uninstall --force arm-none-eabi-gcc
+brew uninstall --force arm-none-eabi-binutils
+brew install gcc-arm-embedded
+```
+
+I would suggest to use ARM version
+
+Download:  
+[https://developer.arm.com/downloads/-/a ... -downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+
+Then add this to the PATH:
+```bash
+echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"' >> ~/.bash_profile && source ~/.bash_profile```
+```
+### Linux:  
 ```bash
 sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
 ```  
