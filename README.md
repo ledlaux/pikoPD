@@ -121,6 +121,12 @@ To use safe volume it is recomended to keep limiter on. I added a simple delay u
 
 Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
+And video of using mpr121 with samples loaded in PD on RP2040. Check example patch:
+
+https://github.com/ledlaux/pikoPD/blob/main/patches/sample_drums_MPR121.pd
+
+https://github.com/user-attachments/assets/01730a33-1773-4c31-b4e1-928125b71d42
+
 ## Default Patch
 
 PD patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
