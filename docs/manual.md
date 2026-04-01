@@ -233,7 +233,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ```json
 "sensors": {
       "mpr121": [
-        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
+        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 6, "addr_index": 0 },
         { "name": "mpr2", "i2c_bus": "i2c1", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
       ]
     }
