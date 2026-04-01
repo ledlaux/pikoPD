@@ -1,26 +1,43 @@
-# Toolchain setup 
 
-### Python 3.10+ 
+# Toolchain setup
+
+## Python 3.10+ 
 
   - jinja2
 
 
-### arm-none-eabi-gcc toolchain ###
+## Cmake and arm-none-eabi-gcc
 
-Mac:
+### Mac:
 ```bash
 brew install cmake
 brew install git  
 xcode-select --install  
 brew install arm-none-eabi-gcc
-```   
+```
+If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version
 
-Linux:  
+```bash
+brew uninstall --force arm-none-eabi-gcc
+brew uninstall --force arm-none-eabi-binutils
+brew install gcc-arm-embedded
+```
+
+I would suggest to use ARM version
+
+Download:  
+[https://developer.arm.com/downloads/-/a ... -downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
+
+Then add this to the PATH:
+```bash
+echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"' >> ~/.bash_profile && source ~/.bash_profile
+```
+### Linux:  
 ```bash
 sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
 ```  
 
-### Heavy compiler (hvcc) 
+## Heavy compiler (hvcc) 
 
 ```bash
 python3 -m venv venv
@@ -30,7 +47,7 @@ cd hvcc/
 pip3 install -e .  
 ```
 
-### Raspberry Pi Pico SDK 
+## Raspberry Pi Pico SDK 
 
 ```bash
 git clone https://github.com/raspberrypi/pico-sdk.git  
@@ -43,7 +60,7 @@ Set pico-sdk path environment variable:
 export PICO_SDK_PATH=/your_path/pico-sdk
 ```  
 
-### pico-extras 
+## pico-extras 
 
 Must be places inside the pico-sdk folder.
 
@@ -54,14 +71,14 @@ cd pico-extras
 git submodule update --init  
 ```
 
-### picotool 
+## picotool 
 
-Mac:  
+### Mac:  
 ```bash
 brew install picotool
 ```  
 
-Linux:  
+### Linux:  
 
 ```bash
 git clone https://github.com/raspberrypi/picotool
@@ -210,6 +227,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 
 # Sensors
 
+
 ## MPR121
 
 ```json
@@ -233,6 +251,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 
 
 ## CNY70
+
 
 ```json
 "sensors": {
@@ -302,7 +321,3 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
   https://wasted-audio.github.io/hvcc/
 - Supported vanilla objects  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
-- Tutorial of how to load samples into the pd patch for the HVCC compiler  
-  https://www.youtube.com/watch?v=0qgkYWsYdTo
-
-
