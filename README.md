@@ -7,7 +7,7 @@ I will be testing HTTP web control and OSC protocol to interact with PD patches 
 ## First test - HTTP
 
 
-Raspberry Pi Pico W connected to Wi-Fi and hosting a webpage with a slider that controls PD.
+Raspberry Pi Pico W connected to Wi-Fi and hosting a webpage with a slider that controls PD parameter.
 
 https://github.com/user-attachments/assets/1167bb92-f829-4321-8264-e8fa96430ee1
 
@@ -15,6 +15,6 @@ https://github.com/user-attachments/assets/1167bb92-f829-4321-8264-e8fa96430ee1
 
 ## Second test - OSC
 
-Raspberry Pi Pico W connected to wifi and receiving osc messages from the mac that controls PD.
+Raspberry Pi Pico W connected to wifi and receiving OSC messages from the mac that controls PD parameter.
 
 https://github.com/user-attachments/assets/80f30ee2-c3fe-4fdc-927f-d8da6f6a1685
