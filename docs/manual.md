@@ -17,14 +17,14 @@
 - [Useful Links](#useful-links)
 
 
-# Toolchain setup 
+# Toolchain setup
 
-### Python 3.10+ 
+## Python 3.10+ 
 
   - jinja2
 
 
-### arm-none-eabi-gcc toolchain 
+## Cmake and arm-none-eabi-gcc
 
 ### Mac:
 ```bash
@@ -55,7 +55,7 @@ echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PA
 sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
 ```  
 
-### Heavy compiler (hvcc) 
+## Heavy compiler (hvcc) 
 
 ```bash
 python3 -m venv venv
@@ -65,7 +65,7 @@ cd hvcc/
 pip3 install -e .  
 ```
 
-### Raspberry Pi Pico SDK 
+## Raspberry Pi Pico SDK 
 
 ```bash
 git clone https://github.com/raspberrypi/pico-sdk.git  
@@ -78,7 +78,7 @@ Set pico-sdk path environment variable:
 export PICO_SDK_PATH=/your_path/pico-sdk
 ```  
 
-### pico-extras 
+## pico-extras 
 
 Must be places inside the pico-sdk folder.
 
@@ -89,14 +89,14 @@ cd pico-extras
 git submodule update --init  
 ```
 
-### picotool 
+## picotool 
 
-Mac:  
+### Mac:  
 ```bash
 brew install picotool
 ```  
 
-Linux:  
+### Linux:  
 
 ```bash
 git clone https://github.com/raspberrypi/picotool
