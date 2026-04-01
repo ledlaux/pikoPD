@@ -1775,7 +1775,7 @@ function renderLists() {
         const themeColor = '#a0522d'; 
 
         const busPins = {
-            'i2c0': [4, 8, 12, 16, 20],
+            'i2c0': [0, 4, 8, 12, 16, 20],
             'i2c1': [2, 6, 10, 14, 18, 26]
         };
         const availablePins = busPins[it.i2c_bus] || busPins['i2c0'];
@@ -2095,7 +2095,7 @@ function updateModeUI() {
         const currentBus = document.getElementById('mpr-bus')?.value || 'i2c0';
         const currentSda = parseInt(document.getElementById('mpr-sda')?.value || (currentBus === 'i2c0' ? 4 : 2));
         const busPins = {
-            'i2c0': [ 4, 8, 12, 16, 20],
+            'i2c0': [ 0, 4, 8, 12, 16, 20],
             'i2c1': [ 2, 6, 10, 14, 18, 26]
         };
 
