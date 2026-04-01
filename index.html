@@ -156,8 +156,9 @@
 
         /* Analog / ADC = Orange */
         .pin.assigned-adc { 
-            background: var(--adc) !important; 
-            color: #000 !important; 
+            background: #ff8c00 !important; 
+            color: #ffffff !important;     
+            box-shadow: 0 0 8px rgba(255, 140, 0, 0.4); 
         }
             
         /* Digital Inputs (Buttons) = Green */
@@ -178,10 +179,11 @@
             box-shadow: 0 0 8px rgba(0, 136, 255, 0.4);
         }
         /* MPR121 */
-        .pin.assigned-sensor {
-            background-color: #ff8c00; 
-            color: white;
-            border: 1px solid #fff;
+        .pin.assigned-sensor { 
+            background: #a0522d !important; 
+            color: #fff !important; 
+            /* Matches the 'glow' style of your encoders */
+            box-shadow: 0 0 8px rgba(160, 82, 45, 0.4); 
         }
         
         .comp-groups {display: flex; gap: 15px; flex: 1; align-items: stretch;}
@@ -763,7 +765,7 @@
 </div>
     </div>
     <div class="panel">
-        <h3>Audio Engine & FX</h3>
+        <h3>Audio Engine</h3>
         <div style="flex-grow: 1;"> 
             <label>Sample Rate (Hz)</label>
             <select id="sample-rate" onchange="config.sample_rate = parseInt(this.value); refreshUI()">
@@ -782,14 +784,15 @@
             <input type="number" id="voice-count" value="4" min="1" max="16" oninput="config.voice_count = parseInt(this.value); refreshUI()">
         </div>
    <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 12px; margin-top: auto;">
-    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Master Limiter</span>
-        <input type="checkbox" id="fx-limiter" checked onchange="config.masterfx.limiter = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
-    </div>
-    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Master Delay</span>
+     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Delay</span>
         <input type="checkbox" id="fx-delay" onchange="config.masterfx.delay = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
     </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Limiter</span>
+        <input type="checkbox" id="fx-limiter" checked onchange="config.masterfx.limiter = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
+    </div>
+   
 </div>
 </div>
 </div>
@@ -1319,8 +1322,8 @@ function showPage(id) {
         },
         leds: [],
         masterfx: { 
-            limiter: true,
-            delay: false
+            delay: false,
+            limiter: true
         }
     };
 
@@ -1769,7 +1772,7 @@ function renderLists() {
         
         if (config.inputs.sensors.mpr121) {
     config.inputs.sensors.mpr121.forEach((it, i) => {
-        const themeColor = '#ff8c00'; 
+        const themeColor = '#a0522d'; 
 
         const busPins = {
             'i2c0': [4, 8, 12, 16, 20],
