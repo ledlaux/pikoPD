@@ -49,7 +49,7 @@ Download:
 
 Then add this to the PATH:
 ```bash
-echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"' >> ~/.bash_profile && source ~/.bash_profile```
+echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PATH"' >> ~/.bash_profile && source ~/.bash_profile
 ```
 ### Linux:  
 ```bash
