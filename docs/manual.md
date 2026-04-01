@@ -24,7 +24,7 @@
   - jinja2
 
 
-### arm-none-eabi-gcc toolchain ###
+### arm-none-eabi-gcc toolchain 
 
 ### Mac:
 ```bash
