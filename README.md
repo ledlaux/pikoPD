@@ -10,6 +10,10 @@ Compiled binaries for RP2040 are published in the [release](https://github.com/l
 
 I also created an interactive **web config tool**. You can try it here: [Live Demo](https://ledlaux.github.io/pikoPD).
 
+<img width="1920" height="920" alt="pikoPD-tool"
+src="https://raw.githubusercontent.com/ledlaux/pikoPD/github-pages/docs/images/pikoPD-tool.png" />
+
+
 ## Project Updates
 
 - [x] serial console
