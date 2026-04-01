@@ -68,11 +68,10 @@ I also created an interactive **web config tool**. You can try it here: [Live De
 3. Midi input and output implemented in usb, usb host and uart config. Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 4. Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device.
 5. Sample loading works despite limitations. By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more. 
-
+6. For devices with wifi like picoW and pico2W web and osc control will be added soon. Check web code branch for more info. 
 7. Raspberry Pico can't sample audio so `[adc]` object will not work without an external adc.
 
 
-   
 ## Notes
 
 [Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)
