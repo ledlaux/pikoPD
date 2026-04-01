@@ -2038,17 +2038,15 @@ function showCopySuccess(btn) {
 }
 
 function removeComp(cat, i) {
-    // 1. Handle nested sensors (MPR121 and CNY70)
     if (cat === 'mpr121') {
         if (config.inputs.sensors && config.inputs.sensors.mpr121) {
-            config.inputs.sensors.mpr121.splice(i, 1); // Changed 'index' to 'i'
+            config.inputs.sensors.mpr121.splice(i, 1);
         }
     } else if (cat === 'cny70') {
         if (config.inputs.sensors && config.inputs.sensors.cny70) {
             config.inputs.sensors.cny70.splice(i, 1);
         }
     } 
-    // 2. Handle standard categories
     else if (cat === 'leds') {
         config.leds.splice(i, 1);
     } else if (cat === 'gate_out') {
@@ -2063,9 +2061,11 @@ function removeComp(cat, i) {
         }
     }
 
-    if (config.inputs.sensors && 
-        Object.keys(config.inputs.sensors).every(key => config.inputs.sensors[key].length === 0)) {
-        delete config.inputs.sensors;
+    if (config.inputs.sensors) {
+        const s = config.inputs.sensors;
+        const hasMpr = s.mpr121 && s.mpr121.length > 0;
+        const hasCny = s.cny70 && s.cny70.length > 0;
+
     }
 
     refreshUI();
