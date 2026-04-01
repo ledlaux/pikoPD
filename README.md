@@ -14,3 +14,7 @@ https://github.com/user-attachments/assets/1167bb92-f829-4321-8264-e8fa96430ee1
 
 
 ## Second test - OSC
+
+Raspberry Pi PicoW connected to wifi and receiving osc messages from the mac which controls PD patch running on the device. 
+
+https://github.com/user-attachments/assets/80f30ee2-c3fe-4fdc-927f-d8da6f6a1685
