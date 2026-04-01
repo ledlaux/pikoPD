@@ -14,6 +14,7 @@
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
+- [WEB control and OSC](#web-control-and-osc)
 - [Useful Links](#useful-links)
 
 
@@ -331,6 +332,10 @@ You can enable the masterFX in the board.json. To use safe volume it is recomend
 Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
+
+# WEB control and OSC
+
+Will be updated...
 
 
 # Useful links
