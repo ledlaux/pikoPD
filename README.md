@@ -1,8 +1,8 @@
 # Pure Data → HVCC → Raspberry Pi Pico UF2 Generator 
 
-This project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
+PikoPD project automates building **Pure Data patches** (`.pd`) into a **UF2** firmware using **hvcc compiler** and **Raspberry Pi Pico C/C++ SDK**.   
 
-The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
+The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
 
 It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. Future plans include adding an automated project builder using arduino-cli workflow.
 
@@ -50,8 +50,8 @@ pikopd.py
 
 - Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
 - Copies config files into project folder from `/src`
-- Configures project hardware using `board.json`
-- Uses main.cpp as a project template
+- Configures hardware using `board.json`
+- Uses `main.cpp` as a project template
 - Builds firmware using **CMake** in a `build/` folder  
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
@@ -77,8 +77,8 @@ optional arguments:
 
 [Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)  
 
-- Hardware configuration is done by adjusting the `board.json` file.
-- Use only **hvcc supported PD objects** in your patches.
+- Use only **hvcc supported PD objects** and **heavylib** objects like hv.osc, hv.lfo in your patches.
+- Configure hardware using `board.json`.
 - The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in `board.json`.
 - The script automatically includes objects present in the patch and ignores unconnected.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
