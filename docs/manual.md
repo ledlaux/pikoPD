@@ -1,4 +1,4 @@
-# PikoPD manual 
+# PikoPD Manual 
 
 
 PikoPD project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
@@ -32,7 +32,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 
 
 
-# Toolchain setup
+# Toolchain Setup
 
 ## Python 3.10+ 
 
@@ -122,7 +122,7 @@ make -j8
 sudo make install
 ```
 
-# Hardware configuration
+# Hardware Configuration
 
 Hardware configuration is done by adjusting the `board.json` file.  
 This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mapped to GPIO pins and how it behaves.
@@ -149,7 +149,7 @@ Set in `board.json`:
     - masterfx (delay, limiter)
 
 
-## Audio setup
+## Audio Setup
 
 - I2S (PCM5102)
   
@@ -311,7 +311,7 @@ When you place a finger or an object in front of the sensor (within a few millim
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
 
-# Project configuration
+# Project Configuration
 
 - PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Check PD patch examples in the folder.
@@ -347,7 +347,34 @@ optional arguments:
   -v, --verbose        Enable verbose compiler console debug output
 ```
 
-# Polyphonic input
+
+## Project File Structure
+
+```
+workspace/
+├── pico-sdk/
+│   └── pico-extras/
+├── picotool/
+├── pikoPD/
+│   ├── docs/
+│   ├── lib/
+│   │   └── heavylib/
+│   ├── patches/           # pd patches folder
+│   ├── src/               # hardware config source files
+│   ├── templates/
+│   │   └── main.cpp       # template 
+│   ├── project/
+│   │   ├── build/         # build folder (uf2 file here)   
+│   │   ├── hvcc/          # hvcc compiler generated files
+│   │   ├── src/             
+│   │   └── CMakeLists.txt  
+│   ├── board.json         # user config file
+│   └── pikopd.py          # pikopd script
+```
+
+
+
+# Polyphonic Input
 
 The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
 
@@ -383,13 +410,13 @@ Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
 
 
-# Sample loading
+# Sample Loading
 
 Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
-# Serial monitor 
+# Serial Monitor 
 
 ```json
   "console": true
@@ -397,18 +424,18 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
 
 Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
 
-# WEB config tool
+# WEB Config Tool
 
 Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).    
 Upload your .pd patch to see available parameters or load board.json configuration file.    
 Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
 Export the board.json and place it in the pikoPD folder.    
 
-# WEB control and OSC
+# WEB Control and OSC
 
 For devices with Wi-Fi like picoW and pico2W WEB and OSC control will be added soon. Check web code branch for more info. 
 
-# Useful links
+# Useful Links
 
 - About hvcc compiler  
   https://wasted-audio.github.io/hvcc/
