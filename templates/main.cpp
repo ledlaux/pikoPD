@@ -23,6 +23,13 @@
 #include "ssi.h"
 
 
+// Peer Discovery Variables
+static ip_addr_t computer_ip;
+static uint16_t computer_port = 9000; 
+static bool computer_discovered = false;
+static struct udp_pcb* osc_out_pcb = nullptr;
+
+
 // Define your credentials
 #define WIFI_SSID ""
 #define WIFI_PASSWORD ""
@@ -367,31 +374,41 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
-    int numElem = hv_msg_getNumElements(m);
-    float val0 = hv_msg_getFloat(m, 0);
+    // 1. Determine the value to send
+    float valToSend = 0.0f;
+    if (hv_msg_getNumElements(m) > 0 && hv_msg_isFloat(m, 0)) {
+        valToSend = hv_msg_getFloat(m, 0);
+    } 
+    // If it's a bang, we'll just send 1.0 to indicate activity
+    else if (hv_msg_isBang(m, 0)) {
+        valToSend = 1.0f;
+    }
+
+    // 2. OSC SENDER
+    if (computer_discovered && osc_out_pcb != nullptr) {
+        picoosc::OSCMessage msg;
+        char address[64];
+        
+        // Ensure the address starts with / and uses the PD object name
+        snprintf(address, sizeof(address), "/%s", name);
+        
+        msg.addAddress(address);
+        msg.add(valToSend);
+
+        struct pbuf* pb = pbuf_alloc(PBUF_TRANSPORT, msg.size(), PBUF_RAM);
+        if (pb) {
+            std::memcpy(pb->payload, msg.data(), msg.size());
+            udp_sendto(osc_out_pcb, pb, &computer_ip, computer_port);
+            pbuf_free(pb);
+        }
+    }
 
     switch (hash) {
-    {% for l in board.leds -%}
-        {%- set led_index = loop.index0 -%}
-        {%- for s in hv_manifest.sends if s.name == l.name -%}
-            case {{ s.hash }}U: // {{ l.name }}
-                {% if l.is_rgb -%}
-                if (numElem >= 2) {
-                    Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                    Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
-                } else {
-                    Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                }
-                {%- else -%}
-                Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                {%- endif %}
-                return;
-        {%- endfor -%}
-    {%- endfor %}
-            default:
-                heavyMidiOutHook(vc, name, hash, m);
-                break;
-        } 
+        // Your existing LED logic here
+        default:
+            heavyMidiOutHook(vc, name, hash, m);
+            break;
+    }
 }
 
 
@@ -477,47 +494,59 @@ const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *p
     return NULL; 
 }
 }
-
 static const tCGI cgi_handlers[] = {
     { "/update_pd.cgi", cgi_pd_handler },
 };
 
-
 static void osc_internal_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port) {
     if (!p) return;
-    
+
+    // --- 1. PEER DISCOVERY (The "Handshake") ---
+    // Every time a packet arrives, we update the destination for our SENDER.
+    // This allows the Pico to "lock on" to your computer's current IP.
+    if (!computer_discovered || !ip_addr_cmp(&computer_ip, addr)) {
+        ip_addr_copy(computer_ip, *addr);
+        computer_discovered = true;
+        // Optional: Update the port if your computer sends from a specific port
+        // computer_port = port; 
+        printf(">>> OSC Peer Discovered: %s\n", ip4addr_ntoa(&computer_ip));
+    }
+
     char* payload = (char*)p->payload;
     
-    // Check if it's a valid OSC message (starts with /)
+    // --- 2. RECEIVER LOGIC (Processing Incoming OSC) ---
     if (p->len > 4 && payload[0] == '/') {
-        
+        // Calculate the position of the Type Tags
         int tag_idx = (int)std::strlen(payload) + 1;
         while (tag_idx % 4 != 0) tag_idx++; 
         char* tags = payload + tag_idx;
 
+        // We are looking for a float message (",f")
         if (tags[0] == ',' && tags[1] == 'f') {
             int data_idx = tag_idx + (int)std::strlen(tags) + 1;
             while (data_idx % 4 != 0) data_idx++;
 
-            // Extract the float value
+            // Extract and swap endianness (OSC is Big-Endian, Pico is Little-Endian)
             uint32_t raw;
             std::memcpy(&raw, payload + data_idx, 4);
-            raw = __builtin_bswap32(raw); // Swap Big-Endian to Little-Endian
+            raw = __builtin_bswap32(raw); 
             float val;
             std::memcpy(&val, &raw, 4);
 
-            printf(">>> OSC RCVD | Path: %s | Value: %f\n", payload, val);
-
-            // Send to Heavy/PD
+            // --- ROUTE TO HEAVY/PD ---
+            // Using the specific hash for [receive v] object
             if (strcmp(payload, "/v") == 0) {
                 hv_sendFloatToReceiver(&pd_prog, 0x65400F82, val);
             }
+            
+            // Add more receivers here if needed
+            // else if (strcmp(payload, "/freq") == 0) { ... }
         }
     }
     
+    // Always free the pbuf to prevent memory leaks!
     pbuf_free(p); 
 }
-
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
@@ -535,7 +564,6 @@ int main() {
     Pico::setupAudio(PWM, audioFunc, {{ board.sample_rate }}, {{ board.pwm_pin }}, 0, {{ board.buffer_size }});
     {% endif %}
 
-    // Launch audio on Core 1 immediately to keep it stable
     multicore_launch_core1(Pico::core1_audio_entry);
     
     // 2. Initialize Wi-Fi Hardware
@@ -566,7 +594,7 @@ int main() {
         mdns_resp_add_netif(netif_default, "pikopd");
         mdns_resp_add_service(netif_default, "piko-control", "_http", DNSSD_PROTO_UDP, 80, NULL, NULL);
 
-      
+        osc_out_pcb = udp_new();
         static picoosc::OSCServer osc_receiver(8000, osc_internal_callback);
         
         // Print status to USB Serial
