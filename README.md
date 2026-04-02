@@ -40,7 +40,9 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - Check PD patch examples in the folder.
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.   
+- Tested on macOS.
 
 
 ## Requirements
@@ -84,9 +86,7 @@ optional arguments:
   -v, --verbose        Enable verbose compiler console debug output
 ```
 
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-- Tested on macOS.
+
 
 ## MIDI CC
 
