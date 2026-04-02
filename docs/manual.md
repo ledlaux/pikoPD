@@ -313,17 +313,14 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 
 # Project configuration
 
-- Hardware configuration is done by adjusting the `board.json`.
-- Use only **hvcc supported PD objects** in your patches.
-- The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in `board.json`.
-- Check for the correct `@hv_param` argument for you PD objects. 
-- You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
-- There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
-- Verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- Tested on macOS.
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-
+- Tested on macOS.
 
 ## Build
 
@@ -332,7 +329,7 @@ pikopd.py
 - Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
 - Copies config files into project folder from `/src`
 - Configures hardware using `board.json`
-- Uses `main.cpp` as a project template
+- Uses main.cpp as a project template
 - Builds firmware using **CMake** in a `build/` folder  
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
@@ -350,7 +347,6 @@ optional arguments:
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
-
 
 # Polyphonic input
 
