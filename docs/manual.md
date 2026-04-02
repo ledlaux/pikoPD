@@ -383,6 +383,6 @@ For devices with Wi-Fi like picoW and pico2W WEB and OSC control will be added s
 
 - About hvcc compiler  
   https://wasted-audio.github.io/hvcc/
-- hvcc suported PD object list
+- hvcc suported PD object list  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 
