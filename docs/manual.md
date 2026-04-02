@@ -264,7 +264,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
-# Sensors
+## Sensors
 
 
 ## MPR121
