@@ -56,7 +56,7 @@ brew uninstall --force arm-none-eabi-binutils
 brew install gcc-arm-embedded
 ```
 
-I would suggest to use ARM version
+I recommend using the official ARM toolchain.
 
 Download:  
 [https://developer.arm.com/downloads/-/a ... -downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
@@ -95,7 +95,7 @@ export PICO_SDK_PATH=/your_path/pico-sdk
 
 ## pico-extras 
 
-Must be places inside the pico-sdk folder.
+Must be placed inside the pico-sdk folder.
 
 ```bash
 cd pico-sdk  
