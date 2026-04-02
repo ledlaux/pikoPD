@@ -1,21 +1,39 @@
-## Table of Contents
+# PikoPD manual 
 
+
+PikoPD project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
+
+The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
+
+Supported PD objects:
+
+- **hvcc compiler** supported vanilla PD objects
+
+https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
+
+- **heavylib** objects (hv.osc, hv.lfo ...) 
+
+
+## Table of Contents
 - [Toolchain Setup](#toolchain-setup)
 - [Hardware Configuration](#hardware-configuration)
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
-  - [ADC Inputs](#adc-inputs)
+  - [ADC](#adc)
   - [LED](#led)
   - [Joystick](#joystick)
   - [Encoder](#encoder)
-- [Sensors](#sensors)
-  - [MPR121](#mpr121)
-  - [CNY70](#cny70)
+  - [Sensors](#sensors)
+    - [MPR121](#mpr121)
+    - [CNY70](#cny70)
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
-- [WEB control and OSC](#web-control-and-osc)
+- [WEB Config Tool](#web-config-tool)
+- [WEB Control And OSC](#web-control-and-osc)
 - [Useful Links](#useful-links)
+
+
 
 
 # Toolchain setup
@@ -130,6 +148,27 @@ optional arguments:
 Hardware configuration is done by adjusting the `board.json` file.  
 This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mapped to GPIO pins and how it behaves.
 
+Set in `board.json`:
+  
+    - board (pico, pico_w, zero, pico2)
+    - core frequency
+    - sample rate
+    - audio mode (I2S, PWM) and pins
+    - voice count
+    - led (pwm, rgb and mode)
+    - adc pins (knob, cv_in)
+    - rotary encoder 
+    - gate in/out (gate or trigger)
+    - button (bang, toggle, switch)
+    - joystic and range (regular or midi 1-127)
+    - midi mode (uart, usb, host)
+      - uart (pins tx 0, rx 1 )
+    - debug console
+    - sensors
+      - cny70
+      - mpr121
+    - masterfx (delay, limiter)
+
 
 ## Audio setup
 
@@ -168,7 +207,7 @@ TOGGLE:	Latch (On/Off)
 SWITCH:	Press & Release (Momentary)  
 BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
-## ADC Inputs
+## ADC 
 
 ```json
 "adc_pins": [
@@ -182,6 +221,8 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `knob`  | Standard analog control such as a knob or potentiometer |
 | `cv_in` | Control voltage input for external analog signals       |
 
+
+Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc.
 
 ## LED 
 
@@ -333,14 +374,23 @@ Sample loading works despite the limitations. Here is a [tutorial](https://www.y
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
+# Serial monitor 
+
+```json
+  "console": true
+```
+
+Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
+
+# WEB config tool
+
+
 # WEB control and OSC
 
-Will be updated...
-
+For devices with Wi-Fi like picoW and pico2W WEB and OSC control will be added soon. Check web code branch for more info. 
 
 # Useful links
 
 - About HVCC compiler  
   https://wasted-audio.github.io/hvcc/
-- Supported vanilla objects  
-  https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
+
