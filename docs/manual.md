@@ -39,7 +39,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - jinja2
 
 
-## Cmake and arm-none-eabi-gcc
+## CMake and arm-none-eabi-gcc
 
 ### Mac:
 ```bash
