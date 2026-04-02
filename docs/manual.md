@@ -21,6 +21,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [MPR121](#mpr121)
     - [CNY70](#cny70)
 - [Project Configuration](#project-configuration)
+    - [Build](#build)
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
@@ -120,23 +121,6 @@ cmake .. -DPICO_SDK_PATH=$PICO_SDK_PATH
 make -j8
 sudo make install
 ```
-
-## Usage
-
-Enter bootloader mode by holding device boot button
-
-```
-python3 pikopd.py patches/heavy.pd project_name 
-
-optional arguments:
-  -h, --help           Show help message and exit
-  -b, --board          Path to custom json configuration file
-  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot
-  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
-  -v, --verbose        Enable verbose compiler console debug output
-```
-
 
 # Hardware configuration
 
@@ -339,6 +323,33 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - Tested on macOS.
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
+
+
+## Build
+
+pikopd.py
+
+- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
+- Copies config files into project folder from `/src`
+- Configures hardware using `board.json`
+- Uses `main.cpp` as a project template
+- Builds firmware using **CMake** in a `build/` folder  
+- Checks for device in BOOTSEL mode
+- Flashes UF2 firmware to PICO board and restarts device
+
+Enter bootloader mode by holding device boot button
+
+```
+python3 pikopd.py patches/heavy.pd project_name 
+
+optional arguments:
+  -h, --help           Show help message and exit
+  -b, --board          Path to custom json configuration file
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -v, --verbose        Enable verbose compiler console debug output
+```
 
 
 # Polyphonic input
