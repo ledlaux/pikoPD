@@ -139,7 +139,7 @@ Set in `board.json`:
     - rotary encoder 
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
-    - joystic and range (regular or midi 1-127)
+    - joystick and range (regular or midi 1-127)
     - midi mode (uart, usb, host)
       - uart (pins tx 0, rx 1 )
     - debug console
@@ -277,7 +277,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
       ]
     }
 ```
-PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to physically change it's adress and set *addr_index*: 
 
 1. 0x5A,
 2. 0x5B,
