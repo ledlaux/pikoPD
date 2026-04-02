@@ -335,14 +335,15 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 
 # Project configuration
 
-- Hardware configuration is done by adjusting the `board.json` file   
+- Hardware configuration is done by adjusting the `board.json`.
+- Use only **hvcc supported PD objects** in your patches.
 - The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.
 - Check for the correct `@hv_param` argument for you PD objects. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
 - Verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
-- **If you change board or MIDI mode in `board.json` and encounter compile-time errors, remove the project build folder or rename project in the command to rebuild files.**
-- Tested on **macOS**.  
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Tested on macOS.
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
 
