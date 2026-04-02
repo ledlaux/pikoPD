@@ -337,7 +337,7 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 
 - Hardware configuration is done by adjusting the `board.json`.
 - Use only **hvcc supported PD objects** in your patches.
-- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.
+- The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in `board.json`.
 - Check for the correct `@hv_param` argument for you PD objects. 
 - You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
 - There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
