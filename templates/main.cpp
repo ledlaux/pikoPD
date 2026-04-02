@@ -1,10 +1,12 @@
 #include <stdio.h>
+
 #include <string.h>
 #include <stdint.h>
 #include <atomic>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
+#include "picoOSC.h"
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
 
@@ -12,12 +14,14 @@
 #include "pico/cyw43_arch.h"
 {%- endif %}
 
+
 #include "lwip/apps/httpd.h"
 #include "lwip/apps/mdns.h"
 #include "lwip/netif.h"
 #include "lwip/apps/fs.h"
 #include <stddef.h> 
 #include "ssi.h"
+
 
 // Define your credentials
 #define WIFI_SSID ""
@@ -326,39 +330,39 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
         default: return;
     }
 
-// ---- UART MIDI ----
+// // ---- UART MIDI ----
 
-    {%- if board.midi_mode == 'uart' %}
-    uart_write_blocking(uart0, midiMsg, 3);
-    {%- endif %}
-    {%- if board.midi_mode == 'host' %}
+//     {%- if board.midi_mode == 'uart' %}
+//     uart_write_blocking(uart0, midiMsg, 3);
+//     {%- endif %}
+//     {%- if board.midi_mode == 'host' %}
 
-// ---- USB HOST ----
+// // ---- USB HOST ----
 
-    tuh_midi_stream_write(1, 0, midiMsg, 3);
-    {%- endif %}
+//     tuh_midi_stream_write(1, 0, midiMsg, 3);
+//     {%- endif %}
 
-// ---- USB MIDI ----
+// // ---- USB MIDI ----
 
-    {%- if board.midi_mode == 'usb' %}
-    uint8_t status = midiMsg[0];
-    uint8_t type   = status & 0xF0;
-    uint8_t cin    = status >> 4; 
-    int len = 3; 
-    if (type == 0xC0 || type == 0xD0) len = 2; 
-    uint32_t midi_packed = ((uint32_t)len << 24) | 
-                           ((uint32_t)status << 16) | 
-                           ((uint32_t)midiMsg[1] << 8) | 
-                           (uint32_t)midiMsg[2];
+//     {%- if board.midi_mode == 'usb' %}
+//     uint8_t status = midiMsg[0];
+//     uint8_t type   = status & 0xF0;
+//     uint8_t cin    = status >> 4; 
+//     int len = 3; 
+//     if (type == 0xC0 || type == 0xD0) len = 2; 
+//     uint32_t midi_packed = ((uint32_t)len << 24) | 
+//                            ((uint32_t)status << 16) | 
+//                            ((uint32_t)midiMsg[1] << 8) | 
+//                            (uint32_t)midiMsg[2];
 
-    uint32_t h = midi_out_rb.head.load(std::memory_order_relaxed);
-    uint32_t t = midi_out_rb.tail.load(std::memory_order_acquire);
+//     uint32_t h = midi_out_rb.head.load(std::memory_order_relaxed);
+//     uint32_t t = midi_out_rb.tail.load(std::memory_order_acquire);
 
-    if ((h - t) < MIDI_OUT_BUF) {
-        midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
-        midi_out_rb.head.store(h + 1, std::memory_order_release);
-    }
-{%- endif %}
+//     if ((h - t) < MIDI_OUT_BUF) {
+//         midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
+//         midi_out_rb.head.store(h + 1, std::memory_order_release);
+//     }
+// {%- endif %}
 }
 
 
@@ -463,11 +467,11 @@ const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *p
         
         if (strcmp(pcParam[i], "v") == 0) {
             hv_sendFloatToReceiver(&pd_prog, 0x65400F82, raw_val);
-        } else if (strcmp(pcParam[i], "t") == 0) {
-            hv_sendFloatToReceiver(&pd_prog, 0x99AABBCC, raw_val);
-        } else if (strcmp(pcParam[i], "s") == 0) {
-            hv_sendFloatToReceiver(&pd_prog, 0x22FF3344, raw_val);
-        }
+        // } else if (strcmp(pcParam[i], "t") == 0) {
+        //     hv_sendFloatToReceiver(&pd_prog, 0x99AABBCC, raw_val);
+        // } else if (strcmp(pcParam[i], "s") == 0) {
+        //     hv_sendFloatToReceiver(&pd_prog, 0x22FF3344, raw_val);
+        // }
     }
     
     return NULL; 
@@ -478,9 +482,49 @@ static const tCGI cgi_handlers[] = {
 };
 
 
+static void osc_internal_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port) {
+    if (!p) return;
+    
+    char* payload = (char*)p->payload;
+    
+    // Check if it's a valid OSC message (starts with /)
+    if (p->len > 4 && payload[0] == '/') {
+        
+        int tag_idx = (int)std::strlen(payload) + 1;
+        while (tag_idx % 4 != 0) tag_idx++; 
+        char* tags = payload + tag_idx;
+
+        if (tags[0] == ',' && tags[1] == 'f') {
+            int data_idx = tag_idx + (int)std::strlen(tags) + 1;
+            while (data_idx % 4 != 0) data_idx++;
+
+            // Extract the float value
+            uint32_t raw;
+            std::memcpy(&raw, payload + data_idx, 4);
+            raw = __builtin_bswap32(raw); // Swap Big-Endian to Little-Endian
+            float val;
+            std::memcpy(&val, &raw, 4);
+
+            printf(">>> OSC RCVD | Path: %s | Value: %f\n", payload, val);
+
+            // Send to Heavy/PD
+            if (strcmp(payload, "/v") == 0) {
+                hv_sendFloatToReceiver(&pd_prog, 0x65400F82, val);
+            }
+        }
+    }
+    
+    pbuf_free(p); 
+}
+
+
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
+
+    while (!stdio_usb_connected()) {
+        sleep_ms(100);
+    }
 
     // 1. Audio and Pure Data Setup
     pd_prog.setSendHook(&sendHookHandler);
@@ -521,11 +565,23 @@ int main() {
         mdns_resp_add_netif(netif_default, "pikopd");
         mdns_resp_add_service(netif_default, "piko-control", "_http", DNSSD_PROTO_UDP, 80, NULL, NULL);
 
+      
+        static picoosc::OSCServer osc_receiver(8000, osc_internal_callback);
+        
+        // Print status to USB Serial
+        printf("\n========================================\n");
+        printf("Wi-Fi Connected!\n");
+        printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+        printf("OSC Server listening on port 8000\n");
+        printf("========================================\n\n");
+    
+
         // Optional: Print IP to console for manual fallback
         // printf("Web Server active at: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
     } else {
         // Failed to connect - handle blinky error or retry logic here
     }
+
 
     // 4. The Background Loop
     while (true) {
