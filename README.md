@@ -23,3 +23,15 @@ https://github.com/user-attachments/assets/80f30ee2-c3fe-4fdc-927f-d8da6f6a1685
 ## Third test - send OSC message 
 
 Raspberry Pi Pico W sending OSC messages from the PD patch over Wi-Fi.
+
+https://github.com/user-attachments/assets/c7da8355-add5-4c24-b526-2aa6ea40b852
+
+
+I use liblo for testing on mac. 
+
+First we need to send any pairing OSC message or ping to device and then read the output:
+
+```bash
+oscsend pikopd.local 8000 /v f 10
+oscdump 9000   
+```
