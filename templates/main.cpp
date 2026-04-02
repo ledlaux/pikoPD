@@ -476,6 +476,7 @@ const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *p
     
     return NULL; 
 }
+}
 
 static const tCGI cgi_handlers[] = {
     { "/update_pd.cgi", cgi_pd_handler },
