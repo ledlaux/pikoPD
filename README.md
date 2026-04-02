@@ -13,7 +13,6 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 ## Features
 
-- [x] serial console
 - [x] button
 - [x] led
 - [x] adc
@@ -22,10 +21,11 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] usb midi host
 - [x] encoder
 - [x] joystick
+- [x] sensors
 - [x] gate in/out
 - [x] midi clock
+- [x] i2s audio
 - [x] pwm audio
-- [x] sensors
 - [ ] sd card
 - [ ] screen
 - [ ] bluetooth midi
@@ -81,6 +81,7 @@ optional arguments:
 - Configure hardware using `board.json`.
 - The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in `board.json`.
 - The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - Tested on macOS.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
