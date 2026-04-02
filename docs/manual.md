@@ -5,7 +5,8 @@ PikoPD project automates building **Pure Data patches** (`.pd`) into a **UF2** f
 
 The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
 
-In your patches with pikoPD you can use hvcc compiler supported **vanilla PD** objects and **heavylib** objects like hv.osc, hv.lfo and other. 
+PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+
 
 
 # Toolchain setup
@@ -24,7 +25,7 @@ brew install git
 xcode-select --install  
 brew install arm-none-eabi-gcc
 ```
-If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version
+If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version:
 
 ```bash
 brew uninstall --force arm-none-eabi-gcc
