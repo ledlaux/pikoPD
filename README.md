@@ -77,7 +77,7 @@ optional arguments:
 
 [Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)  
 
-- Use only **hvcc supported PD objects** and **heavylib** objects like hv.osc, hv.lfo in your patches.
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Configure hardware using `board.json`.
 - The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
