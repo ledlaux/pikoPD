@@ -213,8 +213,8 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
 | Type    | Description                                             |
 | ------- | ------------------------------------------------------- |
-| `knob`  | Standard analog control such as a knob or potentiometer |
-| `cv_in` | Control voltage input for external analog signals       |
+| `knob`  | Analog control such as a potentiometer (smoothed) |
+| `cv_in` | Control voltage input for external analog signals (0–3.3V)       |
 
 
 Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc.
