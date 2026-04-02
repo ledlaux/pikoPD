@@ -318,13 +318,14 @@ When you place a finger or an object in front of the sensor (within a few millim
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
 
+
 # Project configuration
 
 - PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Check PD patch examples in the folder.
-- The [s @hv_param] and [r @hv_param] object names must exactly match (case-sensitive) names defined in the config file.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD [print] objects. Use it moderately, because it can crash the device.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 - Tested on macOS.
@@ -336,7 +337,7 @@ pikopd.py
 - Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
 - Copies config files into project folder from `/src`
 - Configures hardware using `board.json`
-- Uses `main.cpp` as a project template
+- Uses main.cpp as a project template
 - Builds firmware using **CMake** in a `build/` folder  
 - Checks for device in BOOTSEL mode
 - Flashes UF2 firmware to PICO board and restarts device
@@ -354,7 +355,6 @@ optional arguments:
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
-
 
 
 # Polyphonic input
