@@ -31,6 +31,18 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [ ] bluetooth midi
 
 
+## Project configuration
+
+[Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)  
+
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- All hardware configuration is done using `board.json` file.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console if enabled will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
+
+
 ## Requirements
 
 - Python 3.10+
@@ -41,10 +53,9 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - pico-extras
 - picotool
 
-Toolchain setup instructions can be found in the [manual]( https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md).
+Toolchain setup instructions can be found in the manual.
  
-
-## Project build
+## Build
 
 pikopd.py
 
@@ -73,21 +84,9 @@ optional arguments:
   -v, --verbose        Enable verbose compiler console debug output
 ```
 
-## Project configuration
-
-[Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)  
-
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- Configure hardware using `board.json`.
-- The `[s name @hv_param]` and `[r name @hv_param]` object names in PD patch must exactly match (case-sensitive) the name defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console will also output PD [print] objects. Use it moderately, because it can crash the device. 
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- Tested on macOS.  
 - If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-
-
-
+- Tested on macOS.
 
 ## MIDI CC
 
