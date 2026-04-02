@@ -47,7 +47,7 @@ brew install git
 xcode-select --install  
 brew install arm-none-eabi-gcc
 ```
-If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version
+If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version:
 
 ```bash
 brew uninstall --force arm-none-eabi-gcc
