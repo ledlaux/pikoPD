@@ -99,6 +99,21 @@ make -j8
 sudo make install
 ```
 
+
+
+## Build
+
+pikopd.py
+
+- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
+- Copies config files into project folder from `/src`
+- Configures hardware using `board.json`
+- Uses `main.cpp` as a project template
+- Builds firmware using **CMake** in a `build/` folder  
+- Checks for device in BOOTSEL mode
+- Flashes UF2 firmware to PICO board and restarts device
+
+
 ## Usage
 
 Enter bootloader mode by holding device boot button
@@ -114,6 +129,19 @@ optional arguments:
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
+
+# Project configuration
+
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- All hardware configuration is done using `board.json` file.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console if enabled will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
+- Tested on macOS.
+
 
 
 # Hardware configuration
@@ -141,7 +169,6 @@ Set in `board.json`:
       - cny70
       - mpr121
     - masterfx (delay, limiter)
-
 
 ## Audio setup
 
@@ -303,19 +330,6 @@ Sensor contains two main parts inside its square plastic housing:
 When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected. Since the CNY70 is produced by multiple manufacturers, many wiring variations and tutorials are available online.
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
-
-
-# Project configuration
-
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- All hardware configuration is done using `board.json` file.
-- Check PD patch examples in the folder.
-- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console if enabled will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
-- Tested on macOS.
 
 
 # Polyphonic input
