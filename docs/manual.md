@@ -327,7 +327,6 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 - The script automatically includes objects present in the patch and ignores unconnected.
 - Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 - Tested on macOS.
 
 ## Build
