@@ -15,15 +15,15 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 - [x] button
 - [x] led
-- [x] adc
-- [x] uart midi
-- [x] usb midi
-- [x] usb midi host
+- [x] pot
 - [x] encoder
 - [x] joystick
 - [x] sensors
-- [x] gate in/out
+- [x] uart midi
+- [x] usb midi
+- [x] usb midi host
 - [x] midi clock
+- [x] gate in/out
 - [x] i2s audio
 - [x] pwm audio
 - [ ] sd card
