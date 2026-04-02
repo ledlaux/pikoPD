@@ -26,6 +26,7 @@ https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/support
   - [Sensors](#sensors)
     - [MPR121](#mpr121)
     - [CNY70](#cny70)
+- [Project Configuration](#project-configuration)
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
@@ -330,6 +331,19 @@ Sensor contains two main parts inside its square plastic housing:
 When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light was reflected. Since the CNY70 is produced by multiple manufacturers, many wiring variations and tutorials are available online.
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
+
+
+# Project configuration
+
+- Hardware configuration is done by adjusting the `board.json` file   
+- The `[send]` and `[receive]` object names in the Pure Data patch **must exactly match** (case-sensitive) the **name** defined in `board.json`.
+- Check for the correct `@hv_param` argument for you PD objects. 
+- You can rename sends and receives as you wish. Currently, there is no enforced naming convention.
+- There’s no need to remove objects from board.json. The script automatically includes only objects present in the patch and ignores unconnected.
+- Verify the correct pin configuration (e.g., **pin 1 corresponds to GPIO1**).
+- **If you change board or MIDI mode in `board.json` and encounter compile-time errors, remove the project build folder or rename project in the command to rebuild files.**
+- Tested on **macOS**.  
+- If something does not work as expected on your system, please open a [GitHub issue](https://github.com/ledlaux/pikoPD/issues).
 
 
 # Polyphonic input
