@@ -301,6 +301,28 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - Tested on macOS.
 
+```
+workspace/
+├── pico-sdk/
+│   └── pico-extras/
+├── picotool/
+├── pikoPD/
+│   ├── docs/
+│   ├── lib/
+│   │   └── heavylib/
+│   ├── patches/           # pd patches folder
+│   ├── src/               # hardware config source files
+│   ├── templates/
+│   │   └── main.cpp       # template 
+│   ├── project/
+│   │   ├── build/         # build folder (uf2 file here)   
+│   │   ├── hvcc/          # hvcc compiler generated files
+│   │   ├── src/             
+│   │   └── CMakeLists.txt  
+│   ├── board.json         # user config file
+│   └── pikopd.py          # pikopd script
+```
+
 ## Build
 
 pikopd.py
@@ -326,30 +348,6 @@ optional arguments:
   -s, --serial         Open serial console after reboot
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
-```
-
-## Project File Structure
-
-```
-workspace/
-├── pico-sdk/
-│   └── pico-extras/
-├── picotool/
-├── pikoPD/
-│   ├── docs/
-│   ├── lib/
-│   │   └── heavylib/
-│   ├── patches/           # pd patches folder
-│   ├── src/               # hardware config source files
-│   ├── templates/
-│   │   └── main.cpp       # template 
-│   ├── project/
-│   │   ├── build/         # build folder (uf2 file here)   
-│   │   ├── hvcc/          # hvcc compiler generated files
-│   │   ├── src/             
-│   │   └── CMakeLists.txt  
-│   ├── board.json         # user config file
-│   └── pikopd.py          # pikopd script
 ```
 
 
