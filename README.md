@@ -13,8 +13,13 @@ https://github.com/user-attachments/assets/1167bb92-f829-4321-8264-e8fa96430ee1
 
 
 
-## Second test - OSC
+## Second test - receive OSC message
 
-Raspberry Pi Pico W connected to wifi and receiving OSC messages from the mac that controls PD parameter.
+Raspberry Pi Pico W connected to Wi-Fi and receiving OSC messages from the mac that controls PD parameter.
 
 https://github.com/user-attachments/assets/80f30ee2-c3fe-4fdc-927f-d8da6f6a1685
+
+
+## Third test - send OSC message 
+
+Raspberry Pi Pico W sending OSC messages from the PD patch over Wi-Fi.
