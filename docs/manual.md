@@ -400,10 +400,10 @@ Debug console will also output PD [print] objects, which are parsed automaticall
 
 # WEB config tool
 
-Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).
-Upload your .pd patch to see available parameters or load board.json configuration file.
-Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.
-Export the board.json and place it in the pikoPD folder.
+Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).  
+Upload your .pd patch to see available parameters or load board.json configuration file.  
+Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.  
+Export the board.json and place it in the pikoPD folder.  
 
 # WEB control and OSC
 
