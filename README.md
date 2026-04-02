@@ -40,7 +40,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - Check PD patch examples in the folder.
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console if enabled will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device. 
 
 
 ## Requirements
