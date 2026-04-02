@@ -15,7 +15,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 - [x] button
 - [x] led
-- [x] pot
+- [x] adc
 - [x] encoder
 - [x] joystick
 - [x] sensors
