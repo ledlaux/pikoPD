@@ -1,18 +1,11 @@
 # PikoPD manual 
 
 
-PikoPD project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
+PikoPD project automates building **Pure Data patches** (`.pd`) into a **UF2** firmware using **hvcc compiler** and **Raspberry Pi Pico C/C++ SDK**. 
 
-The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
+The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
 
-Supported PD objects:
-
-- **hvcc compiler** supported vanilla PD objects
-
-https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
-
-- **heavylib** objects (hv.osc, hv.lfo ...) 
-
+In your patches with pikoPD you can use hvcc compiler supported **vanilla PD** objects and **heavylib** objects like hv.osc, hv.lfo and other. 
 
 
 # Toolchain setup
@@ -388,6 +381,8 @@ For devices with Wi-Fi like picoW and pico2W WEB and OSC control will be added s
 
 # Useful links
 
-- About HVCC compiler  
+- About hvcc compiler  
   https://wasted-audio.github.io/hvcc/
+- hvcc suported PD object list
+  https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
 
