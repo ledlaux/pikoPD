@@ -8,6 +8,17 @@
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
 
+
+#include "hardware/i2c.h"
+
+#include "ssd1306.h"
+
+
+// Define I2C pins and instance
+#define I2C_PORT i2c0
+#define SDA_PIN 4
+#define SCL_PIN 5
+
 {%- if board.pico_board == 'pico_w' %}
 #include "pico/cyw43_arch.h"
 {%- endif %}
@@ -155,33 +166,33 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 };
 {% endif %}
 
-// ---- MPR121 pad objects ----
+// // ---- MPR121 pad objects ----
 
-{% if board.inputs.sensors.mpr121 -%}
-struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
+// {% if board.inputs.sensors.mpr121 -%}
+// struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
 
-{% set active_count = namespace(value=0) -%}
-{% set mpr_count = board.inputs.sensors.mpr121|length -%}
+// {% set active_count = namespace(value=0) -%}
+// {% set mpr_count = board.inputs.sensors.mpr121|length -%}
 
-MprPad active_mpr_pads[] = {
-{#- Range covers up to 8 sensors -#}
-{%- for i in range(1, 97) %}
-    {%- set p_name = "pad" ~ i %}
-    {%- for p in hv_manifest.receives if p.name == p_name %}
-        {%- set s_idx = (i - 1) // 12 -%}
-        {%- set p_idx = (i - 1) % 12 -%}
-        {%- if s_idx < mpr_count %}
-    { "{{ board.inputs.sensors.mpr121[s_idx].name }}", {{ s_idx }}, {{ p_idx }}, "{{ p.name }}", {{ p.hash }} },
-            {%- set active_count.value = active_count.value + 1 -%}
-        {%- endif %}
-    {%- endfor %}
-{%- endfor %}
-};
+// MprPad active_mpr_pads[] = {
+// {#- Range covers up to 8 sensors -#}
+// {%- for i in range(1, 97) %}
+//     {%- set p_name = "pad" ~ i %}
+//     {%- for p in hv_manifest.receives if p.name == p_name %}
+//         {%- set s_idx = (i - 1) // 12 -%}
+//         {%- set p_idx = (i - 1) % 12 -%}
+//         {%- if s_idx < mpr_count %}
+//     { "{{ board.inputs.sensors.mpr121[s_idx].name }}", {{ s_idx }}, {{ p_idx }}, "{{ p.name }}", {{ p.hash }} },
+//             {%- set active_count.value = active_count.value + 1 -%}
+//         {%- endif %}
+//     {%- endfor %}
+// {%- endfor %}
+// };
 
-constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
-{%- endif %}
+// constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
+// {%- endif %}
 
-// ---------------------------
+// // ---------------------------
 
 
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
@@ -456,16 +467,37 @@ int main() {
     #endif
     {%- endif %}
 
- // --- I2C Initialization ---
+//  // --- I2C Initialization ---
 
-    {% if board.inputs.sensors.mpr121 -%}
-    i2c_init(i2c0, 400 * 1000);
-    {% if board.inputs.sensors.mpr121 | selectattr("i2c_bus", "equalto", "i2c1") | list %}
-    i2c_init(i2c1, 400 * 1000);
-    {% endif %}
-    {%- endif %}
+//     {% if board.inputs.sensors.mpr121 -%}
+//     i2c_init(i2c0, 400 * 1000);
+//     {% if board.inputs.sensors.mpr121 | selectattr("i2c_bus", "equalto", "i2c1") | list %}
+//     i2c_init(i2c1, 400 * 1000);
+//     {% endif %}
+//     {%- endif %}
 
- // --------------------------
+//  // --------------------------
+
+// 1. Physical I2C Init
+    i2c_init(I2C_PORT, 400 * 1000);
+    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(SDA_PIN);
+    gpio_pull_up(SCL_PIN);
+
+    // 2. Setup the display structure
+    ssd1306_t disp;
+    disp.external_vcc = false; // CRITICAL: Tells the driver to use the internal charge pump
+
+    // 3. Try 0x3C, if that fails, try 0x3D
+    bool success = ssd1306_init(&disp, 128, 64, 0x3C, I2C_PORT);
+    if (!success) {
+        success = ssd1306_init(&disp, 128, 64, 0x3D, I2C_PORT);
+    }
+    
+   char display_buf[16]; // Smaller buffer for bigger font (fewer chars fit)
+    uint32_t last_screen_update = 0;
+    
 
     {%- if board.pico_board == 'zero' %}
     Pico::init_neopixel();
@@ -500,35 +532,35 @@ int main() {
 
 // ---- MPR121 init ----
 
-{% if board.inputs.sensors.mpr121 -%}
-#define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
+// {% if board.inputs.sensors.mpr121 -%}
+// #define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
 
-    Pico::MPR121Config cfg[NUM_SENSORS] = {
-    {%- for sensor in board.inputs.sensors.mpr121 %}
-        { 
-            {{ sensor.i2c_bus }}, 
-            {{ sensor.sda }}, 
-            {{ sensor.scl }}, 
-            {{ sensor.irq }}, 
-            {{ sensor.addr_index }} 
-        }{{ "," if not loop.last }}
-    {%- endfor %}
-    };
+//     Pico::MPR121Config cfg[NUM_SENSORS] = {
+//     {%- for sensor in board.inputs.sensors.mpr121 %}
+//         { 
+//             {{ sensor.i2c_bus }}, 
+//             {{ sensor.sda }}, 
+//             {{ sensor.scl }}, 
+//             {{ sensor.irq }}, 
+//             {{ sensor.addr_index }} 
+//         }{{ "," if not loop.last }}
+//     {%- endfor %}
+//     };
 
-    Pico::MPR121 sensor_array[NUM_SENSORS] = {
-        {%- for i in range(board.inputs.sensors.mpr121|length) %}
-        Pico::MPR121(cfg[{{ i }}])
-        {%- if not loop.last %},{% endif %}
-        {%- endfor %}
-    };
+//     Pico::MPR121 sensor_array[NUM_SENSORS] = {
+//         {%- for i in range(board.inputs.sensors.mpr121|length) %}
+//         Pico::MPR121(cfg[{{ i }}])
+//         {%- if not loop.last %},{% endif %}
+//         {%- endfor %}
+//     };
 
-    Pico::MPR121::_num_sensors = NUM_SENSORS;
-    for (int i = 0; i < NUM_SENSORS; ++i) {
-        Pico::MPR121::sensors[i] = &sensor_array[i];
-    }
+//     Pico::MPR121::_num_sensors = NUM_SENSORS;
+//     for (int i = 0; i < NUM_SENSORS; ++i) {
+//         Pico::MPR121::sensors[i] = &sensor_array[i];
+//     }
 
-    static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-{%- endif %}
+//     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
+// {%- endif %}
 
 // -----------------------------------
 
@@ -581,50 +613,98 @@ int main() {
     float target_val; 
     int led_idx;
 
+
+    float screen_val = 0.0f;
+    int screen_id = -1;
+    uint32_t screen_interaction_timer = 0;
+
  
     while (true) {
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
+
+        for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
+            if (print_pool[i].busy.load(std::memory_order_acquire)) {
+                screen_val = print_pool[i].val;
+                screen_id = print_pool[i].id;
+                screen_interaction_timer = now;
+            }
+        }
+
+        static uint32_t last_screen_draw = 0;
+        if (now - last_screen_draw >= 40) {
+            last_screen_draw = now;
+            ssd1306_clear(&disp);
+            if (now - screen_interaction_timer < 2000 && screen_id != -1) {
+                            // Combine Name and Value into one string: "Knob: 0.50"
+                            if (screen_id < NUM_PRINT_NAMES) {
+                                snprintf(display_buf, sizeof(display_buf), "%s:%.2f", 
+                                        printNames[screen_id], screen_val);
+                            } else {
+                                snprintf(display_buf, sizeof(display_buf), "%.2f", screen_val);
+                            }
+
+                            // DRAW IN THE MIDDLE (Y=24) 
+                            // Scale 2 is large but fits more characters horizontally than Scale 3
+                            // X=4 (Start near the left), Y=24 (Center), Scale=2
+                            ssd1306_draw_string(&disp, 4, 24, 2, display_buf);
+                            
+                        } else {
+                            // Show Logo in the middle as well
+                            // X=12, Y=24, Scale=3
+                            ssd1306_draw_string(&disp, 12, 24, 3, "PikoPD");
+                        }
+                        ssd1306_show(&disp);
+                    }
+                
         
         midi_task();
         {% if board.midi_mode == 'usb' %}
         process_usb_queue();
         {%- endif %}
 
-        {%- if board.console %}
-        print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-        {% else %}
-        sleep_ms(1); 
-        {%- endif %}
+      // Add this guard to prevent the linker error in Host mode
+        #ifndef MIDI_HOST 
+            {%- if board.console %}
+            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled); 
+            {%- endif %}
+        #endif
+        // {%- if board.console %}
+        // print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+        // {% else %}
+        // sleep_ms(1); 
+        // {%- endif %}
 
-// ---- MPR121 Processing ----
+       
 
-        {% if board.inputs.sensors.mpr121 -%}
-        for (int i = 0; i < NUM_SENSORS; ++i) {
-            if (!sensor_array[i].initialized()) {
-                if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
-                continue;
-            }
+// // ---- MPR121 Processing ----
 
-            sensor_array[i].processMPR121();
-            uint16_t touched = sensor_array[i].getTouched(); 
+//         {% if board.inputs.sensors.mpr121 -%}
+//         for (int i = 0; i < NUM_SENSORS; ++i) {
+//             if (!sensor_array[i].initialized()) {
+//                 if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
+//                 continue;
+//             }
 
-            if (touched != last_touched_state[i]) {
-                for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
-                    MprPad& pad = active_mpr_pads[p]; 
-                    if (pad.sensor_idx == i) {
-                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
-                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
-                        if (isTouched != wasTouched) {
-                            hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
-                        }
-                    }
-                }
-                last_touched_state[i] = touched;
-            }
-        }
-        {%- endif %}
-// -----------------------------
+//             sensor_array[i].processMPR121();
+//             uint16_t touched = sensor_array[i].getTouched(); 
+
+//             if (touched != last_touched_state[i]) {
+//                 for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
+//                     MprPad& pad = active_mpr_pads[p]; 
+//                     if (pad.sensor_idx == i) {
+//                         bool isTouched = (touched >> pad.pad_idx) & 0x01;
+//                         bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
+//                         if (isTouched != wasTouched) {
+//                             hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
+//                         }
+//                     }
+//                 }
+//                 last_touched_state[i] = touched;
+//             }
+//         }
+//         {%- endif %}
+// // -----------------------------
 
 
         if (now - last_led_tick >= 20) {
