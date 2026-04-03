@@ -663,7 +663,7 @@ int main() {
         process_usb_queue();
         {%- endif %}
 
-      // Add this guard to prevent the linker error in Host mode
+      
         #ifndef MIDI_HOST 
             {%- if board.console %}
             print_queue(printNames, NUM_PRINT_NAMES, debug_enabled); 
