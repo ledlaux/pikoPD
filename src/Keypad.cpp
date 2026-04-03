@@ -6,14 +6,41 @@ namespace Pico {
     Keypad keypad;
 
     void addKeypad(uint sda, uint scl, float brightness) {
-    i2c_init(i2c1, 400000); 
-    gpio_set_function(sda, GPIO_FUNC_I2C);
-    gpio_set_function(scl, GPIO_FUNC_I2C);
-    gpio_pull_up(sda);
-    gpio_pull_up(scl);
-    keypad.device.init();
-    keypad.device.set_brightness(brightness);
-}
+       
+        sleep_ms(100);    // Give hardware a time to stabilize
+
+        gpio_init(sda);
+        gpio_init(scl);
+        gpio_set_dir(sda, GPIO_IN);
+        gpio_set_dir(scl, GPIO_IN);
+        gpio_pull_up(sda);
+        gpio_pull_up(scl);
+        sleep_ms(10); 
+
+        i2c_init(i2c1, 400000); 
+        gpio_set_function(sda, GPIO_FUNC_I2C);
+        gpio_set_function(scl, GPIO_FUNC_I2C);
+        gpio_pull_up(sda);
+        gpio_pull_up(scl);
+
+        bool success = false;
+        for (int retry = 0; retry < 5; retry++) {
+            if (keypad.device.init()) {
+                success = true;
+                break;
+            }
+            sleep_ms(50); // Small wait before the next attempt
+        }
+
+        if (success) {
+            keypad.device.set_brightness(brightness);
+            // Optional: Quick flash of the LEDs to show it's alive
+            for(int i=0; i<16; i++) keypad.device.illuminate(i, 20, 20, 20);
+            keypad.device.update();
+        } else {
+            printf("RGB Keypad failed to respond on i2c1\n");
+        }
+    }
 
     void setKeypadStep(int row, int step) {
         if (row >= 0 && row < 4) keypad.steps[row] = step;
@@ -36,13 +63,11 @@ namespace Pico {
             }
         }
 
-        // 2. Blink Update (200ms)
         if (now - keypad.blink_timer >= 200) {
             keypad.blink_timer = now;
             keypad.blink_state = !keypad.blink_state;
         }
 
-        // 3. LED Rendering
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 4; col++) {
                 int i = (row * 4) + col;
