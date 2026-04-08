@@ -407,7 +407,7 @@ Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 | 93        | Delay Bypass           | 
 | 120       | Debug Toggle           | 
 
-You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
+You can enable the masterFX in the board.json. To use safe volume it is recomended to keep the Limiter on. 
 
 
 # Sample Loading
