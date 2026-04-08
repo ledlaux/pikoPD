@@ -190,7 +190,7 @@ constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
 
 // ---------------------------
 
-
+// https://github.com/Wasted-Audio/hvcc/issues/175
 #define HV_HEAVY_SPINLOCK 5
 
 inline void hv_send_msg3_lock(uint32_t hash, float a, float b, float c) {
@@ -209,8 +209,6 @@ inline void hv_send_msg1_lock(uint32_t hash, float a) {
     uint32_t irq = spin_lock_blocking(spin_lock_instance(HV_HEAVY_SPINLOCK));
     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "f", a);
     spin_unlock(spin_lock_instance(HV_HEAVY_SPINLOCK), irq);
-
-    
 }
 
 
@@ -309,122 +307,6 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     }
 }
 
-// https://github.com/Wasted-Audio/hvcc/issues/175
-
-// inline void hv_send_msg3_irq(uint32_t hash, float a, float b, float c) {
-//     uint32_t irq = save_and_disable_interrupts();
-//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "fff", a, b, c);
-//     restore_interrupts(irq);
-// }
-
-// inline void hv_send_msg1_irq(uint32_t hash, float a) {
-//     uint32_t irq = save_and_disable_interrupts();
-//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "f", a);
-//     restore_interrupts(irq);
-// }
-
-// inline void hv_send_msg2_irq(uint32_t hash, float a, float b) {
-//     uint32_t irq = save_and_disable_interrupts();
-//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "ff", a, b);
-//     restore_interrupts(irq);
-// }
-
-
-
-// void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-
-//     uint32_t now = to_ms_since_boot(get_absolute_time());
-
-//     if (status >= 0xF8) {
-//         hv_send_msg1_irq(HV_MIDIREALTIMEIN_HASH, (float)status);
-//         switch(status) {
-//             case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
-//             case MIDI_RT_CONTINUE: clock_running = true; break;
-//             case MIDI_RT_STOP:     clock_running = false; break;
-//             case MIDI_RT_CLOCK:    
-//                 if(clock_running && ++clock_count >= 24) {
-//                     clock_count = 0;
-//                     midi_clock_timer = now + CLOCK_FLASH_MS;
-//                 }
-//                 break;
-//         }
-//         return;
-//     }
-
-//     uint8_t type = status & 0xF0;
-//     uint8_t chan = status & 0x0F;
-//     float f_chan = (float)chan + 1.0f; 
-
-//     switch(type) {
-//         case 0x90: { 
-//             if (data2 > 0) {
-//                 last_midi_velocity = data2;
-//                 current_midi_note = data1;
-//                 midi_activity_timer = now + FLASH_DURATION_MS;
-                
-//                 hv_send_msg3_irq(HV_NOTEIN_HASH, (float)data1, (float)data2, f_chan);
-
-//                 {%- if board.voice_count > 1 %}
-//                 {
-//                     int v_idx = allocateVoice(data1); 
-//                     hv_send_msg3_irq(VOICE_HASHES[v_idx], (float)data1, (float)data2, f_chan);
-//                 }
-//                 {%- endif %}
-//                 break; 
-//             }
-//             [[fallthrough]];
-//         }
-
-//         case 0x80: { 
-//              hv_send_msg3_irq(HV_NOTEIN_HASH, (float)data1, 0.0f, f_chan);
-
-//             {%- if board.voice_count > 1 %}
-//             {
-//                 int i = findVoiceByNote(data1);
-//                 if (i >= 0) {
-//                     sendVoiceNoteOff(i, data1);
-//                     hv_send_msg3_irq(VOICE_HASHES[i], (float)data1, 0.0f, f_chan);
-//                 }
-//             }
-//             {%- endif %}
-//             break;
-//         }
-        
-//         case 0xB0: { 
-//             float val = (float)data2 / 127.0f;
-//             bool is_on = (data2 > 64);
-            
-//             switch(data1) {
-//                 {%- if board.masterfx.limiter %}
-//                 case 7: masterFX.master_volume = val; break; 
-//                 case 8: masterFX.limiter.bypass = !is_on; break;
-//                 {%- endif %}
-//                 {%- if board.masterfx.delay %}
-//                 case 90: masterFX.delay.set_time(val); break;
-//                 case 91: masterFX.delay.target_level = val * 0.8f; break;
-//                 case 92: masterFX.delay.target_fb = val * 0.95f; break;
-//                 case 93: masterFX.delay.bypass = !is_on; break;
-//                 {%- endif %}
-//                 {%- if board.masterfx.reverb %}
-//                 case 2: masterFX.reverb_mix = val; break;      
-//                 case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
-//                 case 96: masterFX.reverb.damping(val); break;      
-//                 case 97: masterFX.reverb.reverb_width = val; break;       
-//                 case 98: masterFX.reverb.reverb_predelay = val; break;    
-//                 case 99: masterFX.reverb_bypass = !is_on; break;
-//                 {%- endif %}
-//             }
-//             hv_send_msg3_irq(HV_CTLIN_HASH, (float)data2, (float)data1, (float)chan);
-//             break;
-//         }
-
-//         case 0xE0: { 
-//             int bend = (data2 << 7) | data1;
-//             hv_send_msg2_irq(HV_BENDIN_HASH, (float)bend, (float)chan);
-//             break;
-//         }
-//     }
-// }
 
 // void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
@@ -524,55 +406,32 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t midiMsg[3] = {0, 0, 0};
-    int humanChannel = 1;
-    if(hv_msg_getNumElements(m) >= 3) humanChannel = (int)hv_msg_getFloat(m, 2);
-
+    int humanChannel = (hv_msg_getNumElements(m) >= 3) ? (int)hv_msg_getFloat(m, 2) : 1;
     int zeroBasedCh = (humanChannel < 1) ? 0 : (humanChannel > 16) ? 15 : humanChannel - 1;
 
-    switch(receiverHash) {
-        case HV_NOTEOUT_HASH: {
-            int note = (int)hv_msg_getFloat(m, 0);
-            int vel  = (int)hv_msg_getFloat(m, 1);
-            midiMsg[0] = vel > 0 ? (0x90 | zeroBasedCh) : (0x80 | zeroBasedCh);
-            midiMsg[1] = note & 0x7F;
-            midiMsg[2] = vel & 0x7F;
-            break;
-        }
-        case HV_CTL_OUT_HASH: {
-            int val = (int)hv_msg_getFloat(m, 0);
-            int cc  = (int)hv_msg_getFloat(m, 1);
-            midiMsg[0] = 0xB0 | zeroBasedCh;
-            midiMsg[1] = cc & 0x7F;
-            midiMsg[2] = val & 0x7F;
-            break;
-        }
-        default: return;
-    }
-
-// ---- UART MIDI ----
+    if (receiverHash == HV_NOTEOUT_HASH) {
+        int note = (int)hv_msg_getFloat(m, 0);
+        int vel  = (int)hv_msg_getFloat(m, 1);
+        midiMsg[0] = (vel > 0 ? 0x90 : 0x80) | zeroBasedCh;
+        midiMsg[1] = note & 0x7F;
+        midiMsg[2] = vel & 0x7F;
+    } 
+    else if (receiverHash == HV_CTL_OUT_HASH) {
+        int val = (int)hv_msg_getFloat(m, 0);
+        int cc  = (int)hv_msg_getFloat(m, 1);
+        midiMsg[0] = 0xB0 | zeroBasedCh;
+        midiMsg[1] = cc & 0x7F;
+        midiMsg[2] = val & 0x7F;
+    } else return;
 
     {%- if board.midi_mode == 'uart' %}
     uart_write_blocking(uart0, midiMsg, 3);
     {%- endif %}
-    {%- if board.midi_mode == 'host' %}
 
-// ---- USB HOST ----
+    {%- if board.midi_mode == 'usb' or board.midi_mode == 'host' %}
+    uint32_t status = midiMsg[0];
 
-    tuh_midi_stream_write(1, 0, midiMsg, 3);
-    {%- endif %}
-
-// ---- USB MIDI ----
-
-    {%- if board.midi_mode == 'usb' %}
-    uint8_t status = midiMsg[0];
-    uint8_t type   = status & 0xF0;
-    uint8_t cin    = status >> 4; 
-    int len = 3; 
-    if (type == 0xC0 || type == 0xD0) len = 2; 
-    uint32_t midi_packed = ((uint32_t)len << 24) | 
-                           ((uint32_t)status << 16) | 
-                           ((uint32_t)midiMsg[1] << 8) | 
-                           (uint32_t)midiMsg[2];
+    uint32_t midi_packed = (status << 16) | (midiMsg[1] << 8) | midiMsg[2];
 
     uint32_t h = midi_out_rb.head.load(std::memory_order_relaxed);
     uint32_t t = midi_out_rb.tail.load(std::memory_order_acquire);
@@ -581,7 +440,7 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
         midi_out_rb.data[h & (MIDI_OUT_BUF - 1)] = midi_packed;
         midi_out_rb.head.store(h + 1, std::memory_order_release);
     }
-{%- endif %}
+    {%- endif %}
 }
 
 
@@ -818,11 +677,9 @@ int main() {
         midi_task();
         
         #if !defined(MIDI_HOST) && ENABLE_DEBUG
-        // Only run the print queue if we are NOT in host mode AND debug is ON
         print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
     #else
-        // In MIDI_HOST mode OR when DEBUG is OFF: 
-        // Slow down Core 0 to free up the memory bus for Core 1 (Audio)
+        // Slow down Core 0 
         sleep_us(20);
     #endif
 
