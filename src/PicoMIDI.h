@@ -233,46 +233,7 @@ void parse_raw_midi_byte(uint8_t byte, MidiParser& p, void (*handler)(uint8_t, u
         #endif
     }
 
-
-//    void midi_task() {
-//     #ifdef MIDI_HOST
-//         tuh_task(); 
-//     #else
-//         tud_task();  
-//     #endif
-
-//     uint8_t b;
-//     while (midi_pop(b)) {
-//         parse_raw_midi_byte(b, core0_parser, handle_midi_message);
-//     }
-
-//     #ifndef MIDI_HOST
-//     if (tud_midi_mounted()) {
-//         uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
-//         uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
-
-//         while (t != h) {
-//             uint32_t msg = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
-//             uint8_t len    = (msg >> 24) & 0xFF; 
-//             uint8_t status = (msg >> 16) & 0xFF;
-//             uint8_t d1     = (msg >> 8)  & 0xFF;
-//             uint8_t d2     = (msg >> 0)  & 0xFF;
-            
-//             uint8_t packet[4] = { (uint8_t)(status >> 4), status, d1, (uint8_t)(len == 3 ? d2 : 0) };
-
-//             if (tud_midi_packet_write(packet)) {
-//                 t++; 
-//                 midi_out_rb.tail.store(t, std::memory_order_release);
-//             } else {
-         
-//                 break; 
-//             }
-//         }
-//     }
-//     #endif
-// }
-
-
+    
 void midi_task() {
 #ifdef MIDI_HOST
     tuh_task(); 
@@ -283,21 +244,39 @@ void midi_task() {
     uint8_t b;
     uint32_t count = 0;
     
-    // Throttle Input: 64 bytes is roughly 20-30 MIDI messages
     while (count++ < 64 && midi_pop(b)) {
         parse_raw_midi_byte(b, core0_parser, handle_midi_message);
     }
 
-#ifndef MIDI_HOST
+#ifdef MIDI_HOST
+    // --- HOST MODE OUTPUT ---
+    if (usb_midi_dev0 != -1 && tuh_midi_mounted(usb_midi_dev0)) {
+        uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
+        uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
+        count = 0;
+
+        while (t != h && count++ < 64) {
+            uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
+            uint8_t status = (uint8_t)(m >> 16);
+            uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
+
+            if (tuh_midi_packet_write(usb_midi_dev0, pkt)) {
+                midi_out_rb.tail.store(++t, std::memory_order_release);
+            } else break;
+        }
+        tuh_midi_write_flush(usb_midi_dev0);
+    }
+#else
+    // --- DEVICE MODE OUTPUT ---
     if (tud_midi_mounted()) {
         uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
         uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
         count = 0;
 
-        // Throttle Output: 64 USB packets
         while (t != h && count++ < 64) {
             uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
-            uint8_t pkt[4] = { (uint8_t)((m >> 16) >> 4), (uint8_t)(m >> 16), (uint8_t)(m >> 8), (uint8_t)m };
+            uint8_t status = (uint8_t)(m >> 16);
+            uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
 
             if (tud_midi_packet_write(pkt)) {
                 midi_out_rb.tail.store(++t, std::memory_order_release);
