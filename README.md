@@ -85,22 +85,6 @@ optional arguments:
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
-
-
-
-## MIDI CC
-
-| CC Number | Parameter              | 
-|-----------|------------------------|
-| 7         | Master Volume          | 
-| 8        | Limiter Bypass         | 
-| 90        | Delay Time             |
-| 91        | Delay Send Level       | 
-| 92        | Delay Feedback Amount  |
-| 93        | Delay Bypass           | 
-| 120       | Debug Console Toggle   | 
-
-Keep limiter ON for a safe volume. 
   
 ## Sample loading
 
