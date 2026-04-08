@@ -6,11 +6,18 @@
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
 #include "PicoControl.h"
-#include "Heavy_{{ name }}.hpp"
-
+#include "PicoAudio.h"
+#include "PicoMIDI.h"
 {%- if board.pico_board == 'pico_w' %}
 #include "pico/cyw43_arch.h"
 {%- endif %}
+
+{%- if board.masterfx %}
+MasterFX masterFX;
+{%- endif %}
+
+#include "Heavy_{{ name }}.hpp"
+
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
@@ -37,10 +44,8 @@
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
-#ifndef MAX_VOICES
-#define MAX_VOICES 1
-#endif
 
+Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 {% set receives = {} %}
 {%- for r in hv_manifest.receives -%}{%- set _ = receives.update({r.name: r.hash}) -%}
@@ -126,8 +131,6 @@
     {%- set _ = active_cny70.append({'adc_pin': cny.adc_pin, 'hash': receives[cny.name]}) -%}
 {%- endfor -%}
 
-Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
-
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
@@ -141,6 +144,10 @@ static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
 // ---- NOTE receives ----
+
+#ifndef MAX_VOICES
+#define MAX_VOICES 1
+#endif
 
 {% set note_receives = [] -%}
 {% for r in hv_manifest.receives if r.name.lower().startswith("note") -%}
@@ -184,12 +191,35 @@ constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
 // ---------------------------
 
 
+#define HV_HEAVY_SPINLOCK 5
+
+inline void hv_send_msg3_lock(uint32_t hash, float a, float b, float c) {
+    uint32_t irq = spin_lock_blocking(spin_lock_instance(HV_HEAVY_SPINLOCK));
+    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "fff", a, b, c);
+    spin_unlock(spin_lock_instance(HV_HEAVY_SPINLOCK), irq);
+}
+
+inline void hv_send_msg2_lock(uint32_t hash, float a, float b) {
+    uint32_t irq = spin_lock_blocking(spin_lock_instance(HV_HEAVY_SPINLOCK));
+    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "ff", a, b);
+    spin_unlock(spin_lock_instance(HV_HEAVY_SPINLOCK), irq);
+}
+
+inline void hv_send_msg1_lock(uint32_t hash, float a) {
+    uint32_t irq = spin_lock_blocking(spin_lock_instance(HV_HEAVY_SPINLOCK));
+    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "f", a);
+    spin_unlock(spin_lock_instance(HV_HEAVY_SPINLOCK), irq);
+
+    
+}
+
+
 void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
-    // 1. Real-time MIDI (Clock, Start, Stop)
     if (status >= 0xF8) {
-        hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
+        hv_send_msg1_lock(HV_MIDIREALTIMEIN_HASH, (float)status);
         switch(status) {
             case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
             case MIDI_RT_CONTINUE: clock_running = true; break;
@@ -206,86 +236,290 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
     uint8_t type = status & 0xF0;
     uint8_t chan = status & 0x0F;
+    float f_chan = (float)chan + 1.0f; 
 
     switch(type) {
-        // --- CASE 1: NOTE ON (0x90) ---
-        case 0x90:
+        case 0x90: { 
             if (data2 > 0) {
                 last_midi_velocity = data2;
                 current_midi_note = data1;
                 midi_activity_timer = now + FLASH_DURATION_MS;
                 
-                // 1. Always send to the standard [notein] receiver
-                hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, (float)chan + 1.0f);
+                hv_send_msg3_lock(HV_NOTEIN_HASH, (float)data1, (float)data2, f_chan);
 
-                // 2. Polyphonic Voice Tracking (Only exists if note_receives were found)
-                {%- if note_receives|length > 1 %}
+                {%- if board.voice_count > 1 %}
                 {
-                    int v_idx = -1;
-                    for (int i = 0; i < MAX_VOICES; i++) {
-                        if (!voices[i].active) { v_idx = i; break; }
-                    }
-
-                    if (v_idx == -1) { // Steal Oldest
-                        uint32_t oldest = UINT32_MAX;
-                        for (int i = 0; i < MAX_VOICES; i++) {
-                            if (voices[i].age < oldest) { oldest = voices[i].age; v_idx = i; }
-                        }
-                        hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)voices[v_idx].note, 0.0f, (float)(chan+1));
-                    }
-
-                    voices[v_idx].note = data1;
-                    voices[v_idx].velocity = data2;
-                    voices[v_idx].active = true;
-                    voices[v_idx].age = voiceCounter++;
-                    
-                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)data1, (float)data2, (float)(chan+1));
+                    int v_idx = allocateVoice(data1); 
+                    hv_send_msg3_lock(VOICE_HASHES[v_idx], (float)data1, (float)data2, f_chan);
                 }
                 {%- endif %}
                 break; 
             }
             [[fallthrough]];
+        }
 
-        // --- CASE 2: NOTE OFF (0x80) ---
-        case 0x80:
-            // 1. Always send to the standard [notein] receiver
-            hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, (float)chan + 1.0f);
+        case 0x80: { 
+             hv_send_msg3_lock(HV_NOTEIN_HASH, (float)data1, 0.0f, f_chan);
 
-            // 2. Polyphonic Voice Tracking (Only exists if note_receives were found)
-            {%- if note_receives|length > 1 %}
-            for (int i = 0; i < MAX_VOICES; i++) {
-                if (voices[i].active && voices[i].note == data1) {
-                    voices[i].active = false;
-                    hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[i], 0.0f, "fff", (float)data1, 0.0f, (float)(chan+1));
-                    break;
+            {%- if board.voice_count > 1 %}
+            {
+                int i = findVoiceByNote(data1);
+                if (i >= 0) {
+                    sendVoiceNoteOff(i, data1);
+                    hv_send_msg3_lock(VOICE_HASHES[i], (float)data1, 0.0f, f_chan);
                 }
             }
             {%- endif %}
             break;
+        }
         
-        case 0xB0: { // Control Change
+        case 0xB0: { 
             float val = (float)data2 / 127.0f;
             bool is_on = (data2 > 64);
-            switch(data1){
-                case 7:   Pico::master_volume = val; break;
-                case 8:   Pico::limiter_bypass = is_on; break;
-                case 90:  Pico::target_delay_samples = 500.0f + val * 23000.0f; break;
-                case 91:  Pico::delay_level = val * 0.8f; break;
-                case 92:  Pico::delay_feedback = val * 0.95f; break;
-                case 93:  Pico::delay_bypass = is_on; break;
-                case 120: debug_enabled = is_on; break;
+            
+            switch(data1) {
+                {%- if board.masterfx.limiter %}
+                case 7: masterFX.master_volume = val; break; 
+                case 8: masterFX.limiter.bypass = !is_on; break;
+                {%- endif %}
+                {%- if board.masterfx.delay %}
+                case 90: masterFX.delay.set_time(val); break;
+                case 91: masterFX.delay.target_level = val * 0.8f; break;
+                case 92: masterFX.delay.target_fb = val * 0.95f; break;
+                case 93: masterFX.delay.bypass = !is_on; break;
+                {%- endif %}
+                {%- if board.masterfx.reverb %}
+                case 2: masterFX.reverb_mix = val; break;      
+                case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
+                case 96: masterFX.reverb.damping(val); break;      
+                case 97: masterFX.reverb.reverb_width = val; break;       
+                case 98: masterFX.reverb.reverb_predelay = val; break;    
+                case 99: masterFX.reverb_bypass = !is_on; break;
+                {%- endif %}
             }
-            hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+            hv_send_msg3_lock(HV_CTLIN_HASH, (float)data2, (float)data1, (float)chan);
             break;
         }
 
-        case 0xE0: { // Pitch Bend
+        case 0xE0: { 
             int bend = (data2 << 7) | data1;
-            hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
+            hv_send_msg2_lock(HV_BENDIN_HASH, (float)bend, (float)chan);
             break;
         }
     }
 }
+
+// https://github.com/Wasted-Audio/hvcc/issues/175
+
+// inline void hv_send_msg3_irq(uint32_t hash, float a, float b, float c) {
+//     uint32_t irq = save_and_disable_interrupts();
+//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "fff", a, b, c);
+//     restore_interrupts(irq);
+// }
+
+// inline void hv_send_msg1_irq(uint32_t hash, float a) {
+//     uint32_t irq = save_and_disable_interrupts();
+//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "f", a);
+//     restore_interrupts(irq);
+// }
+
+// inline void hv_send_msg2_irq(uint32_t hash, float a, float b) {
+//     uint32_t irq = save_and_disable_interrupts();
+//     hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "ff", a, b);
+//     restore_interrupts(irq);
+// }
+
+
+
+// void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+
+//     uint32_t now = to_ms_since_boot(get_absolute_time());
+
+//     if (status >= 0xF8) {
+//         hv_send_msg1_irq(HV_MIDIREALTIMEIN_HASH, (float)status);
+//         switch(status) {
+//             case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
+//             case MIDI_RT_CONTINUE: clock_running = true; break;
+//             case MIDI_RT_STOP:     clock_running = false; break;
+//             case MIDI_RT_CLOCK:    
+//                 if(clock_running && ++clock_count >= 24) {
+//                     clock_count = 0;
+//                     midi_clock_timer = now + CLOCK_FLASH_MS;
+//                 }
+//                 break;
+//         }
+//         return;
+//     }
+
+//     uint8_t type = status & 0xF0;
+//     uint8_t chan = status & 0x0F;
+//     float f_chan = (float)chan + 1.0f; 
+
+//     switch(type) {
+//         case 0x90: { 
+//             if (data2 > 0) {
+//                 last_midi_velocity = data2;
+//                 current_midi_note = data1;
+//                 midi_activity_timer = now + FLASH_DURATION_MS;
+                
+//                 hv_send_msg3_irq(HV_NOTEIN_HASH, (float)data1, (float)data2, f_chan);
+
+//                 {%- if board.voice_count > 1 %}
+//                 {
+//                     int v_idx = allocateVoice(data1); 
+//                     hv_send_msg3_irq(VOICE_HASHES[v_idx], (float)data1, (float)data2, f_chan);
+//                 }
+//                 {%- endif %}
+//                 break; 
+//             }
+//             [[fallthrough]];
+//         }
+
+//         case 0x80: { 
+//              hv_send_msg3_irq(HV_NOTEIN_HASH, (float)data1, 0.0f, f_chan);
+
+//             {%- if board.voice_count > 1 %}
+//             {
+//                 int i = findVoiceByNote(data1);
+//                 if (i >= 0) {
+//                     sendVoiceNoteOff(i, data1);
+//                     hv_send_msg3_irq(VOICE_HASHES[i], (float)data1, 0.0f, f_chan);
+//                 }
+//             }
+//             {%- endif %}
+//             break;
+//         }
+        
+//         case 0xB0: { 
+//             float val = (float)data2 / 127.0f;
+//             bool is_on = (data2 > 64);
+            
+//             switch(data1) {
+//                 {%- if board.masterfx.limiter %}
+//                 case 7: masterFX.master_volume = val; break; 
+//                 case 8: masterFX.limiter.bypass = !is_on; break;
+//                 {%- endif %}
+//                 {%- if board.masterfx.delay %}
+//                 case 90: masterFX.delay.set_time(val); break;
+//                 case 91: masterFX.delay.target_level = val * 0.8f; break;
+//                 case 92: masterFX.delay.target_fb = val * 0.95f; break;
+//                 case 93: masterFX.delay.bypass = !is_on; break;
+//                 {%- endif %}
+//                 {%- if board.masterfx.reverb %}
+//                 case 2: masterFX.reverb_mix = val; break;      
+//                 case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
+//                 case 96: masterFX.reverb.damping(val); break;      
+//                 case 97: masterFX.reverb.reverb_width = val; break;       
+//                 case 98: masterFX.reverb.reverb_predelay = val; break;    
+//                 case 99: masterFX.reverb_bypass = !is_on; break;
+//                 {%- endif %}
+//             }
+//             hv_send_msg3_irq(HV_CTLIN_HASH, (float)data2, (float)data1, (float)chan);
+//             break;
+//         }
+
+//         case 0xE0: { 
+//             int bend = (data2 << 7) | data1;
+//             hv_send_msg2_irq(HV_BENDIN_HASH, (float)bend, (float)chan);
+//             break;
+//         }
+//     }
+// }
+
+// void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
+
+//     uint32_t now = to_ms_since_boot(get_absolute_time());
+
+//     if (status >= 0xF8) {
+//         hv_sendMessageToReceiverV(&pd_prog, HV_MIDIREALTIMEIN_HASH, 0.0f, "f", (float)status);
+//         switch(status) {
+//             case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
+//             case MIDI_RT_CONTINUE: clock_running = true; break;
+//             case MIDI_RT_STOP:     clock_running = false; break;
+//             case MIDI_RT_CLOCK:    
+//                 if(clock_running && ++clock_count >= 24) {
+//                     clock_count = 0;
+//                     midi_clock_timer = now + CLOCK_FLASH_MS;
+//                 }
+//                 break;
+//         }
+//         return;
+//     }
+
+//     uint8_t type = status & 0xF0;
+//     uint8_t chan = status & 0x0F;
+//     float f_chan = (float)chan + 1.0f; 
+
+//     switch(type) {
+//         case 0x90: { 
+//             if (data2 > 0) {
+//                 last_midi_velocity = data2;
+//                 current_midi_note = data1;
+//                 midi_activity_timer = now + FLASH_DURATION_MS;
+                
+//                 hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, (float)data2, f_chan);
+
+//                 {%- if board.voice_count > 1 %}
+//                 {
+//                     int v_idx = allocateVoice(data1); 
+//                     hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[v_idx], 0.0f, "fff", (float)data1, (float)data2, f_chan);
+//                 }
+//                 {%- endif %}
+//                 break; 
+//             }
+//             [[fallthrough]];
+//         }
+
+//         case 0x80: { 
+//             hv_sendMessageToReceiverV(&pd_prog, HV_NOTEIN_HASH, 0.0f, "fff", (float)data1, 0.0f, f_chan);
+
+//             {%- if board.voice_count > 1 %}
+//             {
+//                 int i = findVoiceByNote(data1);
+//                 if (i >= 0) {
+//                     sendVoiceNoteOff(i, data1);
+//                     hv_sendMessageToReceiverV(&pd_prog, VOICE_HASHES[i], 0.0f, "fff", (float)data1, 0.0f, f_chan);
+//                 }
+//             }
+//             {%- endif %}
+//             break;
+//         }
+        
+//         case 0xB0: { 
+//             float val = (float)data2 / 127.0f;
+//             bool is_on = (data2 > 64);
+            
+//             switch(data1) {
+//                 {%- if board.masterfx.limiter %}
+//                 case 7: masterFX.master_volume = val; break; 
+//                 case 8: masterFX.limiter.bypass = !is_on; break;
+//                 {%- endif %}
+//                 {%- if board.masterfx.delay %}
+//                 case 90: masterFX.delay.set_time(val); break;
+//                 case 91: masterFX.delay.target_level = val * 0.8f; break;
+//                 case 92: masterFX.delay.target_fb = val * 0.95f; break;
+//                 case 93: masterFX.delay.bypass = !is_on; break;
+//                 {%- endif %}
+//                 {%- if board.masterfx.reverb %}
+//                 case 2: masterFX.reverb_mix = val; break;      
+//                 case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
+//                 case 96: masterFX.reverb.damping(val); break;      
+//                 case 97: masterFX.reverb.reverb_width = val; break;       
+//                 case 98: masterFX.reverb.reverb_predelay = val; break;    
+//                 case 99: masterFX.reverb_bypass = !is_on; break;
+//                 {%- endif %}
+//             }
+//             hv_sendMessageToReceiverV(&pd_prog, HV_CTLIN_HASH, 0.0f, "fff", (float)data2, (float)data1, (float)chan);
+//             break;
+//         }
+
+//         case 0xE0: { 
+//             int bend = (data2 << 7) | data1;
+//             hv_sendMessageToReceiverV(&pd_prog, HV_BENDIN_HASH, 0.0f, "ff", (float)bend, (float)chan);
+//             break;
+//         }
+//     }
+// }
 
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
@@ -379,9 +613,9 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         } 
 }
 
-
 {%- if board.console %}
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
+PrintMsg print_pool[PRINT_POOL_SIZE];
 
 static const char* printNames[NUM_PRINT_NAMES] = {
 {% for p in hv_manifest.prints -%}
@@ -437,19 +671,12 @@ void hv_print_handler(HeavyContextInterface* context,
 
 void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
-    {%- if board.masterfx.delay %}
-    Pico::applyStereoDelay(buffer, frames);
-    {%- endif %}
-    {%- if board.masterfx.limiter %}
-    Pico::applyLimiter(buffer, frames);
-    {%- endif %}
 }
-
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
-    
+
     {%- if board.console %}
     #ifndef MIDI_HOST
     cdc_stdio_lib_init();
@@ -497,6 +724,8 @@ int main() {
         0,  // second pin is unused
         {{ board.buffer_size }});
     {%- endif %}
+
+     masterFX.init();
 
 // ---- MPR121 init ----
 
@@ -587,15 +816,15 @@ int main() {
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
         midi_task();
-        {% if board.midi_mode == 'usb' %}
-        process_usb_queue();
-        {%- endif %}
-
-        {%- if board.console %}
+        
+        #if !defined(MIDI_HOST) && ENABLE_DEBUG
+        // Only run the print queue if we are NOT in host mode AND debug is ON
         print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-        {% else %}
-        sleep_ms(1); 
-        {%- endif %}
+    #else
+        // In MIDI_HOST mode OR when DEBUG is OFF: 
+        // Slow down Core 0 to free up the memory bus for Core 1 (Audio)
+        sleep_us(20);
+    #endif
 
 // ---- MPR121 Processing ----
 
