@@ -146,7 +146,7 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 - About HVCC compiler  
   https://wasted-audio.github.io/hvcc/
 - Supported vanilla objects  
-  https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
+  [https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md](https://wasted-audio.github.io/hvcc/reference/objects/supported/)
 
 
 ## Licence
