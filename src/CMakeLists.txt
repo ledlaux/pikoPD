@@ -21,7 +21,6 @@ endif()
 
 add_definitions(-DMAX_VOICES=${MAX_VOICES})
 
-
 if(MIDI_HOST_ENABLED)
     set(USB_LIB "tinyusb_host")
     add_compile_definitions(
@@ -30,7 +29,8 @@ if(MIDI_HOST_ENABLED)
         CFG_TUD_ENABLED=0
         CFG_TUH_MIDI=1
         CFG_TUSB_RHPORT0_MODE=OPT_MODE_HOST
-    )
+)
+    
 else()
     set(USB_LIB "tinyusb_device")
     add_compile_definitions(
@@ -41,16 +41,22 @@ else()
     )
 endif()
 
-
-
 pico_sdk_init()
-
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
     "${CMAKE_CURRENT_LIST_DIR}/src/*.c"          
     "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"         
 )
+
+if(WEB)
+    file(GLOB WEB_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_LIST_DIR}/src/web/*.c"
+        "${CMAKE_CURRENT_LIST_DIR}/src/web/*.cpp"
+    )
+    list(APPEND SRC_FILES ${WEB_FILES})
+endif()
+
 file(GLOB HVCC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.cpp"
@@ -59,6 +65,13 @@ file(GLOB HVCC_FILES CONFIGURE_DEPENDS
 set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES})
 
 add_executable(pikopd.elf ${ALL_SOURCES})
+
+
+if(WEB)
+    target_include_directories(pikopd.elf PRIVATE "${CMAKE_CURRENT_LIST_DIR}/src/web")
+    target_compile_definitions(pikopd.elf PRIVATE WEB_ENABLED=1)
+endif()
+
 
 target_compile_definitions(pikopd.elf PRIVATE
     CFG_TUSB_MCU=OPT_MCU_RP2040
@@ -93,12 +106,26 @@ if(PICO_ZERO_BOARD)
 endif()
 
 if("${PICO_BOARD}" STREQUAL "pico_w")
-    target_link_libraries(pikopd.elf PRIVATE pico_cyw43_arch_none)
     target_compile_definitions(pikopd.elf PRIVATE PICO_W=1)
+
+    if(WEB)
+        target_link_libraries(pikopd.elf PRIVATE 
+            pico_cyw43_arch_lwip_threadsafe_background
+            pico_lwip_http
+            pico_lwip_mdns
+        )
+    else()
+        target_link_libraries(pikopd.elf PRIVATE pico_cyw43_arch_none)
+    endif()
 endif()
 
-# 8. Standard Pico Configuration
-pico_enable_stdio_usb(pikopd.elf 0)
+
+if(WEB)
+    pico_enable_stdio_usb(pikopd.elf 1)
+else()
+    pico_enable_stdio_usb(pikopd.elf 0)
+endif()
+
 pico_enable_stdio_uart(pikopd.elf 0)
 pico_add_extra_outputs(pikopd.elf)
 
