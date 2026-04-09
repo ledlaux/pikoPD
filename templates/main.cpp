@@ -31,8 +31,8 @@ static struct udp_pcb* osc_out_pcb = nullptr;
 
 
 // Define your credentials
-#define WIFI_SSID "Redmi"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
