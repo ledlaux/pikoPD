@@ -1,0 +1,112 @@
+cmake_minimum_required(VERSION 3.13)
+
+project(pikopd C CXX ASM)
+
+add_compile_definitions(HV_BARE_METAL)
+
+set(PICO_SDK_PATH "$ENV{PICO_SDK_PATH}")
+set(PICO_EXTRAS_PATH "$ENV{PICO_SDK_PATH}/pico-extras")
+
+include("${CMAKE_CURRENT_LIST_DIR}/src/pico_sdk_import.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/src/pico_extras_import.cmake")
+
+if(ENABLE_DEBUG)
+    add_compile_definitions(ENABLE_DEBUG=1)
+else()
+    add_compile_definitions(ENABLE_DEBUG=0)
+endif()
+
+add_definitions(-DMAX_VOICES=${MAX_VOICES})
+
+
+if(MIDI_HOST_ENABLED)
+    set(USB_LIB "tinyusb_host")
+    add_compile_definitions(
+        MIDI_HOST=1
+        CFG_TUH_ENABLED=1
+        CFG_TUD_ENABLED=0
+        CFG_TUH_MIDI=1
+        CFG_TUSB_RHPORT0_MODE=OPT_MODE_HOST
+    )
+else()
+    set(USB_LIB "tinyusb_device")
+    add_compile_definitions(
+        CFG_TUH_ENABLED=0
+        CFG_TUD_ENABLED=1
+        CFG_TUD_MIDI=1
+        CFG_TUSB_RHPORT0_MODE=OPT_MODE_DEVICE
+    )
+endif()
+
+
+
+pico_sdk_init()
+
+file(GLOB SRC_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/main.cpp"          
+    "${CMAKE_CURRENT_LIST_DIR}/src/*.c"          
+    "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"         
+)
+
+list(REMOVE_ITEM SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/htmldata.c")
+file(GLOB HVCC_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.c"
+    "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.cpp"
+)
+
+set(ALL_SOURCES ${SRC_FILES} ${HVCC_FILES})
+
+add_executable(pikopd.elf ${ALL_SOURCES})
+
+
+target_compile_definitions(pikopd.elf PRIVATE
+    CFG_TUSB_MCU=OPT_MCU_RP2040
+    HV_UNIX=1
+    PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
+)
+
+target_include_directories(pikopd.elf PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/src"
+    "${CMAKE_CURRENT_LIST_DIR}/hvcc"
+    "${PICO_SDK_PATH}/lib/tinyusb/src"
+    "${PICO_EXTRAS_PATH}/tinyusb"
+)
+
+target_compile_definitions(pikopd.elf PRIVATE
+    CFG_TUD_MIDI_RX_BUFSIZE=64
+    CFG_TUD_MIDI_TX_BUFSIZE=64
+    CFG_TUD_MIDI_EP_BUFSIZE=64
+)
+
+target_link_libraries(pikopd.elf PRIVATE
+    pico_stdlib
+    pico_audio_i2s
+    pico_audio_pwm
+    hardware_clocks
+    hardware_adc
+    hardware_pwm
+    pico_multicore
+    hardware_i2c
+	pico_lwip_mdns
+)
+
+if(PICO_ZERO_BOARD)
+    target_compile_definitions(pikopd.elf PRIVATE PICO_ZERO=1)
+    pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+    target_link_libraries(pikopd.elf PRIVATE hardware_pio)
+endif()
+
+if("${PICO_BOARD}" STREQUAL "pico_w")
+    target_link_libraries(pikopd.elf PRIVATE  pico_cyw43_arch_lwip_threadsafe_background
+    pico_lwip_http)
+    target_compile_definitions(pikopd.elf PRIVATE PICO_W=1)
+endif()
+
+# 8. Standard Pico Configuration
+pico_enable_stdio_usb(pikopd.elf 1)
+pico_enable_stdio_uart(pikopd.elf 0)
+pico_add_extra_outputs(pikopd.elf)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+target_compile_options(pikopd.elf PRIVATE -O3 -ffast-math)

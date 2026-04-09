@@ -1,0 +1,60 @@
+{
+  "name": "heavy",
+  "pico_board": "pico_w",
+  "core_freq": 240000,
+  "audio_mode": "I2S",
+  "sample_rate": 22050,
+  "channel": 2,
+  "buffer_size": 64,
+  "i2s_data_pin": 9,
+  "i2s_bclk_pin": 10,
+  "pwm_pin": 10,
+  "voice_count": 1,
+  "midi_mode": "uart",
+  "console": false,
+
+  "inputs": {
+
+    "adc_pins": [
+
+    ],
+
+    "buttons": [
+  
+    ],
+
+    "gate_in": [
+ 
+    ],
+
+    "encoders": [
+  
+    ],
+
+    "joystick": [
+    ],
+
+     "sensors": {
+      "cny70": [
+      ],
+       "mpr121": [
+      ]
+    }
+  },
+
+  "outputs": {
+    
+    "gate_out": [
+    ]
+  },
+
+  "leds": [
+  
+   
+  ], 
+
+  "masterfx": {
+    "limiter": true,
+    "delay": false
+  }
+}
