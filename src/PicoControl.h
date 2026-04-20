@@ -5,7 +5,10 @@
 #include <cmath>
 
 #include "MPR121.h"
-#include "HC-SR04.h"
+
+#ifdef DISTANCE_SENSOR_ENABLED
+    #include "HC-SR04.h"
+#endif
 
 #ifdef MIDI_HOST
     #ifndef CFG_TUH_ENABLED
@@ -158,6 +161,8 @@ namespace Pico {
     void addCNY70(int pin, int threshold, int max_sensor, 
               float alpha, int dead_zone, int output_id);
 
+    
+  
     void processPin(int i, float &outVal, bool &shouldSend);
     bool processKnob(int i, float& outVal);
     bool processEnc(int index, float &val);
@@ -190,9 +195,19 @@ namespace Pico {
     void applyStereoDelay(float* buffer, int frames);
     void applyLimiter(float* buffer, int frames);
     void init_dsp_effects();
+
+
+   #ifdef DISTANCE_SENSOR_ENABLED
+    void addDistanceSensor(uint32_t trig, uint32_t echo);
+    void triggerDistanceSensor(); 
+    bool processDistanceSensor();
+    float getDistance();
+    
+    #endif
    
 }
 
+ 
     #define MIDI_IN_BUF 256
 
     struct MidiInputBuffer {
