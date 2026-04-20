@@ -97,7 +97,7 @@ irq 0 rel              side 0
             // Set the function to be executed for the isr.
             irq_set_exclusive_handler(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0, isr);
             // Enable the ISR
-            irq_set_enabled(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_1, true);
+            irq_set_enabled(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0, true);     // Corected to PIo1_IRQ_0
             pio_interrupt_clear(pio, sm);
         }
 

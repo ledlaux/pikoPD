@@ -36,37 +36,46 @@ DistanceSensor* DistanceSensor::_sensor_map[2][4] = {};
 uint DistanceSensor::_PioOffsets[2] = {PIO_OFFSET_UNSET, PIO_OFFSET_UNSET};
 
 static void _SensorIrq() {
-    // Check PIO0 interrupt sources
     for (uint i = 0; i < 4; i++) {
-        // If the interrupt is from pio0 state machine i, then get the distance from
-        // that PIO's state machine and write it to the distance sensor
+        // PIO0 logic
         if (pio_interrupt_get(pio0, i)) {
             DistanceSensor* sensor = DistanceSensor::GetMappedSensor(0, i);
-            sensor->distance = (~pio_sm_get(pio0, i) * 2) / 58;
-            sensor->is_sensing = false;
-            pio_interrupt_clear(pio0, i);
-        };
+            if (sensor) {
+                sensor->distance = (~pio_sm_get(pio0, i) * 2) / 58;
+                sensor->is_sensing = false;
+                pio_interrupt_clear(pio0, i);
+            }
+        }
 
-        // If the interrupt is from pio1 state machine i, then get the distance from
-        // that PIO's state machine and write it to the distance sensor
+        // PIO1 logic
         if (pio_interrupt_get(pio1, i)) {
             DistanceSensor* sensor = DistanceSensor::GetMappedSensor(1, i);
-            sensor->distance = (~pio_sm_get(pio0, i) * 2) / 58;
-            sensor->is_sensing = false;
-            pio_interrupt_clear(pio1, i);
-        };
+            if (sensor) {
+                sensor->distance = (~pio_sm_get(pio1, i) * 2) / 58; 
+                sensor->is_sensing = false;
+                pio_interrupt_clear(pio1, i);
+            }
+        }
     }
 }
 
 DistanceSensor::DistanceSensor(PIO pio, uint sm, uint trigger_gpio) : pio(pio), sm(sm) {
-    // Initialize the program and set up the IRQ handler to save the
-    // distance reading to this->distance.
+    // 1. Map the instance so the IRQ knows which object to update
     DistanceSensor::_sensor_map[pio == pio0 ? 0 : 1][sm] = this;
-    _InitializeSensorForGpio(trigger_gpio, pio, sm, _SensorIrq);
-    puts("IRQ initialized");
-    sleep_ms(1000);
-}
 
+    // 2. Explicitly link the hardware IRQ to our static handler
+    // PIO0_IRQ_0 handles pio0, PIO1_IRQ_0 handles pio1
+    irq_set_exclusive_handler(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0, _SensorIrq);
+    
+    // 3. Enable the interrupt in the processor's NVIC
+    irq_set_enabled(pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0, true);
+
+    // 4. Initialize the PIO hardware and program
+    _InitializeSensorForGpio(trigger_gpio, pio, sm, _SensorIrq);
+    sleep_ms(1000);
+    puts("IRQ initialized for Distance Sensor");
+}
+   
 void DistanceSensor::_InitializeSensorForGpio(uint gpio, PIO pio, uint sm, irq_handler_t handler) {
     // Load the program and get the offset
     // Note this is safe to call even if the sensor was already loaded, it will not reload it.
