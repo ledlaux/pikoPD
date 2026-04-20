@@ -752,7 +752,7 @@ int main() {
                 
 // ---- HC-SR04 Distance sensor ----
 
-            %- for d in active_dist %}
+           {%- for d in active_dist %}
             if (Pico::dist_sensor.changed()) {
                 float dist_cm = Pico::dist_sensor.getDistance(); 
                 hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, dist_cm);

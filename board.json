@@ -1,6 +1,6 @@
 {
   "name": "heavy",
-  "pico_board": "pico2",
+  "pico_board": "pico_w",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
@@ -14,13 +14,13 @@
   "console": true,
 
   "inputs": {
+
     "adc_pins": [
-      { "name": "knob", "pin": 26, "type": "knob" }
+
     ],
 
     "buttons": [
-      { "name": "btn1", "pin": 23, "mode": "switch" },
-      { "name": "btn3", "pin": 14, "mode": "bang" }
+  
     ],
 
     "gate_in": [
@@ -46,11 +46,13 @@
   "outputs": {
     
     "gate_out": [
+ 
     ]
   },
 
   "leds": [
-    { "name": "led1", "pin": 25, "mode": "pd" }
+
+   
   ], 
 
   "masterfx": {

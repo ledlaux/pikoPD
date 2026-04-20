@@ -3,7 +3,9 @@
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/timer.h"
-#include "distance_sensor.h"
+#ifdef DISTANCE_SENSOR_ENABLED
+    #include "distance_sensor.h"
+#endif
 #include <cmath>
 #include <cstdio> 
 
@@ -28,10 +30,10 @@ public:
         hw = new DistanceSensor{pio, (uint)sm, (uint)trig};
         add_repeating_timer_ms(60, timer_callback, this, &timer);
 
-        #if ENABLE_DEBUG
-        printf("[Distance] Started: Trig GP%d, Echo GP%d (PIO%d, SM%d)\n", 
-                trig, echo, (pio == pio1), sm);
-        #endif
+        // #if ENABLE_DEBUG
+        // printf("[Distance] Started: Trig GP%d, Echo GP%d (PIO%d, SM%d)\n", 
+        //         trig, echo, (pio == pio1), sm);
+        // #endif
     }
 
     bool changed() {
@@ -43,7 +45,7 @@ public:
             current_val = (float)d;
 
             #if ENABLE_DEBUG
-            printf("[Distance] New Value: %0.1f cm\n", current_val);
+        //    printf("[Distance] New Value: %0.1f cm\n", current_val);
             #endif
 
             return true;

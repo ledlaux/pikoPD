@@ -62,18 +62,34 @@ target_compile_definitions(pikopd.elf PRIVATE
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
-set(DISTANCE_SENSOR_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor")
 
-add_subdirectory(${DISTANCE_SENSOR_PATH} pico_distance_sensor)
 
-pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor/src/sensor.pio)
+option(ENABLE_DISTANCE_SENSOR "Build with HC-SR04 support" ON)
+
+if(ENABLE_DISTANCE_SENSOR)
+    target_compile_definitions(pikopd.elf PRIVATE DISTANCE_SENSOR_ENABLED=1)
+    
+    set(DISTANCE_SENSOR_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor")
+
+    add_subdirectory(${DISTANCE_SENSOR_PATH} pico_distance_sensor)
+
+    pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor/src/sensor.pio)
+
+    target_include_directories(pikopd.elf PRIVATE "${DISTANCE_SENSOR_PATH}/include")
+    target_link_libraries(pikopd.elf PRIVATE distance-sensor)
+else()
+    add_compile_definitions(DISTANCE_SENSOR_ENABLED=0)
+endif()
+
+
+
+
 
 target_include_directories(pikopd.elf PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/src"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc"
     "${PICO_SDK_PATH}/lib/tinyusb/src"
     "${PICO_EXTRAS_PATH}/tinyusb"
-    "${DISTANCE_SENSOR_PATH}/include"
 )
 
 target_link_libraries(pikopd.elf PRIVATE
@@ -87,7 +103,6 @@ target_link_libraries(pikopd.elf PRIVATE
     hardware_pwm
     pico_multicore
     hardware_i2c
-    distance-sensor
 )
 
 if(PICO_ZERO_BOARD)
