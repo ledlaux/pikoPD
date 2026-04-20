@@ -431,9 +431,6 @@ namespace Pico {
         n_cny70++;
     }
 
-    void addDistanceSensor(uint32_t trig, uint32_t echo) {
-    dist_sensor.init(trig, echo, pio1, 3);
-    }
 
     void update(uint32_t now) {
         uint32_t all_pins = gpio_get_all(); 
@@ -792,14 +789,13 @@ namespace Pico {
             sum += adc_read();
         }
         
-        // 10bit adc read
         float raw10 = (float)sum / 64.0f; 
         rawOut = raw10; 
 
         float current_norm = 0.0f;
-       
-        // SAFETY: If sensor is below threshold force it to 
-        // exactly 0.0 to prevent crashing PD.
+        
+        // SAFETY: If sensor is below threshold (e.g. 400.3 vs 450), 
+        // force it to exactly 0.0 to prevent crashing PD.
         if (raw10 > (float)s.threshold) {
             float range = (float)s.max_sensor - (float)s.threshold;
             if (range < 1.0f) range = 1.0f;
@@ -829,13 +825,24 @@ namespace Pico {
         return false;
     }
 
+
+     #if DISTANCE_SENSOR_ENABLED
+
+    void addDistanceSensor(uint32_t trig, uint32_t echo) {
+        dist_sensor.init(trig, echo, pio1, 3);
+    }
+
     bool processDistanceSensor() {
-            return dist_sensor.changed();
+        return dist_sensor.changed();
         }
 
     float getDistance() {
-            return dist_sensor.getDistance();
+        return dist_sensor.getDistance();
         }
+            
+    #endif
+
+  
 
 
 // -----------Audio-----------
@@ -1082,8 +1089,6 @@ extern "C" {
         }
     }
 #endif
-
-   
 
 
 }
