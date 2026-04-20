@@ -469,12 +469,12 @@ int main() {
 
  // --- I2C Initialization ---
 
-    {% if board.inputs.sensors.mpr121 -%}
-    i2c_init(i2c0, 400 * 1000);
-    {% if board.inputs.sensors.mpr121 | selectattr("i2c_bus", "equalto", "i2c1") | list %}
-    i2c_init(i2c1, 400 * 1000);
-    {% endif %}
-    {%- endif %}
+    // {% if board.inputs.sensors.mpr121 -%}
+    // i2c_init(i2c0, 400 * 1000);
+    // {% if board.inputs.sensors.mpr121 | selectattr("i2c_bus", "equalto", "i2c1") | list %}
+    // i2c_init(i2c1, 400 * 1000);
+    // {% endif %}
+    // {%- endif %}
 
  // --------------------------
 
@@ -612,33 +612,37 @@ int main() {
         sleep_ms(1); 
         {%- endif %}
 
+
+        static uint32_t last_dist_time = 0;
+
+
 // ---- MPR121 Processing ----
 
-        {% if board.inputs.sensors.mpr121 -%}
-        for (int i = 0; i < NUM_SENSORS; ++i) {
-            if (!sensor_array[i].initialized()) {
-                if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
-                continue;
-            }
+        // {% if board.inputs.sensors.mpr121 -%}
+        // for (int i = 0; i < NUM_SENSORS; ++i) {
+        //     if (!sensor_array[i].initialized()) {
+        //         if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
+        //         continue;
+        //     }
 
-            sensor_array[i].processMPR121();
-            uint16_t touched = sensor_array[i].getTouched(); 
+        //     sensor_array[i].processMPR121();
+        //     uint16_t touched = sensor_array[i].getTouched(); 
 
-            if (touched != last_touched_state[i]) {
-                for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
-                    MprPad& pad = active_mpr_pads[p]; 
-                    if (pad.sensor_idx == i) {
-                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
-                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
-                        if (isTouched != wasTouched) {
-                            hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
-                        }
-                    }
-                }
-                last_touched_state[i] = touched;
-            }
-        }
-        {%- endif %}
+        //     if (touched != last_touched_state[i]) {
+        //         for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
+        //             MprPad& pad = active_mpr_pads[p]; 
+        //             if (pad.sensor_idx == i) {
+        //                 bool isTouched = (touched >> pad.pad_idx) & 0x01;
+        //                 bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
+        //                 if (isTouched != wasTouched) {
+        //                     hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
+        //                 }
+        //             }
+        //         }
+        //         last_touched_state[i] = touched;
+        //     }
+        // }
+        // {%- endif %}
 // -----------------------------
 
 
@@ -748,22 +752,17 @@ int main() {
                 
 // ---- HC-SR04 Distance sensor ----
 
-                {%- for d in active_dist %}
-                if (Pico::dist_sensor.changed()) {
-                    // 1. Get the sensor data
-                    float dist_cm = Pico::dist_sensor.getDistance();
-                
-                    // 2. Send the captured value to the specific PD hash for this sensor
-                    hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, dist_cm);
-                
-                    // 3. Print raw sensor values to the serial monitor
-                    printf("[Distance] Sensor: %s | Val: %.2f cm\n", "{{ d.name }}", dist_cm);
-                }
+            %- for d in active_dist %}
+            if (Pico::dist_sensor.changed()) {
+                float dist_cm = Pico::dist_sensor.getDistance(); 
+                hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, dist_cm);
+                printf("[Distance] %s | Val: %.2f cm\n", "distance", dist_cm);
+            }
             {%- endfor %}
-                
-            } 
-        tight_loop_contents();
-    } 
+                            
+                        } 
+                    tight_loop_contents();
+                } 
 
-    return 0;
-}
+                return 0;
+            }
