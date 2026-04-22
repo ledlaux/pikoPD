@@ -1,6 +1,6 @@
 This is a test branch for the **HC-SR04** distance sensor reading and processing with pikoPD.  
 
-To implement the sensor reading this library is included in /lib:  
+Sensor reading library is included in /lib:  
 https://github.com/dangarbri/pico-distance-sensor
 
 ## Pins
