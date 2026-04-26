@@ -277,7 +277,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
       ]
     }
 ```
-PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to physically change it's adress and set *addr_index*: 
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more MPR121 on the same i2c bus you will have to physically change it's adress and set *addr_index*: 
 
 1. 0x5A,
 2. 0x5B,
