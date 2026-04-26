@@ -1,6 +1,6 @@
 {
   "name": "heavy",
-  "pico_board": "pico2",
+  "pico_board": "pico_w",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
@@ -11,7 +11,7 @@
   "pwm_pin": 10,
   "voice_count": 1,
   "midi_mode": "usb",
-  "console": false,
+  "console": true,
 
   "inputs": {
 
@@ -66,14 +66,14 @@
   "leds": [
     { "name": "led1", "pin": 25, "mode": "pd" },
     { "name": "midi", "pin": 24, "mode": "midi" },
-    { "name": "clock", "pin": 23, "mode": "clock" }
-    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "pd" },
+    { "name": "clock", "pin": 23, "mode": "clock" },
+    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "pd" }
    
   ], 
 
   "masterfx": {
     "delay": false,
     "reverb": false,
-    "limiter": true,
+    "limiter": true
   }
 }
