@@ -19,6 +19,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - [Encoder](#encoder)
   - [Sensors](#sensors)
     - [MPR121](#mpr121)
+    - [HC-SR04](#hc-sr04)
     - [CNY70](#cny70)
 - [Project Configuration](#project-configuration)
     - [Build](#build)
@@ -267,7 +268,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ## Sensors
 
 
-## MPR121
+## MPR121 
 
 ```json
 "sensors": {
@@ -288,6 +289,17 @@ IRQ pin is used by default to make processing more efficient.
 
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
+## HC-SR04 
+
+PikoPD supports multiple HC-SR04 distance sensors.
+
+```json
+  "sensors": {
+       "hc-sr04": [
+        { "name": "distance", "trigger": 2, "echo": 3}
+      ]
+    }
+ ``` 
 
 ## CNY70
 
