@@ -3,9 +3,14 @@
 #include "pico/stdlib.h"
 #include <atomic>
 #include <cmath>
-#include "MPR121.h"
 
+#ifdef MPR121_ENABLED
+    #include "sensors/MPR121.h"
+#endif
 
+#ifdef DISTANCE_SENSOR_ENABLED
+    #include "sensors/HC-SR04.h"
+#endif
 
 namespace Pico {
 
