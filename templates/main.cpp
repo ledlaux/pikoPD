@@ -18,7 +18,6 @@ MasterFX masterFX;
 
 #include "Heavy_{{ name }}.hpp"
 
-
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
 #define HV_POLYTOUCHIN_HASH  0xBC530F59
@@ -43,7 +42,6 @@ MasterFX masterFX;
 #define MIDI_RT_STOP            0xFC
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
-
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
@@ -130,6 +128,17 @@ Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 {%- for cny in board.inputs.sensors.cny70 if cny.name in receives -%}
     {%- set _ = active_cny70.append({'adc_pin': cny.adc_pin, 'hash': receives[cny.name]}) -%}
 {%- endfor -%}
+
+{%- set active_dist = [] -%}
+{%- if board.inputs.sensors['hc-sr04'] -%}
+    {%- for d in board.inputs.sensors['hc-sr04'] if d.name in receives -%}
+        {%- set _ = active_dist.append({
+            'trig': d.trigger, 
+            'echo': d.echo, 
+            'hash': receives[d.name]
+        }) -%}
+    {%- endfor -%}
+{%- endif -%}
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
@@ -662,6 +671,10 @@ int main() {
     Pico::addCNY70({{ cny.adc_pin }}, 380, 750, 0.6f, 2, {{ loop.index0 }});
     {% endfor %}
 
+    {%- for d in active_dist %}
+    Pico::addDistanceSensor({{ d.trig }}, {{ d.echo }});
+    {%- endfor %}
+
     multicore_launch_core1(Pico::core1_audio_entry);
 
     float val, v; 
@@ -817,6 +830,15 @@ int main() {
             }
             {%- endfor %}
 
+// ---- HC-SR04 Distance sensor ----
+
+           {%- for d in active_dist %}
+            if (Pico::dist_sensor.changed()) {
+                float dist_cm = Pico::dist_sensor.getDistance(); 
+                hv_sendFloatToReceiver(&pd_prog, {{ d.hash }}, dist_cm);
+             // printf("[Distance] %s | Val: %.2f cm\n", "distance", dist_cm);
+            }
+            {%- endfor %}
         } 
         tight_loop_contents();
     } 
