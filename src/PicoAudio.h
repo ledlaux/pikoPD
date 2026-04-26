@@ -9,11 +9,14 @@
 #include <string.h>
 #include <cmath>
 #include <algorithm>
-#include "masterfx/freeverb.h"
 
 //#define USE_DELAY
 #define USE_REVERB
 #define USE_LIMITER
+
+#ifdef USE_REVERB
+#include "masterfx/freeverb.h"
+#endif
 
 #define USE_PWM_AUDIO
 
@@ -214,6 +217,13 @@ namespace Pico {
         masterFX.process_inplace(buffer, frames); 
     }
 
+
+    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
+                            int sample_rate, uint data_pin, uint bclk_pin, int buffer_size) {
+            _mode = mode; _cb = callback; _srate = sample_rate;
+            _dpin = data_pin; _bpin = bclk_pin; _bsize = buffer_size;
+        }
+
     void __not_in_flash_func(core1_audio_entry)() {
         audio_format_t audio_format = {
             .sample_freq   = (uint32_t)_srate,
@@ -297,11 +307,5 @@ namespace Pico {
                 }
             }
         }
-    }
-
-    void setupAudio(AudioMode mode, AudioProcessCallback callback, 
-                        int sample_rate, uint data_pin, uint bclk_pin, int buffer_size) {
-        _mode = mode; _cb = callback; _srate = sample_rate;
-        _dpin = data_pin; _bpin = bclk_pin; _bsize = buffer_size;
     }
 }
