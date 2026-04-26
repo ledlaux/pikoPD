@@ -9,7 +9,7 @@
 #include <string.h>
 #include <cmath>
 #include <algorithm>
-#include "freeverb.h"
+#include "masterfx/freeverb.h"
 
 //#define USE_DELAY
 #define USE_REVERB
