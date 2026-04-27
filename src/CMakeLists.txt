@@ -95,7 +95,7 @@ if(PICO_ZERO_BOARD)
     target_link_libraries(pikopd.elf PRIVATE hardware_pio)
 endif()
 
-if("${PICO_BOARD}" STREQUAL "pico_w" OR "${PICO_BOARD}" STREQUAL "pico2_w")
+if("${PICO_BOARD}" STREQUAL "pico_w")
     target_compile_definitions(pikopd.elf PRIVATE PICO_W=1)
 
     if(WEB)
@@ -118,7 +118,6 @@ else()
     pico_enable_stdio_usb(pikopd.elf 0)
 endif()
 
-pico_enable_stdio_usb(pikopd.elf 1)
 pico_enable_stdio_uart(pikopd.elf 0)
 pico_add_extra_outputs(pikopd.elf)
 
