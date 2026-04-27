@@ -10,29 +10,44 @@
 #include "PicoControl.h"
 #include "Heavy_{{ name }}.hpp"
 
-{%- if board.pico_board == 'pico_w' %}
-#include "pico/cyw43_arch.h"
-{%- endif %}
+{% if board.web and board.web.enabled %}
+#if WEB_ENABLED
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "lwip/apps/httpd.h"
 #include "lwip/apps/mdns.h"
 #include "lwip/netif.h"
 #include "lwip/apps/fs.h"
+
+{% if board.web.active_mode == 0 %}
+#include "dhcpserver.h"
+{% endif %}
+
+#ifdef __cplusplus
+}
+#endif
+
 #include <stddef.h> 
 #include "ssi.h"
 
-
-// Peer Discovery Variables
 static ip_addr_t computer_ip;
-static uint16_t computer_port = 9000; 
+static uint16_t computer_port = {{ board.web.osc_port }}; 
 static bool computer_discovered = false;
 static struct udp_pcb* osc_out_pcb = nullptr;
 
+{% if board.web.active_mode == 0 %}
+#define WIFI_SSID "{{ board.web.ap.ssid }}"
+#define WIFI_PASSWORD "{{ board.web.ap.password }}"
+{% else %}
+#define WIFI_SSID "{{ board.web.sta.ssid }}"
+#define WIFI_PASSWORD "{{ board.web.sta.password }}"
+{% endif %}
 
-// Define your credentials
-#define WIFI_SSID ""
-#define WIFI_PASSWORD ""
+#endif
+{% endif %}
 
 #define HV_NOTEIN_HASH       0x67E37CA3
 #define HV_CTLIN_HASH        0x41BE0F9C
@@ -559,7 +574,6 @@ int main() {
         sleep_ms(100);
     }
 
-    // 1. Audio and Pure Data Setup
     pd_prog.setSendHook(&sendHookHandler);
     {% if board.audio_mode == "I2S" %}
     Pico::setupAudio(I2S, audioFunc, {{ board.sample_rate }}, {{ board.i2s_data_pin }}, {{ board.i2s_bclk_pin }}, {{ board.buffer_size }});
@@ -569,58 +583,77 @@ int main() {
 
     multicore_launch_core1(Pico::core1_audio_entry);
     
-    // 2. Initialize Wi-Fi Hardware
+    {% if board.web and board.web.enabled %}
+    #if WEB_ENABLED
+
+    // 1. Initialize Wi-Fi Hardware
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
+        printf("Wi-Fi init failed\n");
         return -1;
     }
 
+    {% if board.web.active_mode == 0 %}
+    // --- MODE 0: ACCESS POINT (AP) ---
+    const char *wifi_ssid = "{{ board.web.ap.ssid }}";
+    const char *wifi_pass = "{{ board.web.ap.password }}";
+
+    cyw43_arch_enable_ap_mode(wifi_ssid, wifi_pass, CYW43_AUTH_WPA2_AES_PSK);
+
+    struct netif *ap_netif = &cyw43_state.netif[CYW43_ITF_AP];
+    ip4_addr_t ip, mask, gw;
+    IP4_ADDR(&ip, 192, 168, 4, 1);
+    IP4_ADDR(&mask, 255, 255, 255, 0);
+    IP4_ADDR(&gw, 192, 168, 4, 1);
+    netif_set_addr(ap_netif, &ip, &mask, &gw);
+
+    {% else %}
+    // --- MODE 1: STATION (STA) ---
+    const char *wifi_ssid = "{{ board.web.sta.ssid }}";
+    const char *wifi_pass = "{{ board.web.sta.password }}";
+
     cyw43_arch_enable_sta_mode();
+    printf("Connecting to Wi-Fi: %s...\n", wifi_ssid);
 
-    // 3. Attempt Connection
-    int connect_result = cyw43_arch_wifi_connect_blocking(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
-    
-    if (connect_result == 0) {
-        // --- SUCCESSFUL CONNECTION ---
-        
-        // A. Disable Power Save immediately for stable web traffic
-        cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
-
-        // B. Initialize Web Server Services
-        // We do this BEFORE mDNS so the HTTP port is ready
-        httpd_init();
-        http_set_cgi_handlers(cgi_handlers, 1); 
-        ssi_init();
-
-        // C. Initialize mDNS Responder
-        // This allows access via http://pikopd.local
-        mdns_resp_init();
-        mdns_resp_add_netif(netif_default, "pikopd");
-        mdns_resp_add_service(netif_default, "piko-control", "_http", DNSSD_PROTO_UDP, 80, NULL, NULL);
-
-        osc_out_pcb = udp_new();
-        static picoosc::OSCServer osc_receiver(8000, osc_internal_callback);
-        
-        // Print status to USB Serial
-        printf("\n========================================\n");
-        printf("Wi-Fi Connected!\n");
-        printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
-        printf("OSC Server listening on port 8000\n");
-        printf("========================================\n\n");
-    
-
-        // Optional: Print IP to console for manual fallback
-        // printf("Web Server active at: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+    if (cyw43_arch_wifi_connect_blocking(wifi_ssid, wifi_pass, CYW43_AUTH_WPA2_AES_PSK)) {
+        printf("Failed to connect to %s\n", wifi_ssid);
     } else {
-        // Failed to connect - handle blinky error or retry logic here
+        printf("Wi-Fi Connected successfully.\n");
     }
+    {% endif %}
 
+    // Disable Power Save for stable performance
+    cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
 
-    // 4. The Background Loop
+    httpd_init();
+    http_set_cgi_handlers(cgi_handlers, 1); 
+    ssi_init();
+
+    mdns_resp_init();
+    mdns_resp_add_netif(netif_default, "{{ board.web.mdns_name }}");
+    mdns_resp_add_service(netif_default, "piko-control", "_http", DNSSD_PROTO_TCP, {{ board.web.http_port }}, NULL, NULL);
+
+    osc_out_pcb = udp_new();
+
+    // Status Output
+    printf("\n========================================\n");
+    {% if board.web.active_mode == 0 %}
+    printf("Mode: Access Point (AP)\n");
+    printf("SSID: %s\n", wifi_ssid);
+    printf("Manual Client IP Required: 192.168.4.2\n");
+    {% else %}
+    printf("Mode: Station (STA)\n");
+    printf("Connected to: %s\n", wifi_ssid);
+    {% endif %}
+    printf("IP Address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+    printf("mDNS Name:  http://{{ board.web.mdns_name }}.local\n");
+    printf("OSC Port:   {{ board.web.osc_port }}\n");
+    printf("========================================\n\n");
+
+    #endif
+    {% endif %}
+
     while (true) {
-        // This is mandatory for the background Wi-Fi stack to process packets
         cyw43_arch_poll();
-        
-        // Give the processor a tiny break to let internal tasks catch up
         sleep_ms(1);
     } 
 
