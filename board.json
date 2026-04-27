@@ -13,6 +13,24 @@
   "midi_mode": "uart",
   "console": false,
 
+  "web": {
+    "enabled": true,
+    "active_mode": 1,
+    "ap": {
+      "mode_id": 0,
+      "ssid": "pikoPD",
+      "password": "password123"
+    },
+    "sta": {
+      "mode_id": 1,
+      "ssid": "",
+      "password": ""
+    },
+    "mdns_name": "pikopd",
+    "http_port": 80,
+    "osc_port": 8000
+  },
+
   "inputs": {
 
     "adc_pins": [
