@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(pikopd C CXX ASM)
 
@@ -121,6 +123,4 @@ endif()
 pico_enable_stdio_uart(pikopd.elf 0)
 pico_add_extra_outputs(pikopd.elf)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 target_compile_options(pikopd.elf PRIVATE -O3 -ffast-math)
