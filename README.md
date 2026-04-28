@@ -26,6 +26,8 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] gate in/out
 - [x] i2s audio
 - [x] pwm audio
+- [x] web interface
+- [x] osc control
 - [ ] sd card
 - [ ] screen
 - [ ] bluetooth midi
