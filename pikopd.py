@@ -236,25 +236,29 @@ class PicoUF2Generator:
         print(f"\033[32m  -> Using config: {config_filename}\033[0m")
         midi_mode = midi_host if midi_host else settings.get("midi_mode")
 
-        # 3. Source File Sync (Conditional Folders)
-        os.makedirs(self.c_dir, exist_ok=True)
+     # 1. Determine which folder to ignore based on web status
         web_enabled = settings.get("web", {}).get("enabled", False)
-        conditional_folders = {"web": "web", "screen": "screen", "usb": not web_enabled}
+        screen_enabled = settings.get("screen", {}).get("enabled", False)
+
+        ignore_list = []
+        if web_enabled:
+            ignore_list.append("usb")  # Web and USB are mutually exclusive
+        else:
+            ignore_list.append("web")
+
+        if not screen_enabled:
+            ignore_list.append("screen")
+
+        # 2. Sync files
+        os.makedirs(self.c_dir, exist_ok=True)
 
         for root, dirs, files in os.walk(self.src_dir):
             rel_dir = os.path.relpath(root, self.src_dir)
-            should_copy = True
             
-            for folder_prefix, setting_key in conditional_folders.items():
-                if rel_dir.startswith(folder_prefix):
-                    val = settings.get(setting_key)
-                    # Check if it's a dict with "enabled": true or just a boolean
-                    is_enabled = val.get("enabled") if isinstance(val, dict) else val
-                    if not is_enabled:
-                        should_copy = False
-                        break
-            
-            if not should_copy: continue
+            # Check if the current folder is in our ignore list
+            if any(rel_dir == f or rel_dir.startswith(f + os.sep) for f in ignore_list):
+                dirs[:] = []  # Tell os.walk not to look inside these folders
+                continue
 
             for f in files:
                 src_file = os.path.join(root, f)

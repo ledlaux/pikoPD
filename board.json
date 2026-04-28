@@ -10,7 +10,7 @@
   "i2s_bclk_pin": 10,
   "pwm_pin": 10,
   "voice_count": 1,
-  "midi_mode": "uart",
+  "midi_mode": "usb",
   "console": true,
 
   "inputs": {
@@ -64,6 +64,8 @@
   },
 
   "leds": [
+   
+   
   ], 
   
   "masterfx": {
@@ -72,8 +74,9 @@
     "limiter": true
   },
 
+
  "web": {
-    "enabled": true,
+    "enabled": false,
     "active_mode": 0,
     "ap": {
       "mode_id": 0,
@@ -89,6 +92,8 @@
     "http_port": 80,
     "osc_enabled": true,
     "osc_port": 8000
+    
+
   }
 }
 
