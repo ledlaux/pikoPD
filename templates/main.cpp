@@ -294,7 +294,7 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                 case 93: masterFX.delay.bypass = !is_on; break;
                 {%- endif %}
                 {%- if board.masterfx.reverb %}
-                case 2: masterFX.reverb_mix = val; break;      
+                case 94: masterFX.reverb_mix = val; break;      
                 case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
                 case 96: masterFX.reverb.damping(val); break;      
                 case 97: masterFX.reverb.reverb_width = val; break;       
