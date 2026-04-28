@@ -203,19 +203,15 @@ class PicoUF2Generator:
             print(f"❌ Heavy library path not found: {self.hv_lib_path}")
             sys.exit(1)
 
+        # 1. Heavy Compiler Step
         if not skip_hvcc:
             self.print_progress(0.1, "Heavy Compiler")
             hvcc_cmd = [
-            "hvcc",
-            self.pd_path,
-            "-o",
-            self.hvcc_dir,
-            "-n",
-            self.patch_name,
-            "-g",
-            "c",
-            "-p",
-            self.hv_lib_path,
+                "hvcc", self.pd_path,
+                "-o", self.hvcc_dir,
+                "-n", self.patch_name,
+                "-g", "c",
+                "-p", self.hv_lib_path,
             ]
             self.run_cmd(hvcc_cmd, step_name="HVCC")
             self.flatten_hvcc_output()
@@ -223,112 +219,121 @@ class PicoUF2Generator:
         else:
             print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
 
+        # 2. Load Configuration
         self.print_progress(0.3, "Setup")
-        settings = {"pico_board": "pico2", "midi_mode": "usb"} # Defaults
+        settings = {"pico_board": "pico2", "midi_mode": "usb"} # Default base settings
 
         config_filename = board_config if board_config else "board.json"
         config_path = os.path.join(self.script_dir, config_filename)
         
         if not os.path.exists(config_path):
-            if board_config:
-                print(f"\033[91m❌ Custom board file not found: {board_config}\033[0m")
-            else:
-                print(f"\033[91m❌ Default configuration file not found. Create board.json or use -b.\033[0m")
+            print(f"\033[91m❌ Configuration file not found: {config_filename}\033[0m")
             sys.exit(1)
 
         with open(config_path) as f:
             settings.update(json.load(f))
             
         print(f"\033[32m  -> Using config: {config_filename}\033[0m")
-        
         midi_mode = midi_host if midi_host else settings.get("midi_mode")
 
-        # ---- Copy sources ----
+        # 3. Source File Sync (Conditional Folders)
         os.makedirs(self.c_dir, exist_ok=True)
-        for f in os.listdir(self.src_dir):
-            s = os.path.join(self.src_dir, f)
-            if f == "CMakeLists.txt":
-                d = os.path.join(self.project_root, f)  # copy CMakeLists.txt to project root
-            else:
-                d = os.path.join(self.c_dir, f)  # all other files go to src/
+        web_enabled = settings.get("web", {}).get("enabled", False)
+        conditional_folders = {"web": "web", "screen": "screen", "usb": not web_enabled}
 
-            if os.path.isfile(s) and (
-                not os.path.exists(d) or open(s, "rb").read() != open(d, "rb").read()
-            ):
-                shutil.copy2(s, d)
+        for root, dirs, files in os.walk(self.src_dir):
+            rel_dir = os.path.relpath(root, self.src_dir)
+            should_copy = True
+            
+            for folder_prefix, setting_key in conditional_folders.items():
+                if rel_dir.startswith(folder_prefix):
+                    val = settings.get(setting_key)
+                    # Check if it's a dict with "enabled": true or just a boolean
+                    is_enabled = val.get("enabled") if isinstance(val, dict) else val
+                    if not is_enabled:
+                        should_copy = False
+                        break
+            
+            if not should_copy: continue
 
-        os.makedirs(self.build_dir, exist_ok=True)
+            for f in files:
+                src_file = os.path.join(root, f)
+                rel_path = os.path.relpath(src_file, self.src_dir)
+                dest_file = os.path.join(self.project_root, f) if f == "CMakeLists.txt" else os.path.join(self.c_dir, rel_path)
+                
+                os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+                if not os.path.exists(dest_file) or open(src_file, "rb").read() != open(dest_file, "rb").read():
+                    shutil.copy2(src_file, dest_file)
 
+        # 4. Generate main.cpp Template
         self.print_progress(0.5, "Updating C++ & Manifest")
         manifest = self.collect_and_save_manifest()
-
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(self.templates))
-
-        new_main = env.get_template("main.cpp").render(
-        name=self.patch_name,
-        hv_manifest=manifest,
-        board=settings
-        )
-        m_path = os.path.join(self.c_dir, "main.cpp") 
-        with open(m_path, "w") as f:
+        new_main = env.get_template("main.cpp").render(name=self.patch_name, hv_manifest=manifest, board=settings)
+        
+        with open(os.path.join(self.c_dir, "main.cpp"), "w") as f:
             f.write(new_main)
 
+        # 5. CMake Configuration
         sdk = os.environ.get("PICO_SDK_PATH")
         board = settings.get("pico_board", "pico")
-        sdk_target = "pico" if board == "zero" else board
+        sdk_target = "pico_w" if board == "pico_w" else ("pico" if board == "zero" else board)
 
         if board == "pico2":
             toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
         else:
             toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
-        if board == "pico_w":
-            sdk_target = "pico_w"
-        elif board == "zero":
-            sdk_target = "pico"
-            extra_args = ["-DPICO_ZERO_BOARD=1"]
-        else:
-            sdk_target = board
 
         os.makedirs(self.build_dir, exist_ok=True)
-        if not os.path.exists(os.path.join(self.build_dir, "Makefile")):
-            self.print_progress(0.7, "Configuring CMake")
-            cmake_cmd = [
-                "cmake",
-                "-G", "Unix Makefiles",
-                f"-DPICO_SDK_PATH={sdk}",
-                f"-DPICO_BOARD={sdk_target}",
-                f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
-                self.project_root,
-            ]
+        self.print_progress(0.7, "Configuring CMake")
 
-            if settings.get("console") is True:
-                cmake_cmd.append("-DENABLE_DEBUG=1")
-                print("\033[32m  -> Console Debugging Enabled\033[0m")
-            else:
-                cmake_cmd.append("-DENABLE_DEBUG=0")
+        cmake_cmd = [
+            "cmake", "-G", "Unix Makefiles",
+            f"-DPICO_SDK_PATH={sdk}",
+            f"-DPICO_BOARD={sdk_target}",
+            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+            self.project_root,
+        ]
 
-            if board == "zero":
-                cmake_cmd.append("-DPICO_ZERO_BOARD=1")
-
+        # Web & MIDI Logic
+        web_cfg = settings.get("web", {})
+        if web_cfg.get("enabled"):
+            mode = web_cfg.get("active_mode", 0)
+            creds = web_cfg.get("ap" if mode == 0 else "sta", {})
+            osc = web_cfg.get("osc", {})
+            
+            cmake_cmd.extend([
+                "-DWEB=1",
+                f"-DACTIVE_MODE={mode}",
+                f'-DWIFI_SSID="{creds.get("ssid", "")}"',
+                f'-DWIFI_PASSWORD="{creds.get("password", "")}"',
+                f'-DMDNS_NAME="{web_cfg.get("mdns_name", "pikopd")}"',
+                f"-DOSC_ENABLED={1 if osc.get('enabled', True) else 0}",
+                f'-DOSC_PORT={web_cfg.get("osc_port", 8000)}',
+                "-DMIDI_HOST_ENABLED=0",  
+                "-DMIDI_UART_ENABLED=1"   
+            ])
+            print("\033[32m  -> Web Enabled: MIDI Host disabled, UART MIDI enabled\033[0m")
+        else:
+            cmake_cmd.append("-DWEB=0")
             if midi_mode == "host":
-                cmake_cmd.append("-DMIDI_HOST_ENABLED=1")
-                print("\033[32m  -> MIDI Host Mode enabled (TinyUSB Host)\033[0m")
+                cmake_cmd.extend(["-DMIDI_HOST=1", "-DMIDI_UART_ENABLED=0"])
+                print("\033[32m  -> MIDI Host Mode enabled\033[0m")
             elif midi_mode == "uart":
-                cmake_cmd.append("-DMIDI_HOST_ENABLED=0") 
-                print("\033[32m  -> MIDI UART Mode enabled (Hardware Pins)\033[0m")
+                cmake_cmd.extend(["-DMIDI_HOST=0", "-DMIDI_UART_ENABLED=1"])
+                print("\033[32m  -> MIDI UART Mode enabled\033[0m")
             else:
-                cmake_cmd.append("-DMIDI_HOST_ENABLED=0")
-                print("\033[32m  -> USB MIDI Device Mode enabled (TinyUSB Device)\033[0m")
+                cmake_cmd.extend(["-DMIDI_HOST=0", "-DMIDI_UART_ENABLED=0"])
+                print("\033[32m  -> USB MIDI Device Mode enabled\033[0m")
 
-            max_voices = settings.get("voice_count", 1)
-            cmake_cmd.append(f"-DMAX_VOICES={max_voices}")
+        # Console & Extra Flags
+        cmake_cmd.append(f"-DENABLE_DEBUG={'1' if settings.get('console') else '0'}")
+        if board == "zero": cmake_cmd.append("-DPICO_ZERO_BOARD=1")
+        cmake_cmd.append(f"-DMAX_VOICES={settings.get('voice_count', 1)}")
 
-            self.run_cmd(
-                cmake_cmd,
-                cwd=self.build_dir,
-                step_name="CMake",
-            )
+        self.run_cmd(cmake_cmd, cwd=self.build_dir, step_name="CMake")
 
+        # 6. Compilation & Flash
         self.print_progress(0.85, "Compiling")
         self.run_cmd(["make", "-j10"], cwd=self.build_dir, step_name="Make")
 
@@ -338,22 +343,15 @@ class PicoUF2Generator:
                 self.print_progress(0.95, "Flashing")
                 uf2 = glob.glob(os.path.join(self.build_dir, "*.uf2"))[0]
                 self.run_cmd(["picotool", "load", "-f", "-x", uf2], step_name="Flash")
-                duration = time.time() - start_time
-                self.print_progress(1.0, f"Finished in {duration:.1f}s | Rebooting...")
-                time.sleep(1.5)
-                sys.stdout.write("\n")
                 flash_success = True
             else:
-                sys.stdout.write("\n")
                 print("\033[91m❌ STOP: Pico not in BOOTSEL mode.\033[0m")
                 sys.exit(1)
-        else:
-            duration = time.time() - start_time
-            self.print_progress(1.0, f"Finished in {duration:.1f}s")
-            sys.stdout.write("\n")
 
-        if serial and flash_success:
-            self.open_serial()
+        duration = time.time() - start_time
+        self.print_progress(1.0, f"Finished in {duration:.1f}s")
+        sys.stdout.write("\n")
+        if serial and flash_success: self.open_serial()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
