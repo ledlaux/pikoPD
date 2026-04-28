@@ -1,30 +1,33 @@
 #pragma once
+
 #include "pico/stdlib.h"
 #include <cstdio>
 #include <atomic>
 #include <cmath>
 
-#ifdef MIDI_HOST
-    #ifndef CFG_TUH_ENABLED
-        #define CFG_TUH_ENABLED 1
-    #endif
-    #ifndef CFG_TUH_MIDI
-        #define CFG_TUH_MIDI 1
-    #endif
-    #ifndef BOARD_TUH_RHPORT
-        #define BOARD_TUH_RHPORT 0
-    #endif
-    
-    #include "tusb_config.h"
-    #include "tusb.h"
-    #include "host/usbh.h"
-    #include "class/midi/midi_host.h"
+#if defined(WEB) && (WEB == 1)
 #else
-    #include "tusb_config.h"
-    #include "tusb.h"
-    #include "cdc_stdio_lib.h" 
+    #ifdef MIDI_HOST
+        #ifndef CFG_TUH_ENABLED
+            #define CFG_TUH_ENABLED 1
+        #endif
+        #ifndef CFG_TUH_MIDI
+            #define CFG_TUH_MIDI 1
+        #endif
+        #ifndef BOARD_TUH_RHPORT
+            #define BOARD_TUH_RHPORT 0
+        #endif
+        
+        #include "usb/tusb_config.h"
+        #include "tusb.h"
+        #include "host/usbh.h"
+        #include "class/midi/midi_host.h"
+    #else
+        #include "usb/tusb_config.h"
+        #include "tusb.h"
+        #include "usb/cdc_stdio_lib.h" 
+    #endif
 #endif
-
 
 #ifndef ENABLE_DEBUG
     #define ENABLE_DEBUG 0 
@@ -222,6 +225,8 @@ void parse_raw_midi_byte(uint8_t byte, MidiParser& p, void (*handler)(uint8_t, u
 
     static int usb_midi_dev0 = -1;
 
+    #if !defined(WEB) || (WEB == 0)
+
     void usb_init() {
    
         usb_midi_dev0 = -1;
@@ -232,60 +237,62 @@ void parse_raw_midi_byte(uint8_t byte, MidiParser& p, void (*handler)(uint8_t, u
             tusb_init(); 
         #endif
     }
+    #endif
 
-    
 void midi_task() {
-#ifdef MIDI_HOST
-    tuh_task(); 
-#else
-    tud_task();  
-#endif
+    #if !defined(WEB) || (WEB == 0)
+        #ifdef MIDI_HOST
+            tuh_task(); 
+        #else
+            tud_task();  
+        #endif
+    #endif
 
     uint8_t b;
     uint32_t count = 0;
-    
     while (count++ < 64 && midi_pop(b)) {
         parse_raw_midi_byte(b, core0_parser, handle_midi_message);
     }
 
-#ifdef MIDI_HOST
-    // --- HOST MODE OUTPUT ---
-    if (usb_midi_dev0 != -1 && tuh_midi_mounted(usb_midi_dev0)) {
-        uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
-        uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
-        count = 0;
+    #if !defined(WEB) || (WEB == 0)
+        #ifdef MIDI_HOST
+            // --- HOST MODE OUTPUT ---
+            if (usb_midi_dev0 != -1 && tuh_midi_mounted(usb_midi_dev0)) {
+                uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
+                uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
+                uint32_t out_count = 0;
 
-        while (t != h && count++ < 64) {
-            uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
-            uint8_t status = (uint8_t)(m >> 16);
-            uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
+                while (t != h && out_count++ < 64) {
+                    uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
+                    uint8_t status = (uint8_t)(m >> 16);
+                    uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
 
-            if (tuh_midi_packet_write(usb_midi_dev0, pkt)) {
-                midi_out_rb.tail.store(++t, std::memory_order_release);
-            } else break;
-        }
-        tuh_midi_write_flush(usb_midi_dev0);
-    }
-#else
-    // --- DEVICE MODE OUTPUT ---
-    if (tud_midi_mounted()) {
-        uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
-        uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
-        count = 0;
+                    if (tuh_midi_packet_write(usb_midi_dev0, pkt)) {
+                        midi_out_rb.tail.store(++t, std::memory_order_release);
+                    } else break;
+                }
+                tuh_midi_write_flush(usb_midi_dev0);
+            }
+        #else
+            // --- DEVICE MODE OUTPUT ---
+            if (tud_midi_mounted()) {
+                uint32_t h = midi_out_rb.head.load(std::memory_order_acquire);
+                uint32_t t = midi_out_rb.tail.load(std::memory_order_relaxed);
+                uint32_t out_count = 0;
 
-        while (t != h && count++ < 64) {
-            uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
-            uint8_t status = (uint8_t)(m >> 16);
-            uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
+                while (t != h && out_count++ < 64) {
+                    uint32_t m = midi_out_rb.data[t & (MIDI_OUT_BUF - 1)];
+                    uint8_t status = (uint8_t)(m >> 16);
+                    uint8_t pkt[4] = { (uint8_t)(status >> 4), status, (uint8_t)(m >> 8), (uint8_t)m };
 
-            if (tud_midi_packet_write(pkt)) {
-                midi_out_rb.tail.store(++t, std::memory_order_release);
-            } else break;
-        }
-    }
-#endif
-}
-
+                    if (tud_midi_packet_write(pkt)) {
+                        midi_out_rb.tail.store(++t, std::memory_order_release);
+                    } else break;
+                }
+            }
+        #endif
+    #endif
+} 
 
     extern "C" void on_uart_rx() {
         while (uart_is_readable(uart0)) {
@@ -308,7 +315,6 @@ void midi_task() {
     }
 
 
-    
 // ----------- PRINT-----------
    
 #ifndef MIDI_HOST
@@ -323,7 +329,7 @@ void midi_task() {
             if (idx >= PRINT_POOL_SIZE) continue;
 
             PrintMsg* m = &print_pool[idx];
-
+            #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
             #if ENABLE_DEBUG
             if (tud_cdc_connected() && debug) {
                 const char* name = (m->id >= 0 && m->id < num_names)
@@ -335,12 +341,14 @@ void midi_task() {
                 }
             }
             #endif
-
+            #endif
             m->busy.store(false, std::memory_order_release);
         } 
     } 
     
 #endif
+
+#if !defined(WEB) || (WEB == 0)
 
 extern "C" {
 
@@ -406,7 +414,7 @@ extern "C" {
 #endif
 
 }
-
+#endif
 
 // This is not thread safe but atleast works for RP2040
 
