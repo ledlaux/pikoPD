@@ -11,7 +11,7 @@ extern "C" {
 #include "lwip/netif.h"
 #include "lwip/apps/fs.h"
 
-// Conditionally include DHCP server for Access Point mode
+// AP mode
 #if (ACTIVE_MODE == 0)
 #include "web/dhcpserver.h"
 #endif
