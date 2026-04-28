@@ -28,8 +28,8 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] pwm audio
 - [x] web interface
 - [x] osc control
+- [x] screen
 - [ ] sd card
-- [ ] screen
 - [ ] bluetooth midi
 
 
