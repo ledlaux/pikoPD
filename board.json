@@ -46,10 +46,10 @@
       ],
        
        "mpr121": [       
-        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 }
       ],
        
        "hc-sr04": [
+        { "name": "distance", "trigger": 2, "echo": 3}
     
       ]
     }
@@ -74,26 +74,34 @@
     "limiter": true
   },
 
-
- "web": {
-    "enabled": false,
-    "active_mode": 0,
-    "ap": {
-      "mode_id": 0,
-      "ssid": "pikoPD",
-      "password": "12345678"
+  "display": {
+      "enabled": true,
+      "driver": "ssd1306",
+      "i2c_bus": "i2c0",
+      "sda": 4,
+      "scl": 5,
+      "width": 128,
+      "height": 64,
+      "mode": "pd"
     },
-    "sta": {
-      "mode_id": 1,
-      "ssid": "",
-      "password": ""
-    },
-    "mdns_name": "pikopd",
-    "http_port": 80,
-    "osc_enabled": true,
-    "osc_port": 8000
-    
-
+  
+   "web": {
+      "enabled": true,
+      "active_mode": 0,
+      "ap": {
+        "mode_id": 0,
+        "ssid": "pikoPD",
+        "password": "12345678"
+      },
+      "sta": {
+        "mode_id": 1,
+        "ssid": "",
+        "password": ""
+      },
+      "mdns_name": "pikopd",
+      "http_port": 80,
+      "osc_enabled": false,
+      "osc_port": 8000
+    }
   }
-}
 
