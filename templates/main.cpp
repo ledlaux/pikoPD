@@ -8,9 +8,7 @@
 #include "PicoControl.h"
 #include "PicoAudio.h"
 #include "PicoMIDI.h"
-{%- if board.pico_board == 'pico_w' %}
-#include "pico/cyw43_arch.h"
-{%- endif %}
+#include "PicoWEB.h"
 
 {%- if board.masterfx %}
 MasterFX masterFX;
@@ -481,6 +479,33 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         } 
 }
 
+ osc_hv_float_handler_t osc_hv_handler = nullptr;
+ web_float_handler_t web_float_handler = nullptr;
+
+
+static void web_router(const char *param, float value)
+{
+    if (strcmp(param, "v") == 0) {
+        hv_sendFloatToReceiver(&pd_prog, 0x65400F82, value);
+        return;
+    }
+}
+
+
+static void hv_osc_router(const char *address, float value)
+{
+    if (!address) return;
+
+    if (strcmp(address, "/v") == 0) {
+        hv_sendFloatToReceiver(&pd_prog, 0x65400F82, value);
+        return;
+    }
+
+ #if ENABLE_DEBUG
+    printf("OSC unhandled: %s = %f\n", address, value);
+#endif
+}
+
 {%- if board.console %}
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
 PrintMsg print_pool[PRINT_POOL_SIZE];
@@ -545,9 +570,12 @@ int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
 
-    {%- if board.console %}
-    #ifndef MIDI_HOST
-    cdc_stdio_lib_init();
+ {%- if board.console %}
+    // Only initialize USB Serial if Web is OFF to avoid TinyUSB/LWIP conflicts
+    #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
+        #ifndef MIDI_HOST
+        cdc_stdio_lib_init();
+        #endif
     #endif
     {%- endif %}
 
@@ -566,9 +594,15 @@ int main() {
     Pico::init_neopixel();
     {%- endif %}
 
-    {% if board.pico_board == 'pico_w' %}
-    cyw43_arch_init();
-    {% endif %}
+    // {% if board.pico_board == 'pico_w' %}
+    // cyw43_arch_init();
+    // {% endif %}
+
+
+    #if WEB
+        init_wifi();
+    #endif
+
     {% if board.midi_mode == 'uart' %}
     uart_midi_init();
     {% elif board.midi_mode in ['usb', 'host'] %}
@@ -595,10 +629,9 @@ int main() {
 
      masterFX.init();
 
-// ---- MPR121 init ----
-
-{% if board.inputs.sensors.mpr121 -%}
-#define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
+    // ---- MPR121 init ----
+    {% if board.inputs.sensors.mpr121 -%}
+    #define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
 
     Pico::MPR121Config cfg[NUM_SENSORS] = {
     {%- for sensor in board.inputs.sensors.mpr121 %}
@@ -625,9 +658,9 @@ int main() {
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-{%- endif %}
-
-// -----------------------------------
+    {%- endif %}
+    
+    // -----------------------------------
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -682,49 +715,22 @@ int main() {
     float target_val; 
     int led_idx;
 
+    osc_hv_handler = hv_osc_router;
+    web_float_handler = web_router;
  
     while (true) {
 
+        web_poll(); 
+   
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
         midi_task();
         
         #if !defined(MIDI_HOST) && ENABLE_DEBUG
-        print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-    #else
-        // Slow down Core 0 
-        sleep_us(20);
-    #endif
-
-// ---- MPR121 Processing ----
-
-        {% if board.inputs.sensors.mpr121 -%}
-        for (int i = 0; i < NUM_SENSORS; ++i) {
-            if (!sensor_array[i].initialized()) {
-                if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
-                continue;
-            }
-
-            sensor_array[i].processMPR121();
-            uint16_t touched = sensor_array[i].getTouched(); 
-
-            if (touched != last_touched_state[i]) {
-                for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
-                    MprPad& pad = active_mpr_pads[p]; 
-                    if (pad.sensor_idx == i) {
-                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
-                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
-                        if (isTouched != wasTouched) {
-                            hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
-                        }
-                    }
-                }
-                last_touched_state[i] = touched;
-            }
-        }
-        {%- endif %}
-// -----------------------------
-
+            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+        #else
+            best_effort_wfe_or_timeout(make_timeout_time_ms(1));
+        #endif
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
@@ -817,7 +823,7 @@ int main() {
             }
             {%- endfor %}
 
-// ---- CNY70 sensor ----
+// ---- CNY70 ----
 
             {%- for cny in active_cny70 %}
             {
@@ -830,7 +836,7 @@ int main() {
             }
             {%- endfor %}
 
-// ---- HC-SR04 Distance sensor ----
+// ---- HC-SR04 ----
 
            {%- for d in active_dist %}
             if (Pico::dist_sensor.changed()) {
@@ -839,6 +845,38 @@ int main() {
              // printf("[Distance] %s | Val: %.2f cm\n", "distance", dist_cm);
             }
             {%- endfor %}
+
+
+// ---- MPR121 ----
+
+        {% if board.inputs.sensors.mpr121 -%}
+
+        for (int i = 0; i < NUM_SENSORS; ++i) {
+            if (!sensor_array[i].initialized()) {
+             //   if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
+                continue;
+            }
+
+            sensor_array[i].processMPR121();
+            uint16_t touched = sensor_array[i].getTouched(); 
+
+            if (touched != last_touched_state[i]) {
+                for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
+                    MprPad& pad = active_mpr_pads[p]; 
+                    if (pad.sensor_idx == i) {
+                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
+                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
+                        if (isTouched != wasTouched) {
+                            hv_sendFloatToReceiver(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
+                        }
+                    }
+                }
+                last_touched_state[i] = touched;
+            }
+        }
+        {%- endif %}
+
+
         } 
         tight_loop_contents();
     } 
