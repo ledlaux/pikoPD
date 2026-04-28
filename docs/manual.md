@@ -475,6 +475,8 @@ See `patches/web.pd`
 
 At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside PD.   
 
+After device connects to wifi open pikopd.local in the browser. 
+
 For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.shtml` and than run `makefsdata.py`.   
 After that put generated `htmldata.c` inside `/src/web` and rebuild. 
 
