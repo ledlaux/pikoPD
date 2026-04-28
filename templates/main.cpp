@@ -14,6 +14,10 @@
 MasterFX masterFX;
 {%- endif %}
 
+{% if board.pico_board == 'pico_w' -%}
+#include "pico/cyw43_arch.h"
+{%- endif %}
+
 #include "Heavy_{{ name }}.hpp"
 
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -479,6 +483,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         } 
 }
 
+{% if board.web.enabled -%}
  osc_hv_float_handler_t osc_hv_handler = nullptr;
  web_float_handler_t web_float_handler = nullptr;
 
@@ -505,6 +510,8 @@ static void hv_osc_router(const char *address, float value)
     printf("OSC unhandled: %s = %f\n", address, value);
 #endif
 }
+{%- endif %}
+
 
 {%- if board.console %}
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
@@ -594,18 +601,19 @@ int main() {
     Pico::init_neopixel();
     {%- endif %}
 
-    // {% if board.pico_board == 'pico_w' %}
-    // cyw43_arch_init();
-    // {% endif %}
+   {% if board.pico_board == 'pico_w' %}
+        {% if board.web.enabled %}
+    // Web Mode: Initialize full WiFi stack
+    init_wifi();
+        {% else %}
+    // Standard Mode: Basic wireless initialization (for LED/system)
+    cyw43_arch_init();
+        {% endif %}
+    {% endif %}
 
-
-    #if WEB
-        init_wifi();
-    #endif
-
-    {% if board.midi_mode == 'uart' %}
+   {% if board.midi_mode == 'uart' %}
     uart_midi_init();
-    {% elif board.midi_mode in ['usb', 'host'] %}
+    {% elif board.midi_mode in ['usb', 'host'] and not board.web.enabled %}
     usb_init(); 
     {% endif %}
 
@@ -629,9 +637,10 @@ int main() {
 
      masterFX.init();
 
-    // ---- MPR121 init ----
-    {% if board.inputs.sensors.mpr121 -%}
-    #define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
+// ---- MPR121 init ----
+
+{% if board.inputs.sensors.mpr121 -%}
+#define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
 
     Pico::MPR121Config cfg[NUM_SENSORS] = {
     {%- for sensor in board.inputs.sensors.mpr121 %}
@@ -658,9 +667,9 @@ int main() {
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-    {%- endif %}
-    
-    // -----------------------------------
+{%- endif %}
+
+// -----------------------------------
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -715,22 +724,26 @@ int main() {
     float target_val; 
     int led_idx;
 
+    {% if board.web.enabled -%}
     osc_hv_handler = hv_osc_router;
     web_float_handler = web_router;
- 
+    {%- endif %}
+
     while (true) {
 
+        {% if board.web.enabled -%}
         web_poll(); 
-   
+        {%- endif %}
+
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
         
         midi_task();
         
         #if !defined(MIDI_HOST) && ENABLE_DEBUG
-            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-        #else
-            best_effort_wfe_or_timeout(make_timeout_time_ms(1));
-        #endif
+        print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+    #else
+        best_effort_wfe_or_timeout(make_timeout_time_ms(1));
+    #endif
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
