@@ -76,6 +76,7 @@ file(GLOB ALL_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/*.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/src/usb/*.c"
+   "${CMAKE_CURRENT_LIST_DIR}/src/screen/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.cpp"
 )
