@@ -240,6 +240,7 @@ void parse_raw_midi_byte(uint8_t byte, MidiParser& p, void (*handler)(uint8_t, u
     #endif
 
 void midi_task() {
+    // 1. Process TinyUSB Tasks (Only if Web is OFF)
     #if !defined(WEB) || (WEB == 0)
         #ifdef MIDI_HOST
             tuh_task(); 
@@ -248,12 +249,14 @@ void midi_task() {
         #endif
     #endif
 
+    // 2. Process incoming MIDI (Shared: works for UART, USB, and Web/OSC)
     uint8_t b;
     uint32_t count = 0;
     while (count++ < 64 && midi_pop(b)) {
         parse_raw_midi_byte(b, core0_parser, handle_midi_message);
     }
 
+    // 3. USB Output Logic (Only if Web is OFF)
     #if !defined(WEB) || (WEB == 0)
         #ifdef MIDI_HOST
             // --- HOST MODE OUTPUT ---
@@ -292,7 +295,7 @@ void midi_task() {
             }
         #endif
     #endif
-} 
+} // Function always closes correctly now
 
     extern "C" void on_uart_rx() {
         while (uart_is_readable(uart0)) {
@@ -315,6 +318,7 @@ void midi_task() {
     }
 
 
+    
 // ----------- PRINT-----------
    
 #ifndef MIDI_HOST

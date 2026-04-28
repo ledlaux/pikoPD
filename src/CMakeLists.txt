@@ -75,6 +75,7 @@ pico_sdk_init()
 file(GLOB ALL_SOURCES 
     "${CMAKE_CURRENT_LIST_DIR}/*.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/src/usb/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.c"
     "${CMAKE_CURRENT_LIST_DIR}/hvcc/*.cpp"
 )
@@ -96,6 +97,7 @@ if(WEB)
 endif()
 
 list(REMOVE_ITEM ALL_SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/web/htmldata.c")
+
 
 add_executable(pikopd.elf ${ALL_SOURCES})
 
@@ -119,6 +121,7 @@ target_compile_definitions(pikopd.elf PRIVATE
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
+
 option(ENABLE_DISTANCE_SENSOR "Build with HC-SR04 support" ON)
 
 if(ENABLE_DISTANCE_SENSOR)
@@ -135,6 +138,8 @@ if(ENABLE_DISTANCE_SENSOR)
 else()
     add_compile_definitions(DISTANCE_SENSOR_ENABLED=0)
 endif()
+
+
 
 target_link_libraries(pikopd.elf PRIVATE
     pico_stdlib
