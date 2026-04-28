@@ -443,9 +443,51 @@ Upload your .pd patch to see available parameters or load board.json configurati
 Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
 Export the board.json and place it in the pikoPD folder.    
 
-# WEB Control and OSC
+# WEB Control and OSC (experimental)
 
-For devices with Wi-Fi like picoW and pico2W WEB and OSC control will be added soon. Check web code branch for more info. 
+```json
+ "web": {
+    "enabled": true,
+    "active_mode": 0,
+    "ap": {
+      "mode_id": 0,
+      "ssid": "pikoPD",
+      "password": "12345678"
+    },
+    "sta": {
+      "mode_id": 1,
+      "ssid": "",
+      "password": ""
+    },
+    "mdns_name": "pikopd",
+    "http_port": 80,
+    "osc_enabled": false,
+    "osc_port": 8000
+  }
+```
+
+PikoPD supports WEB and OSC protocols for the PICO boards with WIFI chips. 
+
+See `patches/web.pd`
+
+## Web
+- To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
+- To send values back to the browser use [s web @hv_param]
+
+At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside PD.   
+
+For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.shtml` and than run `makefsdata.py`.   
+After that put generated `htmldata.c` inside `/src/web` and rebuild. 
+
+## OSC
+- To receive OSC messages use PD objects with keyword OSC - [r osc @hv_param]  
+- To send values back to the device use [s osc @hv_param]  
+
+To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
+
+# Screens
+
+Will be updated...
 
 # Useful Links
 
