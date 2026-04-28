@@ -240,7 +240,7 @@ namespace Pico {
             struct audio_i2s_config i2s_config = {
                 .data_pin       = (uint8_t)_dpin,
                 .clock_pin_base = (uint8_t)_bpin,
-                .dma_channel    = 0,
+                .dma_channel    = 3,
                 .pio_sm         = 0
             };
 
@@ -281,7 +281,7 @@ namespace Pico {
 
             uint16_t* pwm_buffers[2] = { static_pwm_buffers[0], static_pwm_buffers[1] };
             int write_idx = 0;
-            int dma_chan = dma_claim_unused_channel(true);
+            int dma_chan =  3; // dma_claim_unused_channel(true);
             dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
             channel_config_set_transfer_data_size(&cfg, DMA_SIZE_16);
             channel_config_set_read_increment(&cfg, true);
