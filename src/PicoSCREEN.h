@@ -3,7 +3,6 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 
-// Tell C++ these functions are compiled as plain C
 extern "C" {
     #include "screen/ssd1306.h"
     #include "screen/font.h"
