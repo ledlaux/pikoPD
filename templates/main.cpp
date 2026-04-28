@@ -455,60 +455,104 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 }
 
 
+// void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+//     int numElem = hv_msg_getNumElements(m);
+//     float val0 = hv_msg_getFloat(m, 0);
+
+//     switch (hash) {
+//     {% for l in board.leds -%}
+//         {%- set led_index = loop.index0 -%}
+//         {%- for s in hv_manifest.sends if s.name == l.name -%}
+//             case {{ s.hash }}U: // {{ l.name }}
+//                 {% if l.is_rgb -%}
+//                 if (numElem >= 2) {
+//                     Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
+//                     Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+//                 } else {
+//                     Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
+//                 }
+//                 {%- else -%}
+//                 Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
+//                 {%- endif %}
+//                 return;
+//         {%- endfor -%}
+//     {%- endfor %}
+//             default:
+//                 heavyMidiOutHook(vc, name, hash, m);
+//                 break;
+//         } 
+// }
+
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
-    int numElem = hv_msg_getNumElements(m);
+    if (hv_msg_getNumElements(m) < 1) return;
     float val0 = hv_msg_getFloat(m, 0);
 
     switch (hash) {
+    /* --- Hardware LEDs --- */
     {% for l in board.leds -%}
-        {%- set led_index = loop.index0 -%}
         {%- for s in hv_manifest.sends if s.name == l.name -%}
-            case {{ s.hash }}U: // {{ l.name }}
-                {% if l.is_rgb -%}
-                if (numElem >= 2) {
-                    Pico::led_hue[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                    Pico::led_intensity[{{ led_index }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
-                } else {
-                    Pico::led_intensity[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                }
-                {%- else -%}
-                Pico::led_vals[{{ led_index }}].store(val0, std::memory_order_relaxed);
-                {%- endif %}
-                return;
+        case {{ s.hash }}U: 
+            {% if l.is_rgb -%}
+            Pico::led_hue[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
+            if (hv_msg_getNumElements(m) >= 2) 
+                Pico::led_intensity[{{ loop.index0 }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+            {%- else -%}
+            Pico::led_vals[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
+            {%- endif %}
+            return;
         {%- endfor -%}
     {%- endfor %}
-            default:
-                heavyMidiOutHook(vc, name, hash, m);
-                break;
-        } 
+
+    /* --- Web & OSC Routing --- */
+    {% if board.web.enabled -%}
+    {% for s in hv_manifest.sends -%}
+        {# Check if this specific send was already used by an LED #}
+        {%- set is_led = false -%}
+        {%- for l in board.leds if l.name == s.name %}{% set is_led = true %}{% endfor -%}
+        
+        {%- if not is_led -%}
+        case {{ s.hash }}U:
+            {% if s.name.startswith('web') -%}
+            if (web_float_handler) web_float_handler("{{ s.name }}", val0);
+            {%- elif s.name.startswith('osc') -%}
+            osc_send_float("{{ s.name }}", val0);
+            {%- endif %}
+            return;
+        {%- endif %}
+    {% endfor %}
+    {%- endif %}
+
+    default:
+        heavyMidiOutHook(vc, name, hash, m);
+        break;
+    } 
 }
+
 
 {% if board.web.enabled -%}
- osc_hv_float_handler_t osc_hv_handler = nullptr;
- web_float_handler_t web_float_handler = nullptr;
+// Global handler pointers defined in PicoWEB.h
+osc_hv_float_handler_t osc_hv_handler = nullptr;
+web_float_handler_t web_float_handler = nullptr;
 
-
-static void web_router(const char *param, float value)
-{
-    if (strcmp(param, "v") == 0) {
-        hv_sendFloatToReceiver(&pd_prog, 0x65400F82, value);
+static void web_router(const char *p, float v) {
+    if (!p) return;
+    {% for r in hv_manifest.receives -%}
+    {% if r.name.startswith('web') -%}
+    if (!strcmp(p, "{{ r.name }}")) {
+        hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
         return;
     }
+    {%- endif %}
+    {% endfor %}
 }
 
-
-static void hv_osc_router(const char *address, float value)
-{
-    if (!address) return;
-
-    if (strcmp(address, "/v") == 0) {
-        hv_sendFloatToReceiver(&pd_prog, 0x65400F82, value);
-        return;
-    }
-
- #if ENABLE_DEBUG
-    printf("OSC unhandled: %s = %f\n", address, value);
-#endif
+static void hv_osc_router(const char *a, float v) {
+    if (!a) return;
+    {% for r in hv_manifest.receives -%}
+    {% if r.name.startswith('osc') -%}
+    if (!strcmp(a, "/{{ r.name }}")) hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
+    {%- endif %}
+    {% endfor %}
 }
 {%- endif %}
 
@@ -578,7 +622,6 @@ int main() {
     stdio_init_all(); 
 
  {%- if board.console %}
-    // Only initialize USB Serial if Web is OFF to avoid TinyUSB/LWIP conflicts
     #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
         #ifndef MIDI_HOST
         cdc_stdio_lib_init();
