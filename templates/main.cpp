@@ -8,11 +8,6 @@
 #include "PicoControl.h"
 #include "PicoAudio.h"
 #include "PicoMIDI.h"
-#include "PicoWEB.h"
-
-{%- if board.masterfx %}
-MasterFX masterFX;
-{%- endif %}
 
 {% if board.pico_board == 'pico_w' -%}
 #include "pico/cyw43_arch.h"
