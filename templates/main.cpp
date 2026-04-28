@@ -16,6 +16,7 @@ MasterFX masterFX;
 
 {% if board.pico_board == 'pico_w' -%}
 #include "pico/cyw43_arch.h"
+#include "PicoWEB.h"
 {%- endif %}
 
 #include "Heavy_{{ name }}.hpp"
