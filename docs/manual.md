@@ -472,7 +472,6 @@ See `patches/web.pd`
 
 ## Web
 - To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
-- To send values back to the browser use [s web @hv_param]
 
 At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside PD.   
 
