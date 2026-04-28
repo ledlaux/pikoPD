@@ -487,7 +487,7 @@ After that put generated `htmldata.c` inside `/src/web` and rebuild.
 
 ## OSC
 - To receive OSC messages use PD objects with keyword OSC - [r osc @hv_param]  
-- To send values back to the device use [s osc @hv_param]  
+- To send messages to the device use [s osc @hv_param]  
 
 To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
 
