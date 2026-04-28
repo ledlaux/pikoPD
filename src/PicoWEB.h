@@ -161,7 +161,6 @@ static inline void osc_send_bang(const char *name) {
 #endif
 
 
-// --- UNIFIED INITIALIZATION ---
 bool init_wifi() {
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
         printf("Wi-Fi Hardware Init Failed\n");
