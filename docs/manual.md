@@ -268,7 +268,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ## Sensors
 
 
-## MPR121 
+## MPR121 - Capacitive Touch Sensor
 
 ```json
 "sensors": {
@@ -289,7 +289,7 @@ IRQ pin is used by default to make processing more efficient.
 
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
-## HC-SR04 
+## HC-SR04 - Distance Sensor
 
 PikoPD supports multiple HC-SR04 distance sensors.
 
@@ -301,7 +301,7 @@ PikoPD supports multiple HC-SR04 distance sensors.
     }
  ``` 
 
-## CNY70
+## CNY70 - Optical Sensor
 
 
 ```json
