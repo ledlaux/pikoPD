@@ -14,6 +14,11 @@
 #include "PicoWEB.h"
 {%- endif %}
 
+{% if board.display is defined and board.display.enabled -%}
+#include "PicoSCREEN.h"
+#include "pico/stdio/driver.h"
+{%- endif %}
+
 #include "Heavy_{{ name }}.hpp"
 
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -138,6 +143,31 @@ Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
     {%- endfor -%}
 {%- endif -%}
 
+
+{% if board.display is defined and board.display.enabled -%}
+
+static ssd1306_t display_inst;
+
+static const uint32_t screen_slots[4] = {
+    {%- set count = 0 -%}
+    {%- for s in hv_manifest.sends -%}
+        {%- if "screen" in s.name and count < 4 -%}
+            {{ s.hash }}{{ "," if not loop.last else "" }}
+            {%- set count = count + 1 -%}
+        {%- endif -%}
+    {%- endfor %}
+};
+
+void oled_stdout_hook(const char *buf, int len) {
+    for (int i = 0; i < len; i++) { 
+        Pico::Screen::write_char(buf[i]); 
+    }
+}
+
+static stdio_driver_t oled_stdio;
+{%- endif %}
+
+
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
 static uint32_t midi_activity_timer = 0;
@@ -149,6 +179,10 @@ static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
+
+{%- if board.masterfx %}
+MasterFX masterFX;
+{%- endif %}
 
 // ---- NOTE receives ----
 
@@ -495,26 +529,27 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
             {%- else -%}
             Pico::led_vals[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
             {%- endif %}
-            return;
+            break; 
         {%- endfor -%}
     {%- endfor %}
 
-    /* --- Web & OSC Routing --- */
+    /* --- Web (SSI Sync) & OSC Routing --- */
     {% if board.web.enabled -%}
+    {% set web_count = namespace(index=0) %}
     {% for s in hv_manifest.sends -%}
-        {# Check if this specific send was already used by an LED #}
-        {%- set is_led = false -%}
-        {%- for l in board.leds if l.name == s.name %}{% set is_led = true %}{% endfor -%}
-        
-        {%- if not is_led -%}
         case {{ s.hash }}U:
             {% if s.name.startswith('web') -%}
+            web_values[{{ web_count.index }}] = val0;
+            {% set web_count.index = web_count.index + 1 %}
+
             if (web_float_handler) web_float_handler("{{ s.name }}", val0);
+            return;
+
             {%- elif s.name.startswith('osc') -%}
             osc_send_float("{{ s.name }}", val0);
-            {%- endif %}
             return;
-        {%- endif %}
+            {%- endif %}
+            break;
     {% endfor %}
     {%- endif %}
 
@@ -524,8 +559,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     } 
 }
 
-
-{% if board.web.enabled -%}
+{% if board.web is defined and board.web.enabled -%}
 // Global handler pointers defined in PicoWEB.h
 osc_hv_float_handler_t osc_hv_handler = nullptr;
 web_float_handler_t web_float_handler = nullptr;
@@ -613,6 +647,7 @@ void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
 
+
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
@@ -624,6 +659,7 @@ int main() {
         #endif
     #endif
     {%- endif %}
+
 
  // --- I2C Initialization ---
 
@@ -642,10 +678,10 @@ int main() {
 
    {% if board.pico_board == 'pico_w' %}
         {% if board.web.enabled %}
-    // Web Mode: Initialize full WiFi stack
+    // Initialize full WiFi stack
     init_wifi();
         {% else %}
-    // Standard Mode: Basic wireless initialization (for LED/system)
+    // Basic wireless initialization (for LED/system)
     cyw43_arch_init();
         {% endif %}
     {% endif %}
@@ -678,20 +714,20 @@ int main() {
 
 // ---- MPR121 init ----
 
-{% if board.inputs.sensors.mpr121 -%}
-#define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
+    {% if board.inputs.sensors.mpr121 -%}
+    #define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
 
-    Pico::MPR121Config cfg[NUM_SENSORS] = {
-    {%- for sensor in board.inputs.sensors.mpr121 %}
-        { 
-            {{ sensor.i2c_bus }}, 
-            {{ sensor.sda }}, 
-            {{ sensor.scl }}, 
-            {{ sensor.irq }}, 
-            {{ sensor.addr_index }} 
-        }{{ "," if not loop.last }}
-    {%- endfor %}
-    };
+        Pico::MPR121Config cfg[NUM_SENSORS] = {
+        {%- for sensor in board.inputs.sensors.mpr121 %}
+            { 
+                {{ sensor.i2c_bus }}, 
+                {{ sensor.sda }}, 
+                {{ sensor.scl }}, 
+                {{ sensor.irq }}, 
+                {{ sensor.addr_index }} 
+            }{{ "," if not loop.last }}
+        {%- endfor %}
+        };
 
     Pico::MPR121 sensor_array[NUM_SENSORS] = {
         {%- for i in range(board.inputs.sensors.mpr121|length) %}
@@ -709,6 +745,22 @@ int main() {
 {%- endif %}
 
 // -----------------------------------
+
+    {% if board.display.enabled -%}
+        Pico::Screen::init(
+            &display_inst, 
+            {{ board.display.i2c_bus }}, 
+            {{ board.display.sda }}, 
+            {{ board.display.scl }}, 
+            {{ board.display.width }}, 
+            {{ board.display.height }},
+            Pico::SCREEN_MODE_{{ board.display.mode | upper }}
+        );
+  
+    oled_stdio.out_chars = oled_stdout_hook;
+    stdio_filter_driver(&oled_stdio);
+    printf("PikoPD: Console Hooked\n");
+    {%- endif %}
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -775,14 +827,42 @@ int main() {
         {%- endif %}
 
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
-        
+
         midi_task();
         
         #if !defined(MIDI_HOST) && ENABLE_DEBUG
-        print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-    #else
-        best_effort_wfe_or_timeout(make_timeout_time_ms(1));
-    #endif
+            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+        #else
+            best_effort_wfe_or_timeout(make_timeout_time_ms(1));
+        #endif
+
+        {% if board.display.enabled -%}
+            for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
+                if (print_pool[i].busy.load(std::memory_order_acquire)) {
+                    
+                    uint32_t msg_id = print_pool[i].id; 
+                    float msg_val = print_pool[i].val;
+                    bool is_dashboard_item = false;
+
+                    // Check if this message ID matches one of our 4 quadrant hashes
+                    for (int slot = 0; slot < 4; slot++) {
+                        if (msg_id == screen_slots[slot]) {
+                            Pico::Screen::update_focus(slot, msg_val);
+                            is_dashboard_item = true;
+                            break;
+                        }
+                    }
+
+                    // If it's NOT a quadrant item, treat it as a general console popup
+                    if (!is_dashboard_item) {
+                        Pico::Screen::update_focus(msg_id, msg_val); 
+                    }
+
+                    print_pool[i].busy.store(false, std::memory_order_release);
+                }
+            }
+            Pico::Screen::process(now, printNames, NUM_PRINT_NAMES);
+            {%- endif %}
 
         if (now - last_led_tick >= 20) {
             last_led_tick = now;
@@ -927,7 +1007,6 @@ int main() {
             }
         }
         {%- endif %}
-
 
         } 
         tight_loop_contents();
