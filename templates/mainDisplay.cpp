@@ -20,7 +20,6 @@
 
 static ssd1306_t display_inst;
 
-// Mapping: Extracts hashes from manifest.sends for names containing "screen"
 static const uint32_t screen_slots[4] = {
     {%- set count = 0 -%}
     {%- for s in hv_manifest.sends -%}
