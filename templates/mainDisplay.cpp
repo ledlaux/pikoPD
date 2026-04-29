@@ -18,29 +18,6 @@
 #include "PicoSCREEN.h"
 #include "pico/stdio/driver.h"
 
-static ssd1306_t display_inst;
-
-static const uint32_t screen_slots[4] = {
-    {%- set count = 0 -%}
-    {%- for s in hv_manifest.sends -%}
-        {%- if "screen" in s.name and count < 4 -%}
-            {{ s.hash }}{{ "," if not loop.last else "" }}
-            {%- set count = count + 1 -%}
-        {%- endif -%}
-    {%- endfor %}
-};
-
-// Stdout redirection for SCREEN_MODE_STATUS
-void oled_stdout_hook(const char *buf, int len) {
-    for (int i = 0; i < len; i++) { Pico::Screen::write_char(buf[i]); }
-}
-
-static stdio_driver_t oled_stdio = {
-    .out_chars = oled_stdout_hook,
-    .next = NULL
-};
-{%- endif %}
-
 #include "Heavy_{{ name }}.hpp"
 
 #define HV_NOTEIN_HASH       0x67E37CA3
@@ -165,6 +142,28 @@ Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
     {%- endfor -%}
 {%- endif -%}
 
+static ssd1306_t display_inst;
+
+static const uint32_t screen_slots[4] = {
+    {%- set count = 0 -%}
+    {%- for s in hv_manifest.sends -%}
+        {%- if "screen" in s.name and count < 4 -%}
+            {{ s.hash }}{{ "," if not loop.last else "" }}
+            {%- set count = count + 1 -%}
+        {%- endif -%}
+    {%- endfor %}
+};
+
+// Stdout redirection for SCREEN_MODE_STATUS
+void oled_stdout_hook(const char *buf, int len) {
+    for (int i = 0; i < len; i++) { Pico::Screen::write_char(buf[i]); }
+}
+
+static stdio_driver_t oled_stdio = {
+    .out_chars = oled_stdout_hook,
+    .next = NULL
+};
+{%- endif %}
 
 
 #define FLASH_DURATION_MS 40
@@ -743,7 +742,6 @@ int main() {
 
 // -----------------------------------
 
-
 {% if board.display.enabled -%}
     Pico::Screen::init(
         &display_inst, 
@@ -832,14 +830,13 @@ int main() {
 
         {% if board.display.enabled -%}
             for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
-                // Check if there is a new message in the pool
                 if (print_pool[i].busy.load(std::memory_order_acquire)) {
                     
                     uint32_t msg_id = print_pool[i].id; 
                     float msg_val = print_pool[i].val;
                     bool is_dashboard_item = false;
 
-                    // 1. Check if this message ID matches one of our 4 quadrant hashes
+                    // Check if this message ID matches one of our 4 quadrant hashes
                     for (int slot = 0; slot < 4; slot++) {
                         if (msg_id == screen_slots[slot]) {
                             Pico::Screen::update_focus(slot, msg_val);
@@ -848,19 +845,14 @@ int main() {
                         }
                     }
 
-                    // 2. If it's NOT a quadrant item, treat it as a general console popup
+                    // If it's NOT a quadrant item, treat it as a general console popup
                     if (!is_dashboard_item) {
-                        // Pass the msg_id as the name index so the screen can show the name
                         Pico::Screen::update_focus(msg_id, msg_val); 
                     }
 
-                    // Mark the message as processed
                     print_pool[i].busy.store(false, std::memory_order_release);
                 }
             }
-
-            // 3. Render the frame
-            // Passes printNames so Console Mode can look up the string name for msg_id
             Pico::Screen::process(now, printNames, NUM_PRINT_NAMES);
             {%- endif %}
 
