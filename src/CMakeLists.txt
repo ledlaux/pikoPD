@@ -134,6 +134,10 @@ if(ENABLE_DISTANCE_SENSOR)
 
     pico_generate_pio_header(pikopd.elf ${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor/src/sensor.pio)
 
+pico_generate_pio_header(pikopd.elf
+    ${CMAKE_CURRENT_LIST_DIR}/src/sensors/hx710b_reader.pio
+)
+
     target_include_directories(pikopd.elf PRIVATE "${DISTANCE_SENSOR_PATH}/include")
     target_link_libraries(pikopd.elf PRIVATE distance-sensor)
 else()
