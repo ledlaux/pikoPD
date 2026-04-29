@@ -22,14 +22,13 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [HC-SR04](#hc-sr04)
     - [CNY70](#cny70)
 - [Project Configuration](#project-configuration)
-    - [Build](#build)
+  - [Build](#build)
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
-- [WEB Config Tool](#web-config-tool)
-- [WEB Control And OSC](#web-control-and-osc)
+- [Web Config Tool](#web-config-tool)
+- [Web Control and OSC](#web-control-and-osc)
 - [Useful Links](#useful-links)
-
 
 
 
@@ -268,7 +267,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ## Sensors
 
 
-## MPR121 - Capacitive Touch Sensor
+## MPR121 
 
 ```json
 "sensors": {
@@ -289,9 +288,9 @@ IRQ pin is used by default to make processing more efficient.
 
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
-## HC-SR04 - Distance Sensor
+## HC-SR04 
 
-PikoPD supports multiple HC-SR04 distance sensors.
+PikoPD supports multiple HC-SR04 ultrasonic distance sensors.
 
 ```json
   "sensors": {
@@ -301,7 +300,7 @@ PikoPD supports multiple HC-SR04 distance sensors.
     }
  ``` 
 
-## CNY70 - Optical Sensor
+## CNY70 
 
 
 ```json
@@ -448,7 +447,7 @@ Upload your .pd patch to see available parameters or load board.json configurati
 Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
 Export the board.json and place it in the pikoPD folder.    
 
-# WEB Control and OSC (experimental)
+# WEB Control and OSC
 
 ```json
  "web": {
