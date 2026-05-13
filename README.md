@@ -1,0 +1,20 @@
+# pikoPD Web Configuration Tool
+
+This tool allows you to map your Pure Data patch parameters to Raspberry Pico hardware and export board.json file. It is currently under active development, and you can try the first demo below.
+
+[Live Demo](https://ledlaux.github.io/pikoPD)
+
+Feel free to join the Discussions section to share your feedback!
+
+![UI Preview](./docs/images/pikoPD-tool.png)
+
+## Getting Started
+
+1. Upload your `.pd` patch to view available [@hv_params] parameters, or load an existing board configuration file.
+2. Select your board model (Raspberry Pico, Pico W, Zero, or Pico 2).
+3. Click a pin on the board and add a component, or drag an object tag directly onto a pin.
+4. Objects with the category names like btn, led or enc are recognized and mapped to the category automatically.
+5. Export the `config.json` file and place it in your project root.
+
+
+Read the manual on the page for more detailed instructions.
