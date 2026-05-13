@@ -788,6 +788,10 @@
         <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Delay</span>
         <input type="checkbox" id="fx-delay" onchange="config.masterfx.delay = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
     </div>
+     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Reverb</span>
+        <input type="checkbox" id="fx-reverb" onchange="config.masterfx.reverb = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
+    </div>
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Limiter</span>
         <input type="checkbox" id="fx-limiter" checked onchange="config.masterfx.limiter = this.checked; refreshUI()" class="hw-checkbox" style="margin: 0; width: 16px; height: 16px;">
@@ -1323,6 +1327,7 @@ function showPage(id) {
         leds: [],
         masterfx: { 
             delay: false,
+            reverb: false,
             limiter: true
         }
     };
