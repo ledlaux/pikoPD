@@ -96,7 +96,8 @@ And video of using mpr121 with samples loaded in PD on RP2040. Check example pat
 
 https://github.com/ledlaux/pikoPD/blob/main/patches/sample_drums_MPR121.pd
 
-https://github.com/user-attachments/assets/01730a33-1773-4c31-b4e1-928125b71d42
+https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
+
 
 
 ## Default Patch
@@ -127,6 +128,9 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 
 
 
+
+
+
 ## Useful links
 
 - About HVCC compiler  
@@ -137,6 +141,4 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 
 ## Licence
 
-The code will be released under an open-source license once the project reaches version 0.0.1.
-
-No warranty is provided. Use at your own risk.
+MIT licence
