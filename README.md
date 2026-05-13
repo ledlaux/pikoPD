@@ -6,8 +6,6 @@ The goal of this project is to develop  interface between the Raspberry Pi Pico,
 
 It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. 
 
-Compiled binaries for RP2040 are published in the [release](https://github.com/ledlaux/pikoPD/releases/tag/test1) section. Check [Discussions](https://github.com/ledlaux/pikoPD/discussions) for the project updates, tutorials and videos.
-
 For a hardware configuration you can use interactive **web config tool**: [Live Demo](https://ledlaux.github.io/pikoPD).
 
 
