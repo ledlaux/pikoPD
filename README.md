@@ -1,4 +1,4 @@
-# Pure Data → HVCC → Raspberry Pi Pico UF2 Generator 
+# Pure Data → HVCC → Raspberry Pi Pico UF2 Generator (v0.0.1)
 
 PikoPD project automates building **Pure Data patches** (`.pd`) into a **UF2** firmware using **hvcc compiler** and **Raspberry Pi Pico C/C++ SDK**.   
 
