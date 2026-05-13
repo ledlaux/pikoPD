@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pikoPD | Dashboard</title>
+    <style>
+        :root { --neon: #00ff88; --bg: #0a0a0a; --card: #161616; --border: #2a2a2a; --text: #888; }
+        body { background: var(--bg); color: var(--neon); font-family: 'Inter', -apple-system, sans-serif; display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        h2 { margin: 0 0 20px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; text-align: center; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        label { font-size: 10px; text-transform: uppercase; color: var(--text); display: block; margin-bottom: 8px; font-weight: 700; }
+        .val-out { float: right; color: var(--neon); font-family: monospace; }
+        
+        /* Sliders */
+        input[type=range] { width: 100%; accent-color: var(--neon); margin: 10px 0 20px 0; background: #000; height: 6px; border-radius: 3px; cursor: pointer; }
+        
+        /* Select & Inputs */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        select { background: #000; border: 1px solid var(--border); color: var(--neon); padding: 8px; border-radius: 4px; font-size: 12px; outline: none; }
+        
+        /* Controls */
+        button { background: #000; border: 1px solid var(--border); color: var(--neon); padding: 15px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; text-transform: uppercase; font-size: 11px; }
+        button:active { background: var(--neon); color: #000; }
+        
+        .switch-wrap { display: flex; align-items: center; justify-content: space-between; background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 8px; }
+        .switch { position: relative; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-box { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #222; transition: .3s; border-radius: 20px; }
+        .slider-box:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: var(--neon); transition: .3s; border-radius: 50%; }
+        input:checked + .slider-box { background-color: #004422; }
+        input:checked + .slider-box:before { transform: translateX(20px); }
+
+        /* Console & Telemetry */
+        .console { background: #000; border: 1px solid var(--border); height: 120px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; padding: 10px; overflow-y: auto; color: #00cc66; line-height: 1.4; }
+        .telemetry { display: flex; justify-content: space-between; font-size: 9px; color: var(--text); margin-top: 10px; }
+        .telemetry span { color: var(--neon); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>DSP CONTROL</h2>
+        
+        <label>Main Parameter <span class="val-out" id="v_disp">64</span></label>
+        <input type="range" min="0" max="127" value="64" id="mainSlider">
+
+        <label>Logic Switch</label>
+        <div class="switch-wrap">
+            <span style="font-size: 10px;">SIGNAL ENABLE</span>
+            <label class="switch">
+                <input type="checkbox" id="mainSwitch">
+                <span class="slider-box"></span>
+            </label>
+        </div>
+
+        <label style="margin-top:20px;">Trigger</label>
+        <button id="triggerBtn">Send Impulse</button>
+    </div>
+
+    <div class="card">
+        <h2>MIDI CC BRIDGE</h2>
+        <div class="grid">
+            <div>
+                <label>Channel</label>
+                <select id="midiChan">
+                    <option value="1">CH 1</option><option value="2">CH 2</option>
+                    <option value="3">CH 3</option><option value="4">CH 4</option>
+                </select>
+            </div>
+            <div>
+                <label>CC Number</label>
+                <select id="midiCC">
+                    <option value="1">Mod (1)</option><option value="7">Vol (7)</option>
+                    <option value="74">Cutoff (74)</option><option value="11">Expr (11)</option>
+                </select>
+            </div>
+        </div>
+        <label>CC Value <span class="val-out" id="cc_disp">0</span></label>
+        <input type="range" min="0" max="127" value="0" id="ccSlider">
+    </div>
+
+    <div class="card">
+        <h2>SYSTEM MONITOR</h2>
+        <div class="console" id="console">
+            <div>> Kernel Link Established...</div>
+        </div>
+        <div class="telemetry">
+            <div>TEMP: <span></span></div>
+            <div>CORE: <span></span></div>
+            <div>STATUS: <span></span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let lastSent = 0;
+    const throttleMs = 35;
+
+    function send(param, val, extra = "") {
+        const now = Date.now();
+        if (now - lastSent < throttleMs && (param === 'v' || param === 'm')) return;
+        lastSent = now;
+        
+        let url = `/update_pd.cgi?p=${param}&v=${val}${extra}`;
+        fetch(url, { keepalive: true }).catch(() => {});
+    }
+
+    // DSP Listeners
+    document.getElementById('mainSlider').oninput = (e) => {
+        document.getElementById('v_disp').innerText = e.target.value;
+        send('v', e.target.value);
+    };
+
+    document.getElementById('mainSwitch').onchange = (e) => {
+        send('s', e.target.checked ? 1 : 0);
+    };
+
+    const btn = document.getElementById('triggerBtn');
+    const trigger = (v) => send('t', v);
+    btn.onmousedown = () => trigger(1);
+    btn.onmouseup = () => trigger(0);
+
+    // MIDI Listener
+    document.getElementById('ccSlider').oninput = (e) => {
+        const chan = document.getElementById('midiChan').value;
+        const cc = document.getElementById('midiCC').value;
+        document.getElementById('cc_disp').innerText = e.target.value;
+        send('m', e.target.value, `&c=${chan}&n=${cc}`);
+    };
+
+    // Console Polling (Every 2 seconds to save bandwidth)
+    setInterval(async () => {
+        try {
+            // We fetch the page itself to grab the fresh SSI telemetry values
+            const res = await fetch(location.href);
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTele = doc.querySelector('.telemetry').innerHTML;
+            document.querySelector('.telemetry').innerHTML = newTele;
+        } catch(e) {}
+    }, 2000);
+</script>
+</body>
+</html>
