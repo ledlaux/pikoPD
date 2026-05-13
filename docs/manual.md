@@ -288,9 +288,8 @@ IRQ pin is used by default to make processing more efficient.
 
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
-## HC-SR04 
 
-PikoPD supports multiple HC-SR04 ultrasonic distance sensors.
+## HC-SR04 
 
 ```json
   "sensors": {
@@ -298,7 +297,10 @@ PikoPD supports multiple HC-SR04 ultrasonic distance sensors.
         { "name": "distance", "trigger": 2, "echo": 3}
       ]
     }
- ``` 
+ ```
+
+PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
+
 
 ## CNY70 
 
