@@ -1,10 +1,10 @@
-# Pure Data → HVCC → Raspberry Pi Pico UF2 Generator (v0.0.1)
+# pikoPD(v0.0.1)
 
-PikoPD project automates building **Pure Data patches** (`.pd`) into a **UF2** firmware using **hvcc compiler** and **Raspberry Pi Pico C/C++ SDK**.   
+Automate building of **Pure Data patches** (`.pd`) into a **UF2** firmware using **HVCC compiler** and **Raspberry Pi Pico C/C++ SDK**.   
 
-The goal of this project is to develop  interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
+The goal of the project is to develop  interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
 
-It is currently a **Proof of Concept**. The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. 
+The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. 
 
 For a hardware configuration you can use interactive **web config tool**: [Live Demo](https://ledlaux.github.io/pikoPD).
 
@@ -32,7 +32,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 ## Project configuration
 
-[Read manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
+[Manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 
 - PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - All hardware configuration is done using `board.json` file.
@@ -92,7 +92,6 @@ Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample l
 Video of using MPR121 with samples loaded in PD on RP2040:  
 
 https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
-
 
 
 ## Default Patch
