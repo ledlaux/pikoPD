@@ -11,7 +11,6 @@ MIT Licence
 
 */
 
-    
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -339,8 +338,8 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                 {%- endif %}
                 {%- if board.masterfx.delay %}
                 case 90: masterFX.delay.set_time(val); break;
-                case 91: masterFX.delay.target_level = val * 0.8f; break;
-                case 92: masterFX.delay.target_fb = val * 0.95f; break;
+                case 91: masterFX.delay.targetLevel = val * 0.8f; break;
+                case 92: masterFX.delay.targetFb = val * 0.95f; break;
                 case 93: masterFX.delay.bypass = !is_on; break;
                 {%- endif %}
                 {%- if board.masterfx.reverb %}
