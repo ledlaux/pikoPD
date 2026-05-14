@@ -342,8 +342,8 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 
 PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
 
-1. console - outputs adjusted [print] parameter.
-2. pd - outputs 4 parameters (dashboard) by using [s screen @hv_param] objects.  
+1. console - outputs adjusted parameter [print] object.
+2. pd - outputs first 4 [print] objects as dashboard.
 
 # Project Configuration
 
