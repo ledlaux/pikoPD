@@ -11,21 +11,20 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 ## Features
 
-- [x] button
 - [x] led
 - [x] adc
+- [x] button
 - [x] encoder
 - [x] joystick
 - [x] gate in/out
 - [x] sensors
+- [x] i2s audio
+- [x] pwm audio
 - [x] uart midi
 - [x] usb midi
 - [x] usb midi host
 - [x] midi clock
-- [x] i2s audio
-- [x] pwm audio
-- [x] web interface
-- [x] osc control
+- [x] web & osc
 - [x] screen
 - [ ] sd card
 - [ ] bluetooth midi
