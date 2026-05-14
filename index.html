@@ -185,6 +185,13 @@
             /* Matches the 'glow' style of your encoders */
             box-shadow: 0 0 8px rgba(160, 82, 45, 0.4); 
         }
+
+        .pin.assigned-distance { 
+            background: #00bcd4 !important; 
+            color: #fff !important; 
+            /* Matches the 'glow' style of your encoders */
+            box-shadow: 0 0 8px rgba(160, 82, 45, 0.4); 
+        }
         
         .comp-groups {display: flex; gap: 15px; flex: 1; align-items: stretch;}
         
@@ -712,6 +719,7 @@
         <option value="gate_out">Gate Out</option>
         <option value="cny70">CNY70</option> 
         <option value="mpr121">MPR121</option> 
+        <option value="hc-sr04">HC-SR04</option> 
     </select>
     <div id="mode-ui-container" style="min-height: 70px; margin-top: 12px; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;">
     </div>
@@ -1319,7 +1327,7 @@ function showPage(id) {
             gate_in: [],
             encoders: [],
             joystick: [],
-            sensors: {cny70: [], mpr121:[]}
+            sensors: {cny70: [], mpr121:[], "hc-sr04":[]}
         },
         outputs: {
             gate_out: []
@@ -1482,7 +1490,7 @@ function clearConfig() {
         gate_in: [],
         encoders: [],
         joystick: [],
-        sensors: { cny70: [], mpr121: [] }
+        sensors: { cny70: [], mpr121: [], "hc-sr04": [] }
     };
     config.outputs = { gate_out: [] };
     config.leds = [];
@@ -1555,12 +1563,25 @@ function isNameDuplicate(newName) {
 function addComponent() {
     const errorEl = document.getElementById('error-msg');
     const type = document.getElementById('comp-type').value;
-    const name = document.getElementById('comp-name').value.trim() || `${type}_${selectedPin}`;
+    const customName = document.getElementById('comp-name').value.trim();
+
+    const groupCount =
+        (config.inputs[type]?.length || 0) +
+        (config.inputs.sensors?.[type]?.length || 0) +
+        (config.outputs[type]?.length || 0) +
+        (config[type]?.length || 0);
+
+    const name =
+        customName ||
+        `${type.replace('_pins', '').replace('-', '_')}_${groupCount + 1}`;
+
     const mode = document.getElementById('comp-mode')?.value;
     
-    if (selectedPin === null) {
-        errorEl.innerText = "Select a pin on the board first";
-        return;
+    const noPinRequired = ["mpr121", "hc-sr04"];
+
+    if (selectedPin === null && !noPinRequired.includes(type)) {
+    errorEl.innerText = "Select a pin on the board first";
+    return;
     }
 
     const pin = parseInt(selectedPin);
@@ -1683,6 +1704,43 @@ function addComponent() {
                 });
                 break;
 
+                case "hc-sr04":
+
+                    const trigEl = document.getElementById('hc-trigger');
+                    const echoEl = document.getElementById('hc-echo');
+
+                    if (!trigEl || !echoEl) {
+                        errorEl.innerText = "HC-SR04 pin selectors missing";
+                        return;
+                    }
+
+                    const trigger = parseInt(trigEl.value);
+                    const echo = parseInt(echoEl.value);
+
+                    if (trigger === echo) {
+                        errorEl.innerText = "Trigger and Echo cannot use same pin";
+                        return;
+                    }
+
+                    if (!config.inputs.sensors) {
+                        config.inputs.sensors = {};
+                    }
+
+                    if (!config.inputs.sensors["hc-sr04"]) {
+                        config.inputs.sensors["hc-sr04"] = [];
+                    }
+
+                    removeCompByPin(trigger);
+                    removeCompByPin(echo);
+
+                    config.inputs.sensors["hc-sr04"].push({
+                        name: name || `HC_SR04_${trigger}`,
+                        trigger,
+                        echo
+                    });
+
+                    break;
+
             }
 
         refreshUI();
@@ -1733,6 +1791,7 @@ function renderLists() {
             else if (pinEl.classList.contains('assigned-output')) themeColor = 'var(--output-clr)';
             else if (pinEl.classList.contains('audio-reserved')) themeColor = '#9d00ff';
             else if (pinEl.classList.contains('assigned-sensor')) themeColor = '#ff8c00'; 
+            else if (pinEl.classList.contains('assigned-distance')) themeColor = '#00bcd4'; 
             
         }
 
@@ -1819,6 +1878,81 @@ function renderLists() {
         config.leds.forEach((it, i) => containers['list-leds'].push(createRow(it, 'leds', i, it.pin)));
     }
 
+    // HC-SR04
+if (config.inputs.sensors["hc-sr04"]) {
+    config.inputs.sensors["hc-sr04"].forEach((it, i) => {
+
+        const themeColor = '#00bcd4';
+
+        const pinList = config.pico_board === 'zero'
+            ? [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26,27,28,29]
+            : [0,1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28];
+
+        const trigOptions = pinList.map(p =>
+            `<option value="${p}" ${p == it.trigger ? 'selected' : ''}>GP${p}</option>`
+        ).join('');
+
+        const echoOptions = pinList.map(p =>
+            `<option value="${p}" ${p == it.echo ? 'selected' : ''}>GP${p}</option>`
+        ).join('');
+
+        containers['list-inputs'].push(`
+        <div class="comp-item"
+             style="border-left:5px solid ${themeColor};
+                    padding:8px 12px;
+                    margin-bottom:8px;
+                    background:rgba(255,255,255,0.03);
+                    border-radius:4px;">
+
+            <div class="comp-header"
+                 style="display:flex;justify-content:space-between;align-items:center;">
+
+                <input type="text"
+                       value="${it.name}"
+                       style="background:transparent;border:none;color:white;font-weight:bold;width:80%;"
+                       oninput="renameComp('hc-sr04', ${i}, this.value)">
+
+                <span class="del-btn"
+                      style="cursor:pointer;color:#ff4444;font-size:14px;"
+                      onclick="removeComp('hc-sr04', ${i})">✕</span>
+            </div>
+
+            <div style="display:flex;gap:6px;margin-top:6px;">
+
+                <div style="flex:1;">
+                    <label style="font-size:9px;color:#888;">TRIG</label>
+                    <select style="width:100%;background:#222;color:white;border:1px solid #444;"
+                            onchange="updateHCSR04Pin(${i}, 'trigger', this.value)">
+                        ${trigOptions}
+                    </select>
+                </div>
+
+                <div style="flex:1;">
+                    <label style="font-size:9px;color:#888;">ECHO</label>
+                    <select style="width:100%;background:#222;color:white;border:1px solid #444;"
+                            onchange="updateHCSR04Pin(${i}, 'echo', this.value)">
+                        ${echoOptions}
+                    </select>
+                </div>
+
+            </div>
+<!--
+            <div style="margin-top:6px;">
+                <span class="role-badge"
+                      style="background:${themeColor};
+                             color:#000;
+                             font-weight:bold;
+                             padding:2px 6px;
+                             border-radius:3px;
+                             font-size:9px;">
+                    HC-SR04
+                </span>
+            </div>
+-->
+        </div>`);
+    });
+}
+
     for (const [id, html] of Object.entries(containers)) {
         const target = document.getElementById(id);
         if (target) target.innerHTML = html.join('');
@@ -1845,6 +1979,30 @@ function updateMPRPin(index, newSda) {
     }
 }
 
+function updateHCSR04Pin(index, field, value) {
+
+    const sensor = config.inputs.sensors["hc-sr04"][index];
+    if (!sensor) return;
+
+    const pin = parseInt(value);
+
+    removeCompByPin(pin);
+
+    sensor[field] = pin;
+
+    // prevent duplicate pins
+    if (sensor.trigger === sensor.echo) {
+
+        if (field === 'trigger') {
+            sensor.echo = pin + 1;
+        } else {
+            sensor.trigger = pin - 1;
+        }
+    }
+
+    refreshUI();
+}
+
 function refreshUI() {
     document.getElementById('json-preview').innerText = JSON.stringify(config, null, 2);
     document.querySelectorAll('.pin').forEach(p => {
@@ -1854,7 +2012,8 @@ function refreshUI() {
             'assigned-led', 
             'assigned-adc', 
             'audio-reserved',
-            'assigned-sensor'
+            'assigned-sensor',
+            'assigned-distance'
         );
     });
 
@@ -1897,6 +2056,17 @@ function refreshUI() {
         });
     }
 
+    if (config.inputs.sensors?.["hc-sr04"]) {
+    config.inputs.sensors["hc-sr04"].forEach(i => {
+
+        document.getElementById(`pin-${i.trigger}`)
+            ?.classList.add('assigned-distance');
+
+        document.getElementById(`pin-${i.echo}`)
+            ?.classList.add('assigned-distance');
+    });
+}
+
     config.inputs.buttons.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-input');
     });
@@ -1929,6 +2099,9 @@ function renameComp(cat, i, val) {
         config.outputs.gate_out[i].name = val;
     } else if (cat === 'cny70') {
         config.inputs.sensors.cny70[i].name = val;
+    } else if (cat === 'hc-sr04') {
+    config.inputs.sensors["hc-sr04"][i].name = val;
+
     } else {
         config.inputs[cat][i].name = val;
     }
@@ -1949,7 +2122,9 @@ function removeCompByPin(pinId) {
         item.adc_pin !== p &&
         item.sda !== p &&    
         item.scl !== p &&    
-        item.irq !== p       
+        item.irq !== p &&
+        item.trigger !== p &&
+        item.echo !== p      
     );
 
     config.inputs.adc_pins = filterPins(config.inputs.adc_pins);
@@ -1965,6 +2140,10 @@ function removeCompByPin(pinId) {
         if (config.inputs.sensors.mpr121) {
             config.inputs.sensors.mpr121 = filterPins(config.inputs.sensors.mpr121);
         }
+
+        if (config.inputs.sensors["hc-sr04"]) {
+             config.inputs.sensors["hc-sr04"] = filterPins(config.inputs.sensors["hc-sr04"]);
+}
     }
 
     config.leds = filterPins(config.leds);
@@ -2046,45 +2225,54 @@ function showCopySuccess(btn) {
 }
 
 function removeComp(cat, i) {
+
     if (cat === 'mpr121') {
         if (config.inputs.sensors && config.inputs.sensors.mpr121) {
             config.inputs.sensors.mpr121.splice(i, 1);
         }
+
     } else if (cat === 'cny70') {
         if (config.inputs.sensors && config.inputs.sensors.cny70) {
             config.inputs.sensors.cny70.splice(i, 1);
         }
-    } 
-    else if (cat === 'leds') {
+
+    } else if (cat === 'hc-sr04') {
+        if (config.inputs.sensors && config.inputs.sensors["hc-sr04"]) {
+            config.inputs.sensors["hc-sr04"].splice(i, 1);
+        }
+
+    } else if (cat === 'leds') {
         config.leds.splice(i, 1);
+
     } else if (cat === 'gate_out') {
         config.outputs.gate_out.splice(i, 1);
+
     } else if (cat === 'joystick') {
         if (config.inputs.joystick) {
             config.inputs.joystick.splice(i, 1);
         }
+
     } else {
         if (config.inputs[cat]) {
             config.inputs[cat].splice(i, 1);
         }
     }
 
-    if (config.inputs.sensors) {
-        const s = config.inputs.sensors;
-        const hasMpr = s.mpr121 && s.mpr121.length > 0;
-        const hasCny = s.cny70 && s.cny70.length > 0;
-
-    }
-
     refreshUI();
 }
 
 function updateModeUI() {
+
     const type = document.getElementById('comp-type').value;
     const container = document.getElementById('mode-ui-container');
-    let html = ''; 
 
+    let html = '';
+
+    // =========================
+    // LEDS
+    // =========================
     if (type === "leds") {
+
         html = `
             <select id="comp-mode" style="margin-bottom: 12px;">
                 <option value="pd">Pd</option>
@@ -2092,69 +2280,340 @@ function updateModeUI() {
                 <option value="clock">Clock</option>
                 <option value="status">Status</option>
             </select>
-            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">RGB</span>
-                <input type="checkbox" id="is-rgb-check" class="hw-checkbox">
-            </div>`;
-    } else if (type === 'mpr121') {
-        const currentBus = document.getElementById('mpr-bus')?.value || 'i2c0';
-        const currentSda = parseInt(document.getElementById('mpr-sda')?.value || (currentBus === 'i2c0' ? 4 : 2));
+
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+
+                <span style="
+                    font-size:11px;
+                    color:#888;
+                    text-transform:uppercase;
+                    font-weight:bold;
+                ">
+                    RGB
+                </span>
+
+                <input type="checkbox"
+                       id="is-rgb-check"
+                       class="hw-checkbox">
+            </div>
+        `;
+    }
+
+    // =========================
+    // MPR121
+    // =========================
+    else if (type === 'mpr121') {
+
+        const currentBus =
+            document.getElementById('mpr-bus')?.value || 'i2c0';
+
+        const currentSda =
+            parseInt(
+                document.getElementById('mpr-sda')?.value ||
+                (currentBus === 'i2c0' ? 4 : 2)
+            );
+
         const busPins = {
-            'i2c0': [ 4, 8, 12, 16, 20],
-            'i2c1': [ 2, 6, 10, 14, 18, 26]
+            'i2c0': [4, 8, 12, 16, 20],
+            'i2c1': [2, 6, 10, 14, 18, 26]
         };
 
         const availablePins = busPins[currentBus];
-        
-        const activeSda = availablePins.includes(currentSda) ? currentSda : availablePins[0];
-       
+
+        const activeSda =
+            availablePins.includes(currentSda)
+                ? currentSda
+                : availablePins[0];
+
         const sclCalc = activeSda + 1;
         const irqCalc = activeSda + 2;
 
-        const sdaOptions = availablePins.map(p => 
-            `<option value="${p}" ${p === activeSda ? 'selected' : ''}>GP${p}</option>`
+        const sdaOptions = availablePins.map(p =>
+            `<option value="${p}"
+                ${p === activeSda ? 'selected' : ''}>
+                GP${p}
+            </option>`
         ).join('');
 
         html = `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #1a1a1a; padding: 10px; border-radius: 4px; border: 1px solid #333;">
+            <div style="
+                display:grid;
+                grid-template-columns:1fr 1fr;
+                gap:8px;
+                background:#1a1a1a;
+                padding:10px;
+                border-radius:4px;
+                border:1px solid #333;
+            ">
+
                 <div>
-                    <label style="font-size:9px; color:#888; text-transform:uppercase;">I2C Bus</label>
-                    <select id="mpr-bus" style="width:100%; font-size:11px; background:#222; color:white; border:1px solid #444;" onchange="updateModeUI()">
-                        <option value="i2c0" ${currentBus === 'i2c0' ? 'selected' : ''}>i2c0</option>
-                        <option value="i2c1" ${currentBus === 'i2c1' ? 'selected' : ''}>i2c1</option>
+                    <label style="
+                        font-size:9px;
+                        color:#888;
+                        text-transform:uppercase;
+                    ">
+                        I2C Bus
+                    </label>
+
+                    <select id="mpr-bus"
+                            style="
+                                width:100%;
+                                font-size:11px;
+                                background:#222;
+                                color:white;
+                                border:1px solid #444;
+                            "
+                            onchange="updateModeUI()">
+
+                        <option value="i2c0"
+                            ${currentBus === 'i2c0' ? 'selected' : ''}>
+                            i2c0
+                        </option>
+
+                        <option value="i2c1"
+                            ${currentBus === 'i2c1' ? 'selected' : ''}>
+                            i2c1
+                        </option>
+
                     </select>
                 </div>
+
                 <div>
-                    <label style="font-size:9px; color:#888; text-transform:uppercase;">Addr Index</label>
-                    <select id="mpr-addr" style="width:100%; font-size:11px; background:#222; color:white; border:1px solid #444;">
+                    <label style="
+                        font-size:9px;
+                        color:#888;
+                        text-transform:uppercase;
+                    ">
+                        Addr Index
+                    </label>
+
+                    <select id="mpr-addr"
+                            style="
+                                width:100%;
+                                font-size:11px;
+                                background:#222;
+                                color:white;
+                                border:1px solid #444;
+                            ">
+
                         <option value="0">0</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
+
                     </select>
                 </div>
-                <div style="grid-column: span 2;">
-                    <label style="font-size:9px; color:#888; text-transform:uppercase;">SDA (Bus-specific)</label>
-                    <select id="mpr-sda" style="width:100%; font-size:11px; background:#222; color:white; border:1px solid #444;" onchange="updateModeUI()">
+
+                <div style="grid-column:span 2;">
+
+                    <label style="
+                        font-size:9px;
+                        color:#888;
+                        text-transform:uppercase;
+                    ">
+                        SDA (Bus-specific)
+                    </label>
+
+                    <select id="mpr-sda"
+                            style="
+                                width:100%;
+                                font-size:11px;
+                                background:#222;
+                                color:white;
+                                border:1px solid #444;
+                            "
+                            onchange="updateModeUI()">
+
                         ${sdaOptions}
+
                     </select>
                 </div>
             </div>
-            <div style="margin-top:8px; font-size:10px; color:var(--accent); line-height:1.4; border-left: 2px solid var(--accent); padding-left: 8px;">
-                SCL: GP${sclCalc}, IRQ: GP${irqCalc} 
-            </div>`;
-    } else if (type === "joystick") {
+
+            <div style="
+                margin-top:8px;
+                font-size:10px;
+                color:var(--accent);
+                line-height:1.4;
+                border-left:2px solid var(--accent);
+                padding-left:8px;
+            ">
+                SCL: GP${sclCalc},
+                IRQ: GP${irqCalc}
+            </div>
+        `;
+    }
+
+    // =========================
+    // HC-SR04
+    // =========================
+    else if (type === "hc-sr04") {
+
+        const pinList = config.pico_board === 'zero'
+            ? [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,26,27,28,29]
+            : [0,1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28];
+
+        const triggerDefault =
+            selectedPin ?? pinList[0];
+
+        const echoDefault =
+            pinList.find(p => p !== triggerDefault)
+            || pinList[1];
+
+        const triggerOptions = pinList.map(p =>
+            `<option value="${p}"
+                ${p === triggerDefault ? 'selected' : ''}>
+                GP${p}
+            </option>`
+        ).join('');
+
+        const echoOptions = pinList.map(p =>
+            `<option value="${p}"
+                ${p === echoDefault ? 'selected' : ''}>
+                GP${p}
+            </option>`
+        ).join('');
+
         html = `
-            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">MIDI Range (0-127)</span>
-                <input type="checkbox" id="joy-midi-check" class="hw-checkbox" checked>
-            </div>`;
-    } else if (type === "buttons") {
-        html = '<select id="comp-mode"><option value="bang">Bang</option><option value="toggle">Toggle</option><option value="switch">Switch</option></select>';
-    } else if (type === "adc_pins") {
-        html = '<select id="comp-mode"><option value="knob">Knob</option><option value="cv_in">CV</option></select>';
-    } else if (type === "gate_out") {
-        html = '<select id="comp-mode"><option value="gate">Gate</option><option value="trigger">Trigger</option></select>';
+            <div style="
+                display:flex;
+                gap:8px;
+                background:#1a1a1a;
+                padding:10px;
+                border-radius:4px;
+                border:1px solid #333;
+            ">
+
+                <div style="flex:1;">
+
+                    <label style="
+                        font-size:9px;
+                        color:#888;
+                        text-transform:uppercase;
+                    ">
+                        Trigger
+                    </label>
+
+                    <select id="hc-trigger"
+                            style="
+                                width:100%;
+                                font-size:11px;
+                                background:#222;
+                                color:white;
+                                border:1px solid #444;
+                            ">
+
+                        ${triggerOptions}
+
+                    </select>
+                </div>
+
+                <div style="flex:1;">
+
+                    <label style="
+                        font-size:9px;
+                        color:#888;
+                        text-transform:uppercase;
+                    ">
+                        Echo
+                    </label>
+
+                    <select id="hc-echo"
+                            style="
+                                width:100%;
+                                font-size:11px;
+                                background:#222;
+                                color:white;
+                                border:1px solid #444;
+                            ">
+
+                        ${echoOptions}
+
+                    </select>
+                </div>
+
+            </div>
+
+            <div style="
+                margin-top:8px;
+                font-size:10px;
+                color:#00bcd4;
+                border-left:2px solid #00bcd4;
+                padding-left:8px;
+            ">
+               <!-- HC-SR04 Ultrasonic Sensor -->
+            </div>
+        `;
+    }
+
+    // =========================
+    // JOYSTICK
+    // =========================
+    else if (type === "joystick") {
+
+        html = `
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                width:100%;
+            ">
+
+                <span style="
+                    font-size:11px;
+                    color:#888;
+                    text-transform:uppercase;
+                    font-weight:bold;
+                ">
+                    MIDI Range (0-127)
+                </span>
+
+                <input type="checkbox"
+                       id="joy-midi-check"
+                       class="hw-checkbox"
+                       checked>
+            </div>
+        `;
+    }
+
+    // =========================
+    // BUTTONS
+    // =========================
+    else if (type === "buttons") {
+
+        html = `
+            <select id="comp-mode">
+                <option value="bang">Bang</option>
+                <option value="toggle">Toggle</option>
+                <option value="switch">Switch</option>
+            </select>
+        `;
+    }
+
+    // =========================
+    // ADC
+    // =========================
+    else if (type === "adc_pins") {
+
+        html = `
+            <select id="comp-mode">
+                <option value="knob">Knob</option>
+                <option value="cv_in">CV</option>
+            </select>
+        `;
+    }
+
+    // =========================
+    // GATE OUT
+    // =========================
+    else if (type === "gate_out") {
+
+        html = `
+            <select id="comp-mode">
+                <option value="gate">Gate</option>
+                <option value="trigger">Trigger</option>
+            </select>
+        `;
     }
 
     container.innerHTML = html;
