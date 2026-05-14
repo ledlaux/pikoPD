@@ -25,7 +25,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] usb midi host
 - [x] midi clock
 - [x] web & osc
-- [x] screen
+- [x] display
 - [ ] sd card
 - [ ] bluetooth midi
 
