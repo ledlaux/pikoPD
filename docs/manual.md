@@ -26,8 +26,10 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 - [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
+- [Serial Monitor](#serial-monitor) 
 - [Web Config Tool](#web-config-tool)
 - [Web Control and OSC](#web-control-and-osc)
+- [Screen](#screen)
 - [Useful Links](#useful-links)
 
 
@@ -492,7 +494,7 @@ After that put generated `htmldata.c` inside `/src/web` and rebuild.
 
 To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
 
-# Screens
+# Screen
 
 Will be updated...
 
