@@ -30,7 +30,7 @@ enum AudioMode { I2S, PWM };
 
 class StereoDelay {
 private:
-    static constexpr size_t MAX_DELAY = 24000;
+    static constexpr size_t MAX_DELAY = 16000;
 
     daisysp::DelayLine<float, MAX_DELAY> delayL;
     daisysp::DelayLine<float, MAX_DELAY> delayR;
