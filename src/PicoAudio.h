@@ -10,12 +10,16 @@
 #include <cmath>
 #include <algorithm>
 
-//#define USE_DELAY
+#define USE_DELAY
 #define USE_REVERB
 #define USE_LIMITER
 
 #ifdef USE_REVERB
 #include "masterfx/freeverb.h"
+#endif
+
+#ifdef USE_DELAY
+#include "masterfx/delayline.h"
 #endif
 
 #define USE_PWM_AUDIO
@@ -24,67 +28,71 @@
 
 enum AudioMode { I2S, PWM };
 
-
 class StereoDelay {
 private:
-    int16_t echoL[24000]{0}, echoR[24000]{0};
-    uint32_t write_ptr = 23999;
-    float current_samples = 12000.0f;
-    float smooth_level = 0.0f;
-    float smooth_fb = 0.1f;
+    static constexpr size_t MAX_DELAY = 24000;
+
+    daisysp::DelayLine<float, MAX_DELAY> delayL;
+    daisysp::DelayLine<float, MAX_DELAY> delayR;
+
+    float currentDelay = 12000.0f;
+    float smoothLevel  = 0.0f;
+    float smoothFb     = 0.1f;
 
 public:
-    volatile float target_samples = 12000.0f;
-    volatile float target_level = 0.0f;
-    volatile float target_fb = 0.1f;
+    volatile float targetDelay = 12000.0f;
+    volatile float targetLevel = 0.0f;
+    volatile float targetFb    = 0.1f;
+
     volatile bool bypass = false;
 
-    void set_time(float t) { 
-        float raw = 10.0f + (t * t * 44990.0f);
-        target_samples = std::min(raw, 23000.0f); 
+    void init() {
+        delayL.Init();
+        delayR.Init();
     }
 
-    void inline process(float inL, float inR, float& wetL, float& wetR) {
-    //  parameter smoothing 
-    current_samples += 0.01f * (target_samples - current_samples);
-    smooth_level    += 0.01f * (target_level - smooth_level);
-    smooth_fb       += 0.01f * (target_fb - smooth_fb);
-
-    if (bypass || smooth_level < 0.001f) {
-        wetL = 0; wetR = 0;
-        return;
+    void set_time(float t) {
+        float raw = 10.0f + (t * t * 22000.0f);
+        targetDelay = std::min(raw, 23000.0f);
     }
 
-    float delay_val = current_samples;
-    uint32_t iPart = (uint32_t)delay_val;
-    float fPart = delay_val - iPart;
-    uint32_t frac = (uint32_t)(fPart * 65536.0f);
+    inline void process(float inL,
+                        float inR,
+                        float& wetL,
+                        float& wetR)
+    {
+        currentDelay += 0.0025f * (targetDelay - currentDelay);
+        smoothLevel  += 0.0025f * (targetLevel - smoothLevel);
+        smoothFb     += 0.0025f * (targetFb - smoothFb);
 
-    auto read_buf = [&](int16_t* buf, uint32_t offset) {
-        uint32_t p1 = (write_ptr + iPart + offset) % 24000;
-        uint32_t p2 = (p1 + 1) % 24000;
-        
-        int32_t sample1 = buf[p1];
-        int32_t sample2 = buf[p2];
-        int32_t interpolated = (sample1 * (65536 - frac) + sample2 * frac) >> 16;
-        
-        return (float)interpolated * 0.000030518f; // (1/32768)
-    };
+        if(bypass || smoothLevel < 0.0001f)
+        {
+            wetL = 0.0f;
+            wetR = 0.0f;
 
-    wetL = read_buf(echoL, 0) * smooth_level;
-    wetR = read_buf(echoR, 500) * smooth_level;
+            delayL.Write(inL);
+            delayR.Write(inR);
+            return;
+        }
 
-    float fbL = inL + (wetR * smooth_fb);
-    float fbR = inR + (wetL * smooth_fb);
-    
-    fbL = (fbL > 1.0f) ? 1.0f : (fbL < -1.0f) ? -1.0f : fbL;
-    fbR = (fbR > 1.0f) ? 1.0f : (fbR < -1.0f) ? -1.0f : fbR;
+        delayL.SetDelay(currentDelay);
+        delayR.SetDelay(currentDelay * 1.07f);
 
-    echoL[write_ptr] = (int16_t)(fbL * 32767.0f);
-    echoR[write_ptr] = (int16_t)(fbR * 32767.0f);
+        float dl = delayL.Read();
+        float dr = delayR.Read();
 
-    if (write_ptr == 0) write_ptr = 23999; else write_ptr--;
-}
+        wetL = dl * smoothLevel;
+        wetR = dr * smoothLevel;
+
+        float fbL = inL + dr * smoothFb;
+        float fbR = inR + dl * smoothFb;
+
+        fbL = std::clamp(fbL, -1.0f, 1.0f);
+        fbR = std::clamp(fbR, -1.0f, 1.0f);
+
+        delayL.Write(fbL);
+        delayR.Write(fbR);
+    }
 };
 
 
@@ -133,11 +141,16 @@ public:
     MasterFX() : initialized(false) {}
 
     void init() {
+        #ifdef USE_DELAY
+            delay.init();
+        #endif
+
         #ifdef USE_REVERB
             reverb.init();
         #endif
+
         initialized = true;
-    }
+        }
 
     void process_inplace(float* buffer, int frames) {
         if (!initialized) return;
