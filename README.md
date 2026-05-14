@@ -88,11 +88,9 @@ optional arguments:
   
 ## Sample loading
 
-Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
+Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata. Also check example [patch](https://github.com/ledlaux/pikoPD/blob/develop/patches/sample_drums_MPR121.pd).
 
-And video of using mpr121 with samples loaded in PD on RP2040. Check example patch:
-
-https://github.com/ledlaux/pikoPD/blob/main/patches/sample_drums_MPR121.pd
+Video of using MPR121 with samples loaded in PD on RP2040:  
 
 https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
