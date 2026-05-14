@@ -10,10 +10,6 @@
 #include <cmath>
 #include <algorithm>
 
-#define USE_DELAY
-#define USE_REVERB
-#define USE_LIMITER
-
 #ifdef USE_REVERB
 #include "masterfx/freeverb.h"
 #endif
@@ -28,6 +24,7 @@
 
 enum AudioMode { I2S, PWM };
 
+#ifdef USE_DELAY
 class StereoDelay {
 private:
     static constexpr size_t MAX_DELAY = 16000;
@@ -94,7 +91,7 @@ public:
         delayR.Write(fbR);
     }
 };
-
+#endif
 
 class SoftLimiter {
 private:
