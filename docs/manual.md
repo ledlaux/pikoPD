@@ -28,8 +28,8 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 - [MIDI](#midi)
 - [Sample Loading](#sample-loading)
 - [Serial Monitor](#serial-monitor) 
-- [Web Config Tool](#web-config-tool)
 - [Web Control and OSC](#web-control-and-osc)
+- [Web Config Tool](#web-config-tool)
 - [Useful Links](#useful-links)
 
 
@@ -460,12 +460,6 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
 
 Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
 
-# WEB Config Tool
-
-Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).    
-Upload your .pd patch to see available parameters or load board.json configuration file.    
-Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
-Export the board.json and place it in the pikoPD folder.    
 
 # WEB Control and OSC
 
@@ -509,6 +503,13 @@ After that put generated `htmldata.c` inside `/src/web` and rebuild.
 - To send messages to the device use [s osc @hv_param]  
 
 To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
+
+# WEB Config Tool
+
+Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).    
+Upload your .pd patch to see available parameters or load board.json configuration file.    
+Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
+Export the board.json and place it in the pikoPD folder.    
 
 # Useful Links
 
