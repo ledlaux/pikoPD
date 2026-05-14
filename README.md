@@ -32,7 +32,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 ## Project configuration
 
-[Read manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md)  
+[Read manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 
 - PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - All hardware configuration is done using `board.json` file.
