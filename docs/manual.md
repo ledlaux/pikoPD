@@ -496,7 +496,24 @@ To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
 
 # Screen
 
-Will be updated...
+```json
+  "display": {
+      "enabled": true,
+      "driver": "ssd1306",
+      "i2c_bus": "i2c0",
+      "sda": 4,
+      "scl": 5,
+      "width": 128,
+      "height": 64,
+      "mode": "console"
+    },
+```
+
+PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
+
+1. console - outputs adjusted [print] parameter.
+2. pd - outputs 4 parameters (dashboard) by using [s screen @hv_param] objects.  
+
 
 # Useful Links
 
