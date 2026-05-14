@@ -28,7 +28,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040|RP2350  v0.0.1 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.0 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
@@ -234,15 +234,18 @@ class PicoUF2Generator:
             settings.update(json.load(f))
             
         print(f"\033[32m  -> Using config: {config_filename}\033[0m")
-        midi_mode = midi_host if midi_host else settings.get("midi_mode")
 
-     # 1. Determine which folder to ignore based on web status
+        # 1. Prepare
+
+        midi_mode = midi_host if midi_host else settings.get("midi_mode")
         web_enabled = settings.get("web", {}).get("enabled", False)
         display_enabled = settings.get("display", {}).get("enabled", False)
         sensors = settings.get("sensors", {})
         distance_enabled = len(sensors.get("hc-sr04", [])) > 0
         mpr121_enabled = len(settings.get("sensors", {}).get("mpr121", [])) > 0
+        masterfx = settings.get("masterfx", {})
 
+        # Determine which folder to ignore based on web status
 
         ignore_list = []
         if web_enabled:
@@ -342,6 +345,12 @@ class PicoUF2Generator:
         cmake_cmd.append(f"-DDISTANCE_SENSOR_ENABLED={1 if distance_enabled else 0}")
 
         cmake_cmd.append(f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}")
+
+        cmake_cmd.append(f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}")
+
+        cmake_cmd.append(f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}")
+
+        cmake_cmd.append(f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}")
 
         if board == "zero": cmake_cmd.append("-DPICO_ZERO_BOARD=1")
         cmake_cmd.append(f"-DMAX_VOICES={settings.get('voice_count', 1)}")
