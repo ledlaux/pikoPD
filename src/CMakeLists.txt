@@ -99,7 +99,6 @@ endif()
 
 list(REMOVE_ITEM ALL_SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/web/htmldata.c")
 
-
 add_executable(pikopd.elf ${ALL_SOURCES})
 
 target_include_directories(pikopd.elf PRIVATE
@@ -122,7 +121,6 @@ target_compile_definitions(pikopd.elf PRIVATE
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
 )
 
-
 option(ENABLE_DISTANCE_SENSOR "Build with HC-SR04 support" ON)
 
 if(ENABLE_DISTANCE_SENSOR)
@@ -140,7 +138,6 @@ if(ENABLE_DISTANCE_SENSOR)
 else()
     target_compile_definitions(pikopd.elf PRIVATE DISTANCE_SENSOR_ENABLED=0)
 endif()
-
 
 option(MPR121_ENABLED "Build with MPR121 touch support" ON)
 
@@ -162,6 +159,18 @@ if(ENABLE_DISPLAY)
     target_compile_definitions(pikopd.elf PRIVATE DISPLAY_ENABLED=1)
 else()
     target_compile_definitions(pikopd.elf PRIVATE DISPLAY_ENABLED=0)
+endif()
+
+if(USE_DELAY)
+    target_compile_definitions(pikopd.elf PRIVATE USE_DELAY)
+endif()
+
+if(USE_REVERB)
+    target_compile_definitions(pikopd.elf PRIVATE USE_REVERB)
+endif()
+
+if(USE_LIMITER)
+    target_compile_definitions(pikopd.elf PRIVATE USE_LIMITER)
 endif()
 
 target_link_libraries(pikopd.elf PRIVATE
