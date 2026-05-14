@@ -1,12 +1,10 @@
-
-# Toolchain setup
+# Toolchain Setup
 
 ## Python 3.10+ 
 
   - jinja2
 
-
-## Cmake and arm-none-eabi-gcc
+## CMake and arm-none-eabi-gcc
 
 ### Mac:
 ```bash
@@ -15,7 +13,7 @@ brew install git
 xcode-select --install  
 brew install arm-none-eabi-gcc
 ```
-If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version
+If you encounter *nosys.specs* error  after installation of the arm-none-eabi-gcc homebrew version:
 
 ```bash
 brew uninstall --force arm-none-eabi-gcc
@@ -23,7 +21,7 @@ brew uninstall --force arm-none-eabi-binutils
 brew install gcc-arm-embedded
 ```
 
-I would suggest to use ARM version
+I recommend using the official ARM toolchain.
 
 Download:  
 [https://developer.arm.com/downloads/-/a ... -downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
@@ -62,7 +60,7 @@ export PICO_SDK_PATH=/your_path/pico-sdk
 
 ## pico-extras 
 
-Must be places inside the pico-sdk folder.
+Must be placed inside the pico-sdk folder.
 
 ```bash
 cd pico-sdk  
@@ -89,30 +87,34 @@ make -j8
 sudo make install
 ```
 
-## Usage
-
-Enter bootloader mode by holding device boot button
-
-```
-python3 pikopd.py patches/heavy.pd project_name 
-
-optional arguments:
-  -h, --help           Show help message and exit
-  -b, --board          Path to custom json configuration file
-  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot
-  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
-  -v, --verbose        Enable verbose compiler console debug output
-```
-
-
-# Hardware configuration
+# Hardware Configuration
 
 Hardware configuration is done by adjusting the `board.json` file.  
 This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mapped to GPIO pins and how it behaves.
 
+Set in `board.json`:
+  
+    - board (pico, pico_w, zero, pico2)
+    - core frequency
+    - sample rate
+    - audio mode (I2S, PWM) and pins
+    - voice count
+    - led (pwm, rgb and mode)
+    - adc pins (knob, cv_in)
+    - rotary encoder 
+    - gate in/out (gate or trigger)
+    - button (bang, toggle, switch)
+    - joystick and range (regular or midi 1-127)
+    - midi mode (uart, usb, host)
+      - uart (pins tx 0, rx 1 )
+    - debug console
+    - sensors
+      - cny70
+      - mpr121
+    - masterfx (delay, limiter)
 
-## Audio setup
+
+## Audio Setup
 
 - I2S (PCM5102)
   
@@ -149,7 +151,7 @@ TOGGLE:	Latch (On/Off)
 SWITCH:	Press & Release (Momentary)  
 BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
-## ADC Inputs
+## ADC 
 
 ```json
 "adc_pins": [
@@ -160,9 +162,11 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 
 | Type    | Description                                             |
 | ------- | ------------------------------------------------------- |
-| `knob`  | Standard analog control such as a knob or potentiometer |
-| `cv_in` | Control voltage input for external analog signals       |
+| `knob`  | Analog control such as a potentiometer (smoothed) |
+| `cv_in` | Control voltage input for external analog signals (0–3.3V)       |
 
+
+Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc.
 
 ## LED 
 
@@ -225,20 +229,20 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
-# Sensors
+## Sensors
 
 
-## MPR121
+## MPR121 
 
 ```json
 "sensors": {
       "mpr121": [
-        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 3, "addr_index": 0 },
+        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 6, "addr_index": 0 },
         { "name": "mpr2", "i2c_bus": "i2c1", "sda": 6, "scl": 7, "irq": 8, "addr_index": 0 }
       ]
     }
 ```
-PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more mpr121 on the same i2c bus you will have to phisically change it's adress and set *addr_index*: 
+PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2c buses. To use two or more MPR121 on the same i2c bus you will have to physically change it's adress and set *addr_index*: 
 
 1. 0x5A,
 2. 0x5B,
@@ -250,7 +254,20 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-## CNY70
+## HC-SR04 
+
+```json
+  "sensors": {
+       "hc-sr04": [
+        { "name": "distance", "trigger": 2, "echo": 3}
+      ]
+    }
+ ```
+
+PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
+
+
+## CNY70 
 
 
 ```json
@@ -271,8 +288,87 @@ When you place a finger or an object in front of the sensor (within a few millim
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
+# Display
 
-# Polyphonic input
+```json
+  "display": {
+      "enabled": true,
+      "driver": "ssd1306",
+      "i2c_bus": "i2c0",
+      "sda": 4,
+      "scl": 5,
+      "width": 128,
+      "height": 64,
+      "mode": "console"
+    },
+```
+
+PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
+
+1. console - outputs adjusted parameter [print] object.
+2. pd - outputs first 4 [print] objects as dashboard.
+
+# Project Configuration
+
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Tested on macOS.
+
+```
+workspace/
+├── pico-sdk/
+│   └── pico-extras/
+├── picotool/
+├── pikoPD/
+│   ├── docs/
+│   ├── lib/
+│   │   └── heavylib/
+│   ├── patches/           # pd patches folder
+│   ├── src/               # hardware config source files
+│   ├── templates/
+│   │   └── main.cpp       # template 
+│   ├── project/
+│   │   ├── build/         # build folder (uf2 file here)   
+│   │   ├── hvcc/          # hvcc compiler generated files
+│   │   ├── src/             
+│   │   └── CMakeLists.txt  
+│   ├── board.json         # user config file
+│   └── pikopd.py          # pikopd script
+```
+
+## Build
+
+pikopd.py
+
+- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
+- Copies config files into project folder from `/src`
+- Configures hardware using `board.json`
+- Uses main.cpp as a project template
+- Builds firmware using **CMake** in a `build/` folder  
+- Checks for device in BOOTSEL mode
+- Flashes UF2 firmware to PICO board and restarts device
+
+Enter bootloader mode by holding device boot button
+
+```
+python3 pikopd.py patches/heavy.pd project_name 
+
+optional arguments:
+  -h, --help           Show help message and exit
+  -b, --board          Path to custom json configuration file
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -v, --verbose        Enable verbose compiler console debug output
+```
+
+
+
+# Polyphonic Input
 
 The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
 
@@ -295,29 +391,92 @@ Check example in the patch folder.
 ```
 Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 
-| CC Number | Parameter              | 
-|-----------|------------------------|
-| 7         | Master Volume          | 
-| 8        | Limiter Bypass         | 
-| 90        | Delay Time             |
-| 91        | Delay Send Level       | 
-| 92        | Delay Feedback Amount  |
-| 93        | Delay Bypass           | 
-| 120       | Debug Toggle           | 
+| CC Number | Parameter               |
+|----------:|-------------------------|
+| 7         | Master Volume           |
+| 8         | Limiter Bypass          |
+| 90        | Delay Time              |
+| 91        | Delay Send Level        |
+| 92        | Delay Feedback Amount   |
+| 93        | Delay Bypass            |
+| 94        | Reverb Mix              |
+| 95        | Reverb Room Size        |
+| 96        | Reverb Damping          |
+| 97        | Reverb Width            |
+| 98        | Reverb Pre-delay        |
+| 99        | Reverb Bypass           |
+| 120       | Debug Toggle            |
 
-You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. I added a simple delay utilising delayline from DaisySP library. You can use your own fx by adding code to audioFunc after the pd audio processing in the main.cpp.  
+You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. 
 
-
-# Sample loading
+# Sample Loading
 
 Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
+# Serial Monitor 
 
-# Useful links
+```json
+  "console": true
+```
 
-- About HVCC compiler  
+Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
+
+
+# WEB Control and OSC
+
+```json
+ "web": {
+    "enabled": true,
+    "active_mode": 0,
+    "ap": {
+      "mode_id": 0,
+      "ssid": "pikoPD",
+      "password": "12345678"
+    },
+    "sta": {
+      "mode_id": 1,
+      "ssid": "",
+      "password": ""
+    },
+    "mdns_name": "pikopd",
+    "http_port": 80,
+    "osc_enabled": false,
+    "osc_port": 8000
+  }
+```
+
+PikoPD supports WEB and OSC protocols for the PICO boards with WIFI chips. 
+
+See `patches/web.pd`
+
+## Web
+- To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
+
+At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside PD.   
+
+After device connects to wifi open pikopd.local in the browser. 
+
+For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.shtml` and than run `makefsdata.py`.   
+After that put generated `htmldata.c` inside `/src/web` and rebuild. 
+
+## OSC
+- To receive OSC messages use PD objects with keyword OSC - [r osc @hv_param]  
+- To send messages to the device use [s osc @hv_param]  
+
+To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
+
+# WEB Config Tool
+
+Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).    
+Upload your .pd patch to see available parameters or load board.json configuration file.    
+Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
+Export the board.json and place it in the pikoPD folder.    
+
+# Useful Links
+
+- About hvcc compiler  
   https://wasted-audio.github.io/hvcc/
-- Supported vanilla objects  
+- Hvcc supported PD objects  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
