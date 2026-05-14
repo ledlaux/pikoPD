@@ -21,6 +21,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [MPR121](#mpr121)
     - [HC-SR04](#hc-sr04)
     - [CNY70](#cny70)
+  - [Display](#display)
 - [Project Configuration](#project-configuration)
   - [Build](#build)
 - [Polyphonic Input](#polyphonic-input)
@@ -29,7 +30,6 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 - [Serial Monitor](#serial-monitor) 
 - [Web Config Tool](#web-config-tool)
 - [Web Control and OSC](#web-control-and-osc)
-- [Screen](#screen)
 - [Useful Links](#useful-links)
 
 
@@ -325,6 +325,25 @@ When you place a finger or an object in front of the sensor (within a few millim
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
+# Display
+
+```json
+  "display": {
+      "enabled": true,
+      "driver": "ssd1306",
+      "i2c_bus": "i2c0",
+      "sda": 4,
+      "scl": 5,
+      "width": 128,
+      "height": 64,
+      "mode": "console"
+    },
+```
+
+PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
+
+1. console - outputs adjusted [print] parameter.
+2. pd - outputs 4 parameters (dashboard) by using [s screen @hv_param] objects.  
 
 # Project Configuration
 
@@ -335,7 +354,6 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 - Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - Tested on macOS.
-
 
 ```
 workspace/
@@ -358,8 +376,6 @@ workspace/
 │   ├── board.json         # user config file
 │   └── pikopd.py          # pikopd script
 ```
-
-
 
 ## Build
 
@@ -493,27 +509,6 @@ After that put generated `htmldata.c` inside `/src/web` and rebuild.
 - To send messages to the device use [s osc @hv_param]  
 
 To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
-
-# Screen
-
-```json
-  "display": {
-      "enabled": true,
-      "driver": "ssd1306",
-      "i2c_bus": "i2c0",
-      "sda": 4,
-      "scl": 5,
-      "width": 128,
-      "height": 64,
-      "mode": "console"
-    },
-```
-
-PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
-
-1. console - outputs adjusted [print] parameter.
-2. pd - outputs 4 parameters (dashboard) by using [s screen @hv_param] objects.  
-
 
 # Useful Links
 
