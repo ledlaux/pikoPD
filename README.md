@@ -114,16 +114,7 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 
 ## Patch 2  
 
-**Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay lines.
-
-
-
-
-
-
-
-
-
+**Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay.
 
 
 ## Useful links
