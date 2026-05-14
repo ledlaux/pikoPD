@@ -16,12 +16,12 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] adc
 - [x] encoder
 - [x] joystick
+- [x] gate in/out
 - [x] sensors
 - [x] uart midi
 - [x] usb midi
 - [x] usb midi host
 - [x] midi clock
-- [x] gate in/out
 - [x] i2s audio
 - [x] pwm audio
 - [x] web interface
