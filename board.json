@@ -78,7 +78,7 @@
   },
 
   "display": {
-      "enabled": true,
+      "enabled": false,
       "driver": "ssd1306",
       "i2c_bus": "i2c0",
       "sda": 0,
