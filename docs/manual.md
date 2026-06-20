@@ -229,10 +229,10 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - `[mod]` wraps the value into a fixed range 
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
-# Sensors
+## Sensors
 
 
-## MPR121 
+### MPR121 
 
 ```json
 "sensors": {
@@ -254,7 +254,7 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-## HC-SR04 
+### HC-SR04 
 
 ```json
   "sensors": {
@@ -267,7 +267,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
 
 
-## CNY70 
+### CNY70 
 
 
 ```json
@@ -288,7 +288,7 @@ When you place a finger or an object in front of the sensor (within a few millim
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
-# Display
+## Display
 
 ```json
   "display": {
