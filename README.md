@@ -27,6 +27,7 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 - [x] web & osc
 - [x] display
 - [ ] sd card
+- [ ] audio input
 - [ ] bluetooth midi
 
 
