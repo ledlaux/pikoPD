@@ -8,6 +8,8 @@ The core logic of the system has been implemented, although considerable amount 
 
 For a hardware configuration you can use interactive **web config tool**: [Live Demo](https://ledlaux.github.io/pikoPD).
 
+Read the [manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md) for  detailed instructions.
+
 
 ## Features
 
@@ -32,8 +34,6 @@ For a hardware configuration you can use interactive **web config tool**: [Live 
 
 
 ## Project configuration
-
-[Manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 
 - PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 - All hardware configuration is done using `board.json` file.
