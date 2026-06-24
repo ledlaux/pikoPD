@@ -1,6 +1,6 @@
 # pikoPD(v0.0.1)
 
-Automate building of **Pure Data patches** (`.pd`) into a **UF2** firmware using **HVCC compiler** and **Raspberry Pi Pico C/C++ SDK**.   
+Automate building of **Pure Data patches** (`.pd`) into a **UF2** firmware using **HVCC compiler** and **Raspberry Pi Pico C/C++ SDK** using python script. 
 
 The goal of the project is to develop  interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and PD, providing an interactive workflow for creating embedded audio and MIDI tools.
 
