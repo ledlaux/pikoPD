@@ -14,7 +14,8 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 ## Features
 
 - [x] led
-- [x] adc
+- [x] knob
+- [x] cv in 
 - [x] button
 - [x] encoder
 - [x] joystick
@@ -28,6 +29,7 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 - [x] midi clock
 - [x] web & osc
 - [x] display
+- [ ] cv out
 - [ ] sd card
 - [ ] audio input
 - [ ] bluetooth midi
