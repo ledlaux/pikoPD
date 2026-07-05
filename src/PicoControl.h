@@ -393,18 +393,39 @@ namespace Pico {
     inline bool processCNY70(int i, float &outVal, float &rawOut) {
         if (i < 0 || i >= n_cny70) return false;
         auto &s = cny70[i];
+    
         adc_select_input(s.adc_ch);
         uint32_t sum = 0;
-        for(int j = 0; j < 16; j++) sum += adc_read();
-        float raw10 = (float)sum / 64.0f; 
-        rawOut = raw10; 
-        float current_norm = (raw10 > (float)s.threshold) ? fminf(1.0f, (raw10 - (float)s.threshold) / fmaxf(1.0f, (float)s.max_sensor - (float)s.threshold)) : 0.0f;
-        if (s.last_val < -0.5f) { s.smooth_value = current_norm; s.last_val = 0.0f; }
-        else s.smooth_value += (current_norm - s.smooth_value) * s.alpha;
+        for (int j = 0; j < 16; j++) {
+            sum += adc_read();
+        }
+        
+        // Average of 16 samples scaled up to 12-bit ADC range equivalent (sum / 16.0f * 4.0f)
+        rawOut = (float)sum / 64.0f; 
+    
+        // Calculate normalized value above threshold
+        float current_norm = 0.0f;
+        if (rawOut > (float)s.threshold) {
+            float range = fmaxf(1.0f, (float)s.max_sensor - (float)s.threshold);
+            current_norm = fminf(1.0f, (rawOut - (float)s.threshold) / range);
+        }
+    
+        // Exponential moving average filter
+        if (s.last_val < -0.5f) {
+            s.smooth_value = current_norm;
+            s.last_val = 0.0f;
+        } else {
+            s.smooth_value += (current_norm - s.smooth_value) * s.alpha;
+        }
+    
+        // Dead-zone and boundary check to trigger updates
         float dz = (float)s.dead_zone * 0.001f;
         if (fabsf(s.smooth_value - s.last_val) > dz || s.smooth_value == 0.0f || s.smooth_value == 1.0f) {
-            s.last_val = s.smooth_value; outVal = s.smooth_value; return true;
+            s.last_val = s.smooth_value;
+            outVal = s.smooth_value;
+            return true;
         }
+    
         return false;
     }
 
