@@ -285,7 +285,9 @@ Sensor contains two main parts inside its square plastic housing:
   
 When you place a finger or an object in front of the sensor (within a few millimeters), the IR light reflects off the object and hits the receiver. The sensor then outputs a voltage based on how much light is reflected. 
 
-Because there are multiple manufacturers of these sensors, the pin layouts and wiring can differ. Refer to this 3.3V common wiring [scheme](https://app.cirkitdesigner.com/project/fa619fa3-0145-456f-aaa3-b2f01b14e3e7) for Raspberry Pi Pico boards. Note that because infrared light is invisible to the human eye, you will need to look at the LED through a smartphone camera lens to verify that it is turned on and glowing.
+Because there are multiple manufacturers of these sensors, the pin layouts and wiring can differ. Refer to this 3.3V common wiring [scheme](https://app.cirkitdesigner.com/project/fa619fa3-0145-456f-aaa3-b2f01b14e3e7) for Raspberry Pi Pico boards. 
+
+Note that because infrared light is invisible to the human eye, you will need to look at the LED through a smartphone camera lens to verify that it is turned on and glowing.
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
