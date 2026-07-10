@@ -148,6 +148,7 @@ Set in `board.json`:
     - sensors
       - cny70
       - mpr121
+      - hc-sr04
     - masterfx (delay, limiter)
 
 
