@@ -57,7 +57,7 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
 - pico-extras
 - picotool
 
-Toolchain setup instructions can be found in the manual.
+Toolchain setup instructions can be found in the [manual](https://github.com/ledlaux/pikoPD/blob/develop/docs/manual.md)
  
 ## Build
 
