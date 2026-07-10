@@ -149,7 +149,7 @@ Set in `board.json`:
       - cny70
       - mpr121
       - hc-sr04
-    - masterfx (delay, limiter)
+    - masterfx (delay, reverb, limiter)
 
 
 ## Audio Setup
