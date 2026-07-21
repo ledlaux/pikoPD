@@ -2031,6 +2031,12 @@ function refreshUI() {
         [0, 1].forEach(p => document.getElementById(`pin-${p}`)?.classList.add('audio-reserved'));
     }
 
+    const debugCheckbox = document.getElementById('debug-mode');
+    if (debugCheckbox) {
+        debugCheckbox.checked = config.console;
+    }
+}
+
     config.inputs.adc_pins.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-adc');
     });
