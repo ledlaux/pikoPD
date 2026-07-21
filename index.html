@@ -2035,7 +2035,6 @@ function refreshUI() {
     if (debugCheckbox) {
         debugCheckbox.checked = config.console;
     }
-}
 
     config.inputs.adc_pins.forEach(i => {
         document.getElementById(`pin-${i.pin}`)?.classList.add('assigned-adc');
