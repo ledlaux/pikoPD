@@ -1,12 +1,14 @@
 # pikoPD(v0.0.1)
 
-Automate building of **Pure Data patches** (`.pd`) into a **UF2** firmware using **HVCC compiler** and **Raspberry Pi Pico C/C++ SDK** using python script. 
+This project provides a hardware abstraction layer for developing embedded audio, MIDI, and interactive hardware applications with the **Pure Data** environment on **Raspberry Pi Pico** boards. 
 
-This project provides a hardware abstraction layer linking the Raspberry Pi Pico and its peripherals to Pure Data, streamlining the creation of interactive embedded audio and MIDI tools.
+It automates the conversion of `.pd` patches into **UF2 firmware** using the **HVCC compiler** and **Pico C/C++ SDK**.
 
-The core logic of the system has been implemented, although considerable amount of testing remains. Development is ongoing to expand features and hardware support. 
+Hardware configuration is managed through a simple configuration file defining hardware, pins, and peripherals. While the build system, combining Python automation and CMake, handles code generation, patch conversion, firmware compilation, and uploading to the target board.
 
-For a hardware configuration you can use interactive **web config tool**: [Live Demo](https://ledlaux.github.io/pikoPD).
+This is a solo hobby project. AI is used as a development assistant for code generation, while the design, feature concepts, hardware integration and testing are carried out by the project author. 
+
+PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware.
 
 Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) for  detailed instructions.
 
@@ -35,18 +37,6 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - [ ] bluetooth midi
 
 
-## Project configuration
-
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- All hardware configuration is done using `board.json` file.
-- Check PD patch examples in the folder.
-- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.   
-- Tested on macOS.
-
-
 ## Requirements
 
 - Python 3.10+
@@ -58,6 +48,17 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - picotool
 
 Toolchain setup instructions can be found in the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md).
+
+## Project configuration
+
+- PikoPD supports HVCC compatible vanilla PD and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Hardware configuration is done using `board.json` file or interactive [web config tool](https://ledlaux.github.io/pikoPD).
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Check PD patch examples in the folder.
+- Tested on macOS.
  
 ## Build
 
@@ -83,7 +84,7 @@ optional arguments:
   -h, --help           Show help message and exit
   -b, --board          Path to custom json configuration file
   -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot
+  -s, --serial         Open serial console after reboot (works only on MAC)
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
