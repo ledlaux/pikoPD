@@ -290,8 +290,8 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
     }
 
     uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;
-    float f_chan = (float)chan + 1.0f; 
+    uint8_t chan = status & 0x0F;  // Hardware channel (0-15)
+    float f_chan = (float)chan + 1.0f;  // Converted to human channel (1-16) for Pd
 
     switch(type) {
         case 0x90: { 
@@ -352,13 +352,13 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
                 case 99: masterFX.reverb_bypass = !is_on; break;
                 {%- endif %}
             }
-            hv_send_msg3_lock(HV_CTLIN_HASH, (float)data2, (float)data1, (float)chan);
+            hv_send_msg3_lock(HV_CTLIN_HASH, (float)data2, (float)data1, f_chan);
             break;
         }
 
         case 0xE0: { 
             int bend = (data2 << 7) | data1;
-            hv_send_msg2_lock(HV_BENDIN_HASH, (float)bend, (float)chan);
+            hv_send_msg2_lock(HV_BENDIN_HASH, (float)bend, f_chan);
             break;
         }
     }
@@ -367,8 +367,11 @@ void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t midiMsg[3] = {0, 0, 0};
-    int humanChannel = (hv_msg_getNumElements(m) >= 3) ? (int)hv_msg_getFloat(m, 2) : 1;
-    int zeroBasedCh = (humanChannel < 1) ? 0 : (humanChannel > 16) ? 15 : humanChannel - 1;
+    
+    // Heavy passes the channel as 0-indexed (0-15)
+    int zeroBasedCh = (hv_msg_getNumElements(m) >= 3) ? (int)hv_msg_getFloat(m, 2) : 0;
+    
+    zeroBasedCh = std::clamp(zeroBasedCh, 0, 15);
 
     if (receiverHash == HV_NOTEOUT_HASH) {
         int note = (int)hv_msg_getFloat(m, 0);
