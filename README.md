@@ -6,12 +6,11 @@ It automates the conversion of `.pd` patches into **UF2 firmware** using the **H
 
 Hardware configuration is managed through a simple configuration file defining hardware, pins, and peripherals. While the build system, combining Python automation and CMake, handles code generation, patch conversion, firmware compilation, and uploading to the target board.
 
-This is a solo hobby project. AI is used as a development assistant for code generation, while the design, feature concepts, hardware integration and testing are carried out by the project author. 
+This is a solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
 
-PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware.
+PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware. Feel free to open issues, start discussions, or join the development!
 
-Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) for  detailed instructions.
-
+Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) for detailed instructions.
 
 ## Features
 
@@ -49,16 +48,15 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 
 Toolchain setup instructions can be found in the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md).
 
-## Project configuration
+## Configuration
 
-- PikoPD supports HVCC compatible vanilla PD and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Hardware configuration is done using `board.json` file or interactive [web config tool](https://ledlaux.github.io/pikoPD).
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
 - Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Use HVCC compatible vanilla PD and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Check PD patch examples in the folder.
-- Tested on macOS.
  
 ## Build
 
@@ -84,7 +82,7 @@ optional arguments:
   -h, --help           Show help message and exit
   -b, --board          Path to custom json configuration file
   -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot (works only on MAC)
+  -s, --serial         Open serial console after reboot (works only on macOS)
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
