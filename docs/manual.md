@@ -25,8 +25,8 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - [Display](#display)
 - [Project Configuration](#project-configuration)
   - [Build](#build)
-- [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
+- [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
 - [Serial Monitor](#serial-monitor) 
 - [Web Control and OSC](#web-control-and-osc)
@@ -126,7 +126,18 @@ sudo make install
 ```
 # Architecture
 
-To be updated...
+`pikoPD` separates audio processing from hardware control by using both cores of the Raspberry Pi PICO/PICO2:
+
+### Core 0 — Hardware & Control
+* Reads buttons, sensors, GPIO, and analog inputs using polling and PIO.
+* Handles ADC/CV inputs and MIDI communication.
+* Maps hardware controls to Pure Data patch parameters.
+
+### Core 1 — Audio Engine
+* Runs the compiled HVCC Pure Data audio code.
+* Handles real-time audio generation without interruptions.
+* Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
+* Provides stable audio performance with low jitter and fewer dropouts.
 
 # Hardware Configuration
 
@@ -410,22 +421,6 @@ optional arguments:
   -v, --verbose        Enable verbose compiler console debug output
 ```
 
-
-
-# Polyphonic Input
-
-The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
-
-To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
-
-To use the custom system:  
-1. Set **voice count** to 2 or more in `board.json`.  
-2. Add `[NOTE1, [NOTE2]...` objects for each voice.
-4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
-
-Check example in the patch folder. 
-
-
 # MIDI 
 
 ```json
@@ -452,6 +447,20 @@ Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 | 120       | Debug Toggle            |
 
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. 
+
+
+# Polyphonic Input
+
+The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
+
+To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
+
+To use the custom system:  
+1. Set **voice count** to 2 or more in `board.json`.  
+2. Add `[NOTE1, [NOTE2]...` objects for each voice.
+4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
+
+Check example in the patch folder. 
 
 # Sample Loading
 
