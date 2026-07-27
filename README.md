@@ -1,4 +1,4 @@
-# pikoPD(v0.0.1)
+# pikoPD
 
 This project provides a hardware abstraction layer for developing embedded audio, MIDI, and interactive hardware applications with the **Pure Data (Pd)** environment on **Raspberry Pi Pico** boards. 
 
