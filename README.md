@@ -37,7 +37,7 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 
 # Architecture
 
-`pikoPD` separates audio processing from hardware control by using both cores of the Raspberry Pi PICO/PICO2:
+PikoPD takes advantage of the Pico and Pico 2 multicore processing:
 
 ### Core 0 — Hardware & Control
 * Reads buttons, sensors, GPIO, and analog inputs using polling and PIO.
