@@ -10,6 +10,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 
 ## Table of Contents
 - [Toolchain Setup](#toolchain-setup)
+- [Architecture](#architecture)
 - [Hardware Configuration](#hardware-configuration)
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
@@ -123,6 +124,9 @@ cmake .. -DPICO_SDK_PATH=$PICO_SDK_PATH
 make -j8
 sudo make install
 ```
+# Architecture
+
+To be updated...
 
 # Hardware Configuration
 
