@@ -35,6 +35,21 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - [ ] audio input
 - [ ] bluetooth midi
 
+# Architecture
+
+`pikoPD` separates audio processing from hardware control by using both cores of the Raspberry Pi PICO/PICO2:
+
+### Core 0 — Hardware & Control
+* Reads buttons, sensors, GPIO, and analog inputs using polling and PIO.
+* Handles ADC/CV inputs and MIDI communication.
+* Maps hardware controls to Pure Data patch parameters.
+
+### Core 1 — Audio Engine
+* Runs the compiled HVCC Pure Data audio code.
+* Handles real-time audio generation without interruptions.
+* Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
+* Provides stable audio performance with low jitter and fewer dropouts.
+
 
 ## Requirements
 
