@@ -6,7 +6,7 @@ It automates the conversion of `.pd` patches into **UF2 firmware** using the **H
 
 Hardware configuration is managed through a simple configuration file defining hardware, pins, and peripherals. While the build system, combining Python automation and CMake, handles code generation, patch conversion, firmware compilation, and uploading to the target board.
 
-This is a solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
+This started as solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
 
 PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware. Feel free to open issues, start discussions, or join the development!
 
