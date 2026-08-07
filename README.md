@@ -47,9 +47,11 @@ PikoPD takes advantage of the Pico and Pico 2 multicore processing:
 ## Requirements
 
 - Python 3.10+
-  - jinja2
+  - Jinja2
 - arm-none-eabi toolchain
-- Heavy compiler (hvcc)
+- CMake
+- Ninja
+- Heavy compiler (HVCC)
 - Raspberry Pi Pico SDK
 - pico-extras
 - picotool
