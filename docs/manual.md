@@ -44,11 +44,12 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - jinja2
 
 
-## CMake and arm-none-eabi-gcc
+## CMake, Ninja and arm-none-eabi-gcc
 
 ### Mac:
 ```bash
 brew install cmake
+brew install ninja
 brew install git  
 xcode-select --install  
 brew install arm-none-eabi-gcc
@@ -72,7 +73,7 @@ echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PA
 ```
 ### Linux:  
 ```bash
-sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
+sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib ninja
 ```  
 
 ## Heavy compiler (hvcc) 
