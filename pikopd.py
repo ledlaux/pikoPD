@@ -334,7 +334,7 @@ class PicoUF2Generator:
         self.print_progress(0.7, "Configuring CMake")
 
         cmake_cmd = [
-            "cmake", "-G", "Unix Makefiles",
+            "cmake", "-G", "Ninja",
             f"-DPICO_SDK_PATH={sdk}",
             f"-DPICO_BOARD={sdk_target}",
             f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
@@ -392,7 +392,7 @@ class PicoUF2Generator:
 
         # 7. Compilation & Flash
         self.print_progress(0.85, "Compiling")
-        self.run_cmd(["make", "-j10"], cwd=self.build_dir, step_name="Make")
+        self.run_cmd(["ninja", "-j10"], cwd=self.build_dir, step_name="Ninja")
 
         flash_success = False
         if flash:
