@@ -15,6 +15,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
   - [ADC](#adc)
+  - [DAC](#dac)
   - [LED](#led)
   - [Joystick](#joystick)
   - [Encoder](#encoder)
@@ -22,6 +23,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [MPR121](#mpr121)
     - [HC-SR04](#hc-sr04)
     - [CNY70](#cny70)
+    - [HX710](#hx710)
   - [Display](#display)
 - [Project Configuration](#project-configuration)
   - [Build](#build)
@@ -153,6 +155,7 @@ Set in `board.json`:
     - voice count
     - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
+    - dac pins (cv out, v/oct)
     - rotary encoder 
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
@@ -161,9 +164,12 @@ Set in `board.json`:
       - uart (pins tx 0, rx 1 )
     - debug console
     - sensors
-      - cny70
+      - cny70 
       - mpr121
       - hc-sr04
+      - hx710
+    - display
+    - web & OSC 
     - masterfx (delay, reverb, limiter)
 
 
@@ -218,8 +224,36 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `knob`  | Analog control such as a potentiometer (smoothed) |
 | `cv_in` | Control voltage input for external analog signals (0–3.3V)       |
 
+! Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc (will be added in near future).
 
-Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc.
+
+## DAC
+
+```json
+"outputs": {
+    "mcp4725": [
+      {
+        "name": "note_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "note"
+      },
+      {
+        "name": "cv_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "cv"
+      }
+    ]
+  }
+```
+
+| Type    | Description                                             |
+| ------- | ------------------------------------------------------- |
+| `cv`  | Directly outputs a 0.0 to 3.3V control voltage based on floating-point input values (0.0 to 1.0).  |
+| `note_out` | Converts MIDI note numbers (36.0 to 96.0) into standard Volt-per-Octave pitch control voltages.    |
+
+Create objects `s cv_out @hv_param` or `s note_out @hv_param` inside the PD patch for coresponding mode. 
 
 ## LED 
 
@@ -248,7 +282,6 @@ PikoPD boards support 4 LED modes.
 | Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
 
 Code supports up to 12 different led connection.
-
 
 **RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
 Use `[pack f f]` object before `[s ledRGB]` to send 2 values. 
@@ -285,7 +318,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ## Sensors
 
 
-### MPR121 
+### MPR121 - Touch sensor
 
 ```json
 "sensors": {
@@ -307,7 +340,7 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-### HC-SR04 
+### HC-SR04 - Distance sensor
 
 ```json
   "sensors": {
@@ -320,7 +353,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
 
 
-### CNY70 
+### CNY70 - Optical sensor
 
 
 ```json
@@ -342,6 +375,31 @@ When you place a finger or an object in front of the sensor (within a few millim
 Because there are multiple manufacturers of these sensors, the pin layouts and wiring can differ. Refer to this 3.3V common wiring [scheme](https://app.cirkitdesigner.com/project/fa619fa3-0145-456f-aaa3-b2f01b14e3e7) for Raspberry Pi Pico boards. Note that because infrared light is invisible to the human eye, you will need to look at the LED through a smartphone camera lens to verify that it is turned on and glowing.
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
+
+### HX710 - Air pressure sensor
+
+```json
+"sensors": {
+      "hx710": [
+        {
+          "name": "air",
+          "sck_pin": 2,
+          "dout_pin": 3,
+          "min_raw": 800000,
+          "max_raw": 1200000,
+          "fall_factor": 0.95,
+          "send_interval": 50,
+          "rise_step": 1,
+          "mode": "midi"
+        }
+      ]
+    }
+```
+
+The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors (such as the UPC barometric pressure sensors) for touchless breath, wind, or pressure control. Calibration Parameters: min_raw and max_raw define the expected raw sensor boundaries to normalize output values. Filtering & Smoothing: Includes adjustable fall_factor, rise_step, and send_interval parameters to smooth erratic pressure fluctuations and manage data transmission rates.
+
+Mode Selection: Supports both raw ("RAW) and MIDI mapping options.
+
 
 ## Display
 

@@ -9,18 +9,20 @@ class PicoUF2Generator:
         self.project_root = os.path.abspath(project_root)
         self.verbose = verbose
         self.templates = os.path.join(self.script_dir, "templates")
+        
         if src_dir is None:
             self.src_dir = os.path.join(self.script_dir, "src")
         else:
             self.src_dir = os.path.abspath(src_dir)
-        self.c_dir = os.path.join(self.project_root, "src")
+            
+        self.c_dir = self.project_root
         self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
         self.hvcc_dir = os.path.join(self.project_root, "hvcc")
         self.build_dir = os.path.join(self.project_root, "build")
         self.ir_json = os.path.join(self.hvcc_dir, f"{self.patch_name}.heavy.ir.json")
         self.manifest_out = os.path.join(self.hvcc_dir, f"{self.patch_name}_manifest.json")
         self.hv_lib_path = os.path.abspath(os.path.join(self.project_root, "../lib", "heavylib"))
-        
+
     def print_logo(self):
         logo = r"""
            _  _           _____  _____  
@@ -28,7 +30,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040|RP2350  v0.0.1 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.2 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
@@ -78,7 +80,7 @@ class PicoUF2Generator:
                 "No accessible RP-series devices" not in res.stdout
                 and res.returncode == 0
             )
-        except:
+        except Exception:
             return False
 
     def open_serial(self):
@@ -118,7 +120,8 @@ class PicoUF2Generator:
 
         control = data.get("control", {})
         for r_name, r_body in control.get("receivers", {}).items():
-            if "__hv_" in r_name: continue
+            if "__hv_" in r_name:
+                continue
             manifest["receives"].append({
                 "name": r_name,
                 "hash": r_body.get("hash", "0")
@@ -129,10 +132,10 @@ class PicoUF2Generator:
             args = obj_body.get("args", {})
             
             name = args.get("name") or args.get("label")
-            if not name or "__hv_" in name: continue
+            if not name or "__hv_" in name:
+                continue
 
             obj_hash = args.get("hash", "0")
-
             entry = {"name": name, "hash": obj_hash}
 
             if t == "__send":
@@ -161,7 +164,6 @@ class PicoUF2Generator:
                     src = os.path.join(root, f)
                     dst = os.path.join(self.hvcc_dir, f)
 
-                    # overwrite if newer
                     if not os.path.exists(dst) or (
                         os.path.getmtime(src) > os.path.getmtime(dst)
                     ):
@@ -171,11 +173,11 @@ class PicoUF2Generator:
 
     def samples_inflash(self):
         """Finds generated Heavy tables and adds 'static const' to move them to Flash."""
-        # Find the main generated C++ file (usually Heavy_patchname.cpp)
         cpp_file = os.path.join(self.hvcc_dir, f"Heavy_{self.patch_name}.cpp")
         
         if not os.path.exists(cpp_file):
-            if self.verbose: print(f"Warning: {cpp_file} not found for patching.")
+            if self.verbose:
+                print(f"Warning: {cpp_file} not found for patching.")
             return
 
         with open(cpp_file, 'r') as f:
@@ -184,7 +186,6 @@ class PicoUF2Generator:
         patched = False
         with open(cpp_file, 'w') as f:
             for line in lines:
-                # Target the hTable definitions
                 if line.startswith("float hTable") and "[" in line:
                     f.write("static const " + line)
                     patched = True
@@ -221,7 +222,7 @@ class PicoUF2Generator:
 
         # 2. Load Configuration
         self.print_progress(0.3, "Setup")
-        settings = {"pico_board": "pico2", "midi_mode": "usb"} # Default base settings
+        settings = {"pico_board": "pico2", "midi_mode": "usb"}
 
         config_filename = board_config if board_config else "board.json"
         config_path = os.path.join(self.script_dir, config_filename)
@@ -235,48 +236,82 @@ class PicoUF2Generator:
             
         print(f"\033[32m  -> Using config: {config_filename}\033[0m")
 
-        # 1. Prepare
+        # 3. Parse Configurations and Feature Flags
+        # 3. Parse Configurations and Feature Flags
+        masterfx = settings.get("masterfx") or {}
+        inputs = settings.get("inputs") or {}
+        sensors = inputs.get("sensors") or {}
+        web_config = settings.get("web") or {}
+        display_config = settings.get("display") or {}
 
         midi_mode = midi_host if midi_host else settings.get("midi_mode")
-        web_enabled = settings.get("web", {}).get("enabled", False)
-        display_enabled = settings.get("display", {}).get("enabled", False)
-        sensors = settings.get("sensors", {})
-        distance_enabled = len(sensors.get("hc-sr04", [])) > 0
-        mpr121_enabled = len(settings.get("sensors", {}).get("mpr121", [])) > 0
-        masterfx = settings.get("masterfx", {})
+        web_enabled = web_config.get("enabled", False)
+        display_enabled = display_config.get("enabled", False)
 
-        # Determine which folder to ignore based on web status
+        # Strictly check that the sensor list exists AND has items inside it
+        distance_enabled = isinstance(sensors.get("hc-sr04"), list) and len(sensors.get("hc-sr04")) > 0
+        cny_enabled = isinstance(sensors.get("cny70"), list) and len(sensors.get("cny70")) > 0
+        mpr121_enabled = isinstance(sensors.get("mpr121"), list) and len(sensors.get("mpr121")) > 0
+        air_enabled = isinstance(sensors.get("hx710"), list) and len(sensors.get("hx710")) > 0
 
-        ignore_list = []
+        # Build Ignore List for File Copying
+        ignored_patterns = set()
+
         if web_enabled:
-            ignore_list.append("usb")  # Web and USB are mutually exclusive
+            ignored_patterns.add("usb")
         else:
-            ignore_list.append("web")
+            ignored_patterns.add("web")
 
         if not display_enabled:
-            ignore_list.append("screen")
+            ignored_patterns.add("screen")
 
-        # 2. Sync files
+        if not distance_enabled:
+            ignored_patterns.update(["hc-sr04.h", "hc-sr04.cpp", "hc-sr04.pio"])
+
+        if not mpr121_enabled:
+            ignored_patterns.update(["mpr121.h", "mpr121.cpp"])
+
+        if not air_enabled:
+            ignored_patterns.update(["hx710.h", "hx710.cpp"])
+
+       # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
         os.makedirs(self.c_dir, exist_ok=True)
 
-        for root, dirs, files in os.walk(self.src_dir):
-            rel_dir = os.path.relpath(root, self.src_dir)
-            
-            # Check if the current folder is in our ignore list
-            if any(rel_dir == f or rel_dir.startswith(f + os.sep) for f in ignore_list):
-                dirs[:] = []  # Tell os.walk not to look inside these folders
-                continue
+        if os.path.exists(self.src_dir):
+            for root, dirs, files in os.walk(self.src_dir):
+                for file in files:
+                    # Skip CMakeLists.txt at the root of src
+                    if file == "CMakeLists.txt" and root == self.src_dir:
+                        continue
 
-            for f in files:
-                src_file = os.path.join(root, f)
-                rel_path = os.path.relpath(src_file, self.src_dir)
-                dest_file = os.path.join(self.project_root, f) if f == "CMakeLists.txt" else os.path.join(self.c_dir, rel_path)
-                
-                os.makedirs(os.path.dirname(dest_file), exist_ok=True)
-                if not os.path.exists(dest_file) or open(src_file, "rb").read() != open(dest_file, "rb").read():
-                    shutil.copy2(src_file, dest_file)
+                    # Check parent directory rules to filter out disabled subfolders
+                    if not web_enabled and "web" in root: continue
+                    if web_enabled and "usb" in root: continue
+                    if not display_enabled and "screen" in root: continue
+                    
+                    # Strictly check individual hardware file flags
+                    if "hx710" in file and not air_enabled: continue
+                    if "mpr121" in file and not mpr121_enabled: continue
+                    if "cny70" in file and not cny_enabled: continue
+                    if ("hc-sr04" in file or file.endswith(".pio")) and not distance_enabled: continue
 
-        # 4. Generate main.cpp Template
+                    if "delay" in file.lower() and not masterfx.get('delay', False): continue
+                    if ("reverb" in file.lower() or "freeverb" in file.lower()) and not masterfx.get('reverb', False): continue
+
+                    s = os.path.join(root, file)
+                    d = os.path.join(self.c_dir, file)  # Flattens directly into self.c_dir
+
+                    if not os.path.exists(d) or open(s, "rb").read() != open(d, "rb").read():
+                        shutil.copy2(s, d)
+
+        # Handle CMakeLists.txt separately for the project root
+        cmake_src = os.path.join(self.src_dir, "CMakeLists.txt")
+        cmake_dest = os.path.join(self.project_root, "CMakeLists.txt")
+        if os.path.exists(cmake_src):
+            if not os.path.exists(cmake_dest) or open(cmake_src, "rb").read() != open(cmake_dest, "rb").read():
+                shutil.copy2(cmake_src, cmake_dest)
+
+        # 5. Generate main.cpp Template
         self.print_progress(0.5, "Updating C++ & Manifest")
         manifest = self.collect_and_save_manifest()
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(self.templates))
@@ -285,7 +320,7 @@ class PicoUF2Generator:
         with open(os.path.join(self.c_dir, "main.cpp"), "w") as f:
             f.write(new_main)
 
-        # 5. CMake Configuration
+        # 6. CMake Configuration
         sdk = os.environ.get("PICO_SDK_PATH")
         board = settings.get("pico_board", "pico")
         sdk_target = "pico_w" if board == "pico_w" else ("pico" if board == "zero" else board)
@@ -307,20 +342,19 @@ class PicoUF2Generator:
         ]
 
         # Web & MIDI Logic
-        web_cfg = settings.get("web", {})
-        if web_cfg.get("enabled"):
-            mode = web_cfg.get("active_mode", 0)
-            creds = web_cfg.get("ap" if mode == 0 else "sta", {})
-            osc = web_cfg.get("osc", {})
+        if web_enabled:
+            mode = web_config.get("active_mode", 0)
+            creds = web_config.get("ap" if mode == 0 else "sta", {})
+            osc = web_config.get("osc", {})
             
             cmake_cmd.extend([
                 "-DWEB=1",
                 f"-DACTIVE_MODE={mode}",
                 f'-DWIFI_SSID="{creds.get("ssid", "")}"',
                 f'-DWIFI_PASSWORD="{creds.get("password", "")}"',
-                f'-DMDNS_NAME="{web_cfg.get("mdns_name", "pikopd")}"',
+                f'-DMDNS_NAME="{web_config.get("mdns_name", "pikopd")}"',
                 f"-DOSC_ENABLED={1 if osc.get('enabled', True) else 0}",
-                f'-DOSC_PORT={web_cfg.get("osc_port", 8000)}',
+                f'-DOSC_PORT={web_config.get("osc_port", 8000)}',
                 "-DMIDI_HOST_ENABLED=0",  
                 "-DMIDI_UART_ENABLED=1"   
             ])
@@ -328,36 +362,35 @@ class PicoUF2Generator:
         else:
             cmake_cmd.append("-DWEB=0")
             if midi_mode == "host":
-                cmake_cmd.extend(["-DMIDI_HOST=1", "-DMIDI_UART_ENABLED=0"])
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=1", "-DMIDI_UART_ENABLED=0"])
                 print("\033[32m  -> MIDI Host Mode enabled\033[0m")
             elif midi_mode == "uart":
-                cmake_cmd.extend(["-DMIDI_HOST=0", "-DMIDI_UART_ENABLED=1"])
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=0", "-DMIDI_UART_ENABLED=1"])
                 print("\033[32m  -> MIDI UART Mode enabled\033[0m")
             else:
-                cmake_cmd.extend(["-DMIDI_HOST=0", "-DMIDI_UART_ENABLED=0"])
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=0", "-DMIDI_UART_ENABLED=0"])
                 print("\033[32m  -> USB MIDI Device Mode enabled\033[0m")
 
         # Console & Extra Flags
-        cmake_cmd.append(f"-DENABLE_DEBUG={'1' if settings.get('console') else '0'}")
+        cmake_cmd.extend([
+            f"-DENABLE_DEBUG={1 if settings.get('console') else 0}",
+            f"-DENABLE_DISPLAY={1 if display_enabled else 0}",
+            f"-DENABLE_DISTANCE_SENSOR={1 if distance_enabled else 0}",
+            f"-DCNY70_ENABLED={1 if cny_enabled else 0}",
+            f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}",
+            f"-DHX710_ENABLED={1 if air_enabled else 0}",
+            f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}",
+            f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}",
+            f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}",
+            f"-DMAX_VOICES={settings.get('voice_count', 1)}"
+        ])
 
-        cmake_cmd.append(f"-DDISPLAY_ENABLED={1 if display_enabled else 0}")
-
-        cmake_cmd.append(f"-DDISTANCE_SENSOR_ENABLED={1 if distance_enabled else 0}")
-
-        cmake_cmd.append(f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}")
-
-        cmake_cmd.append(f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}")
-
-        cmake_cmd.append(f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}")
-
-        cmake_cmd.append(f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}")
-
-        if board == "zero": cmake_cmd.append("-DPICO_ZERO_BOARD=1")
-        cmake_cmd.append(f"-DMAX_VOICES={settings.get('voice_count', 1)}")
+        if board == "zero":
+            cmake_cmd.append("-DPICO_ZERO_BOARD=1")
 
         self.run_cmd(cmake_cmd, cwd=self.build_dir, step_name="CMake")
 
-        # 6. Compilation & Flash
+        # 7. Compilation & Flash
         self.print_progress(0.85, "Compiling")
         self.run_cmd(["make", "-j10"], cwd=self.build_dir, step_name="Make")
 
@@ -375,7 +408,9 @@ class PicoUF2Generator:
         duration = time.time() - start_time
         self.print_progress(1.0, f"Finished in {duration:.1f}s")
         sys.stdout.write("\n")
-        if serial and flash_success: self.open_serial()
+        if serial and flash_success:
+            self.open_serial()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
@@ -390,9 +425,9 @@ if __name__ == "__main__":
         "-v", "--verbose", action="store_true", help="Enable debug output"
     )
     parser.add_argument(
-    "-x", "--skip-hvcc",
-    action="store_true",
-    help="Skip running HVCC (useful for manual edits of C/C++ files)"
+        "-x", "--skip-hvcc",
+        action="store_true",
+        help="Skip running HVCC (useful for manual edits of C/C++ files)"
     )
     args = parser.parse_args()
 

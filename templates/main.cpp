@@ -11,7 +11,6 @@ MIT Licence
 
 */
 
-    
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -19,17 +18,18 @@ MIT Licence
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
-#include "PicoAudio.h"
-#include "PicoControl.h"
-#include "PicoMIDI.h"
+
+#include "audio.h"
+#include "control.h"
+#include "midi.h"
 
 {% if board.pico_board == 'pico_w' -%}
 #include "pico/cyw43_arch.h"
-#include "PicoWEB.h"
+#include "web.h"
 {%- endif %}
 
-{% if board.display.enabled -%}
-#include "PicoSCREEN.h"
+{% if board.display is defined and board.display.enabled -%}
+#include "screen.h"
 #include "pico/stdio/driver.h"
 {%- endif %}
 
@@ -73,6 +73,8 @@ MasterFX masterFX;
 {%- for s in hv_manifest.sends -%}{%- set _ = sends.update({s.name: s.hash}) -%}
 {%- endfor -%}
 
+{%- set sensors = board.get('inputs', {}).get('sensors', {}) -%}
+
 {%- set active_btns = [] -%}
 {%- for b in board.inputs.buttons if b.name in receives -%}
     {%- set _ = active_btns.append({'pin': b.pin, 'mode': b.mode, 'hash': receives[b.name]}) -%}
@@ -103,23 +105,16 @@ MasterFX masterFX;
 
 {%- set active_leds = [] -%}
 {%- for l in board.leds -%}
-    {%- set led_hash = 0 -%}
-    
-    {%- if l.mode == 'pd' -%}
-        {%- for s in hv_manifest.sends -%}
-            {%- if s.name == l.name -%}
-                {%- set led_hash = s.hash -%}
-            {%- endif -%}
-        {%- endfor -%}
+    {%- set s = hv_manifest.sends | selectattr('name', 'equalto', l.name) | first -%}
+    {%- if l.mode != 'pd' or s -%}
+        {%- set _ = active_leds.append({
+            'name': l.name,
+            'hash': s.hash if s else 0,
+            'pin': l.pin,
+            'is_rgb': l.is_rgb | default(false),
+            'mode': l.mode | default('status')
+        }) -%}
     {%- endif -%}
-
-    {%- set _ = active_leds.append({
-        'name': l.name,
-        'hash': led_hash, 
-        'pin': l.pin, 
-        'is_rgb': l.is_rgb | default(false),
-        'mode': l.mode | default('status')
-    }) -%}
 {%- endfor -%}
 
 {%- set active_encoders = [] -%}
@@ -160,34 +155,82 @@ MasterFX masterFX;
     {%- endfor -%}
 {%- endif -%}
 
-{% if board.inputs.sensors.mpr121 -%}
+{%- set active_hx710 = [] -%}
+{%- set hx710_sensors = sensors.get('hx710', []) -%}
+{%- for hx in hx710_sensors if hx.name in receives -%}
+    {%- set _ = active_hx710.append({
+        'name': hx.name,
+        'hash': receives[hx.name],
+        'sck_pin': hx.sck_pin,
+        'dout_pin': hx.dout_pin,
+        'min_raw': hx.min_raw,
+        'max_raw': hx.max_raw,
+        'fall_factor': hx.fall_factor,
+        'send_interval': hx.send_interval,
+        'rise_step': hx.rise_step,
+        'mode': hx.mode
+    }) -%}
+{%- endfor -%}
+
+{%- set active_mcp4725 = [] -%}
+{%- for cv_out in board.get('outputs', {}).get('mcp4725', []) if cv_out.name in sends -%}
+    {%- set _ = active_mcp4725.append({
+        'name': cv_out.name,
+        'hash': sends[cv_out.name],
+        'sda_pin': cv_out.sda_pin,
+        'scl_pin': cv_out.scl_pin,
+        'mode': cv_out.mode | default('CV') | upper
+    }) -%}
+{%- endfor -%}
+
+{%- for mcp in active_mcp4725 %}
+static float cv_out_{{ loop.index0 }}_val = 0.0f;
+static bool cv_out_{{ loop.index0 }}_dirty = false;
+{%- endfor %}
+
+{# --- MPR121 Touch Sensor Block --- #}
+{%- set mpr_config = sensors.get('mpr121', []) -%}
+{%- set active_mpr_pads = [] -%}
+
+{%- if mpr_config -%}
+    {%- set mpr_count = mpr_config|length -%}
+    {%- for i in range(1, 97) -%}
+        {%- set p_name = "pad" ~ i -%}
+        {# Check if the pad name exists directly inside receives #}
+        {%- if p_name in receives -%}
+            {%- set s_idx = (i - 1) // 12 -%}
+            {%- set p_idx = (i - 1) % 12 -%}
+            {%- if s_idx < mpr_count -%}
+                {%- set _ = active_mpr_pads.append({
+                    'sensor_name': mpr_config[s_idx].name,
+                    'sensor_idx': s_idx,
+                    'pad_idx': p_idx,
+                    'pad_name': p_name,
+                    'hash': receives[p_name]
+                }) -%}
+            {%- endif -%}
+        {%- endif -%}
+    {%- endfor -%}
+{%- endif -%}
+
+// Only render the C++ struct and array if at least one pad is found in receives 
+{% if active_mpr_pads|length > 0 -%}
 struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
 
-{% set active_count = namespace(value=0) -%}
-{% set mpr_count = board.inputs.sensors.mpr121|length -%}
-
 MprPad active_mpr_pads[] = {
-{#- Range covers up to 8 sensors -#}
-{%- for i in range(1, 97) %}
-    {%- set p_name = "pad" ~ i %}
-    {%- for p in hv_manifest.receives if p.name == p_name %}
-        {%- set s_idx = (i - 1) // 12 -%}
-        {%- set p_idx = (i - 1) % 12 -%}
-        {%- if s_idx < mpr_count %}
-    { "{{ board.inputs.sensors.mpr121[s_idx].name }}", {{ s_idx }}, {{ p_idx }}, "{{ p.name }}", {{ p.hash }} },
-            {%- set active_count.value = active_count.value + 1 -%}
-        {%- endif %}
-    {%- endfor %}
+{%- for pad in active_mpr_pads %}
+    { "{{ pad.sensor_name }}", {{ pad.sensor_idx }}, {{ pad.pad_idx }}, "{{ pad.pad_name }}", {{ pad.hash }} }{{ "," if not loop.last else "" }}
 {%- endfor %}
 };
 
-constexpr int NUM_ACTIVE_MPR_PADS = {{ active_count.value }};
+constexpr int NUM_ACTIVE_MPR_PADS = {{ active_mpr_pads|length }};
 {%- endif %}
 
 
-{% if board.display.enabled -%}
-static ssd1306_t display_inst;
+// ---- Display objects ----
 
+{% if board.display and board.display.enabled -%}
+static ssd1306_t display_inst;
 static const uint32_t screen_slots[4] = {
     {%- set count = 0 -%}
     {%- for s in hv_manifest.sends -%}
@@ -197,9 +240,7 @@ static const uint32_t screen_slots[4] = {
         {%- endif -%}
     {%- endfor -%}
 };
-
 {%- endif %}
-
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
@@ -212,6 +253,8 @@ static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
+
+
 
 
 // ---- NOTE receives ----
@@ -409,11 +452,15 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+
     if (hv_msg_getNumElements(m) < 1) return;
+
     float val0 = hv_msg_getFloat(m, 0);
 
     switch (hash) {
-    /* --- Hardware LEDs --- */
+
+/* --- LEDs --- */
+
     {% for l in board.leds -%}
         {%- for s in hv_manifest.sends if s.name == l.name -%}
         case {{ s.hash }}U: 
@@ -428,8 +475,20 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         {%- endfor -%}
     {%- endfor %}
 
-    /* --- Web (SSI Sync) & OSC Routing --- */
-    {% if board.web.enabled -%}
+/* --- Hardware MCP4725 CV Outputs --- */
+
+    {% for mcp in active_mcp4725 -%}
+        case {{ mcp.hash }}U:
+            if (hv_msg_isFloat(m, 0)) {
+                cv_out_{{ loop.index0 }}_val = val0;
+                cv_out_{{ loop.index0 }}_dirty = true;
+            //    printf("DEBUG: Received value %f for %s\n", val0, "{{ mcp.name }}");
+            }
+            break;
+    {% endfor -%}
+
+/* --- Web (SSI Sync) & OSC Routing --- */
+    {% if board.web is defined and board.web.enabled -%}
     {% set web_count = namespace(index=0) %}
     {% for s in hv_manifest.sends -%}
         case {{ s.hash }}U:
@@ -448,14 +507,15 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     {% endfor %}
     {%- endif %}
 
-    default:
-        heavyMidiOutHook(vc, name, hash, m);
-        break;
+        default:
+            heavyMidiOutHook(vc, name, hash, m);
+            break;
     } 
 }
 
-{% if board.web.enabled -%}
 // Global handler pointers defined in PicoWEB.h
+
+{% if board.web is defined and board.web.enabled -%}
 osc_hv_float_handler_t osc_hv_handler = nullptr;
 web_float_handler_t web_float_handler = nullptr;
 
@@ -481,6 +541,7 @@ static void hv_osc_router(const char *a, float v) {
 }
 {%- endif %}
 
+/* ---  Print handler --- */
 
 {%- if board.console %}
 #define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
@@ -596,7 +657,7 @@ int main() {
 
    {% if board.midi_mode == 'uart' %}
     uart_midi_init();
-    {% elif board.midi_mode in ['usb', 'host'] and not board.web.enabled %}
+    {% elif board.midi_mode in ['usb', 'host'] and not board.get('web', {}).get('enabled', False) %}
     usb_init(); 
     {% endif %}
 
@@ -604,6 +665,9 @@ int main() {
     pd_prog.setPrintHook(&hv_print_handler);
     {% endif %}
     pd_prog.setSendHook(&sendHookHandler);
+
+// ---- AUDIO init ----
+
     {% if board.audio_mode == "I2S" %}
     Pico::setupAudio(I2S, audioFunc, 
         {{ board.sample_rate }}, 
@@ -620,13 +684,46 @@ int main() {
 
      masterFX.init();
 
+// ---- MCP4725 CV Out init ----
+{%- for mcp in active_mcp4725 %}
+Pico::MCP4725 cv_out_{{ loop.index0 }}
+({{ mcp.address | default("0x60") }});
+cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
+{%- endfor %}
+
+// ---- HX710 init ----
+
+{%- for hx in active_hx710 -%}
+    Pico::HX710Config sensor_config_{{ loop.index0 }} = {
+        .sck_pin = {{ hx.sck_pin }},
+        .dout_pin = {{ hx.dout_pin }},
+        .min_raw = {{ hx.min_raw }},
+        .max_raw = {{ hx.max_raw }},
+        .fall_factor = {{ hx.fall_factor }}f,
+        .send_interval = {{ hx.send_interval }},
+        .rise_step = {{ hx.rise_step }},
+        .mode = Pico::OutputMode::{{ hx.mode | upper }}
+    };
+
+    Pico::HX710 sensor_{{ loop.index0 }}(sensor_config_{{ loop.index0 }});
+
+    if (!sensor_{{ loop.index0 }}.tryInit()) {
+        printf("Failed to initialize sensor {{ hx.name }}\n");
+    }
+{%- endfor -%}
+
 // ---- MPR121 init ----
 
-    {% if board.inputs.sensors.mpr121 -%}
-    #define NUM_SENSORS {{ board.inputs.sensors.mpr121 | length }}
+{% if active_mpr_pads and active_mpr_pads|length > 0 -%}
+    #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
 
     Pico::MPR121Config cfg[NUM_SENSORS] = {
-    {%- for sensor in board.inputs.sensors.mpr121 %}
+    {%- set unique_sensors = [] -%}
+    {%- for pad in active_mpr_pads -%}
+        {%- set s_idx = pad.sensor_idx -%}
+        {%- if s_idx not in unique_sensors -%}
+            {%- set _ = unique_sensors.append(s_idx) -%}
+            {%- set sensor = board.inputs.sensors.mpr121[s_idx] -%}
         { 
             {{ sensor.i2c_bus }}, 
             {{ sensor.sda }}, 
@@ -634,11 +731,12 @@ int main() {
             {{ sensor.irq }}, 
             {{ sensor.addr_index }} 
         }{{ "," if not loop.last }}
+        {%- endif -%}
     {%- endfor %}
     };
 
     Pico::MPR121 sensor_array[NUM_SENSORS] = {
-        {%- for i in range(board.inputs.sensors.mpr121|length) %}
+        {%- for i in range(unique_sensors | length) %}
         Pico::MPR121(cfg[{{ i }}])
         {%- if not loop.last %},{% endif %}
         {%- endfor %}
@@ -650,11 +748,11 @@ int main() {
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-    {%- endif %}
+{%- endif %}
 
 // ---- Display init ----
 
-{% if board.display.enabled -%}
+{% if board.display is defined and board.display.enabled -%}
     Pico::Screen::init(
         &display_inst, 
         {{ board.display.i2c_bus }}, 
@@ -693,9 +791,9 @@ int main() {
     #ifdef PICO_ZERO
     Pico::addRgbLed({{ loop.index0 }}, {{ led.pin }}, 255, 255, 255);
     #endif
-    {% else %}
+        {% else %}
     Pico::addLed({{ loop.index0 }}, {{ led.pin }});
-    {% endif %}
+        {% endif %}
     {%- endfor %}
    
     {%- for enc in active_encoders -%}
@@ -721,14 +819,14 @@ int main() {
     float target_val; 
     int led_idx;
 
-    {% if board.web.enabled -%}
+    {% if board.web is defined and board.web.enabled -%}
     osc_hv_handler = hv_osc_router;
     web_float_handler = web_router;
     {%- endif %}
 
     while (true) {
 
-        {% if board.web.enabled -%}
+        {% if board.web is defined and board.web.enabled -%}
         web_poll(); 
         {%- endif %}
 
@@ -742,7 +840,7 @@ int main() {
             best_effort_wfe_or_timeout(make_timeout_time_ms(1));
         #endif
 
-        {% if board.display.enabled -%}
+        {% if board.display is defined and board.display.enabled -%}
             for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
                 if (print_pool[i].busy.load(std::memory_order_acquire)) {
                     
@@ -815,6 +913,7 @@ int main() {
                         {%- else -%}
                             Pico::updateLed({{ idx }}, val);
                         {%- endif %}
+
                     {%- endif %}
                 {% endfor %}
 
@@ -885,15 +984,36 @@ int main() {
             {%- endfor %}
 
 
-// ---- MPR121 ----
+// ---- HX710 ----
 
-            {% if board.inputs.sensors.mpr121 -%}
-
-            for (int i = 0; i < NUM_SENSORS; ++i) {
-                if (!sensor_array[i].initialized()) {
-                //   if (sensor_array[i].tryInit()) printf("Sensor #%d initialized!\n", i);
-                    continue;
+            {% for hx in active_hx710 -%}
+            if (sensor_{{ loop.index0 }}.isReady()) {
+                sensor_{{ loop.index0 }}.read();
+                int32_t output_value = 0;
+                if (sensor_{{ loop.index0 }}.process(&output_value)) {
+                    hv_send_float_lock(&pd_prog, {{ hx.hash }}, (float)output_value);
                 }
+            }
+            {% endfor -%}
+
+// ---- CV Out ----
+
+        {% for mcp in active_mcp4725 %}
+            if (cv_out_{{ loop.index0 }}_dirty) {
+                cv_out_{{ loop.index0 }}_dirty = false;
+                cv_out_{{ loop.index0 }}.write(cv_out_{{ loop.index0 }}_val);
+                
+            }
+        {% endfor %}
+
+
+// ---- MPR121 Processing ----
+
+        {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
+        for (int i = 0; i < NUM_SENSORS; ++i) {
+            if (!sensor_array[i].initialized()) {
+                continue;
+            }
 
             sensor_array[i].processMPR121();
             uint16_t touched = sensor_array[i].getTouched(); 
@@ -916,7 +1036,7 @@ int main() {
 
 
         } 
-        tight_loop_contents();
+        best_effort_wfe_or_timeout(make_timeout_time_ms(1));
     } 
 
     return 0;

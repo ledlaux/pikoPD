@@ -1,12 +1,10 @@
 # pikoPD
 
-This project provides a hardware abstraction layer for developing embedded audio, MIDI, and interactive hardware applications with the **Pure Data (Pd)** environment on **Raspberry Pi Pico** boards. 
-
-It automates the conversion of `.pd` patches into **UF2 firmware** using the **HVCC compiler** and **Pico C/C++ SDK**.
+This project provides a hardware abstraction layer for developing embedded audio, MIDI, and interactive hardware applications with the **Pure Data (Pd)** environment on **Raspberry Pi Pico** boards. Turn `.pd` patches into **UF2 firmware** using the **HVCC compiler** and **Pico C/C++ SDK**.
 
 Hardware configuration is managed through a simple configuration file defining hardware, pins, and peripherals. While the build system, combining Python automation and CMake, handles code generation, patch conversion, firmware compilation, and uploading to the target board.
 
-This is a solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
+This started as solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
 
 PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware. Feel free to open issues, start discussions, or join the development!
 
@@ -16,21 +14,19 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 
 - [x] led
 - [x] knob
-- [x] cv in 
 - [x] button
 - [x] encoder
-- [x] joystick
+- [x] cv in/out 
 - [x] gate in/out
+- [x] joystick
 - [x] sensors
-- [x] i2s audio
-- [x] pwm audio
+- [x] i2s & pwm audio
 - [x] uart midi
 - [x] usb midi
 - [x] usb midi host
 - [x] midi clock
 - [x] web & osc
 - [x] display
-- [ ] cv out
 - [ ] sd card
 - [ ] audio input
 - [ ] bluetooth midi

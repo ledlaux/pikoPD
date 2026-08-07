@@ -1,6 +1,7 @@
+
 {
   "name": "heavy",
-  "pico_board": "pico2",
+  "pico_board": "pico",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
@@ -16,15 +17,9 @@
   "inputs": {
 
     "adc_pins": [
-      { "name": "knob", "pin": 26, "type": "knob" },
-      { "name": "pot", "pin": 27, "type": "knob" },
-      { "name": "cv1", "pin": 28, "type": "cv_in" }
     ],
 
     "buttons": [
-      { "name": "btn1", "pin": 23, "mode": "switch" },
-      { "name": "btn2", "pin": 11, "mode": "switch" },
-      { "name": "btn3", "pin": 14, "mode": "bang" }
     ],
 
     "gate_in": [
@@ -32,48 +27,70 @@
     ],
 
     "encoders": [
-      { "name": "enc", "pin_a": 14, "pin_b": 15 }
+      { "name": "enc", "pin_a": 16, "pin_b": 15 }
     ],
 
     "joystick": [
-      { "name": "joy", "joy_x": 26, "joy_y": 27, "midi_range": true }
     ],
 
   "sensors": {
        
       "cny70": [
-       { "name": "cny", "adc_pin": 28 }
+       { "name": "cny", "adc_pin": 26 }
       ],
        
        "mpr121": [ 
-        { "name": "mpr1", "i2c_bus": "i2c0", "sda": 4, "scl": 5, "irq": 6, "addr_index": 0 }
       ],
        
        "hc-sr04": [
-        { "name": "distance", "trigger": 2, "echo": 3}
+      ],
+
+       
+      "hx710": [
+    {
+        "name": "air",
+        "sck_pin": 14,
+        "dout_pin": 12,
+        "min_raw": 704000,
+        "max_raw": 1004000,
+        "fall_factor": 0.95,
+        "send_interval": 20,
+        "rise_step": 2,
+        "mode": "MIDI"
+    }
+]
     
-      ]
     }
   },
 
-  "outputs": {
-    
+"outputs": {
     "gate_out": [
       { "name": "gate", "pin": 2, "mode": "gate" },
       { "name": "trigger", "pin": 3, "mode": "trigger" }
+    ],
+    "mcp4725": [
+      {
+        "name": "note_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "note"
+      },
+      {
+        "name": "cv_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "cv"
+      }
     ]
   },
 
   "leds": [
-    { "name": "led1", "pin": 25, "mode": "pd" },
-    { "name": "status", "pin": 24, "mode": "status" },
-    { "name": "clock", "pin": 23, "mode": "clock" },
-    { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
+ 
   ], 
   
   "masterfx": {
     "delay": false,
-    "reverb": true,
+    "reverb": false,
     "limiter": true
   },
 
