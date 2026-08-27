@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.2)
+/* pikoPD (v0.0.1)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -25,7 +25,9 @@ MIT Licence
 
 {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' -%}
 #include "pico/cyw43_arch.h"
+{% if board.web and board.web.enabled -%}
 #include "web.h"
+{%- endif %}
 {%- endif %}
 
 {% if board.display is defined and board.display.enabled -%}
@@ -253,8 +255,6 @@ static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
-
-
 
 
 // ---- NOTE receives ----
@@ -488,7 +488,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     {% endfor -%}
 
 /* --- Web (SSI Sync) & OSC Routing --- */
-    {% if board.web is defined and board.web.enabled -%}
+    {% if board.web and board.web.enabled -%}
     {% set web_count = namespace(index=0) %}
     {% for s in hv_manifest.sends -%}
         case {{ s.hash }}U:
@@ -513,29 +513,36 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
     } 
 }
 
-// Global handler pointers defined in PicoWEB.h
+// Global handler pointers defined in web.h
 
-{% if board.web is defined and board.web.enabled -%}
-osc_hv_float_handler_t osc_hv_handler = nullptr;
+typedef void (*web_float_handler_t)(const char *param, float value);
+typedef void (*osc_hv_float_handler_t)(const char *address, float value);
+
 web_float_handler_t web_float_handler = nullptr;
+osc_hv_float_handler_t osc_hv_handler = nullptr;
 
+{% if board.web and board.web.enabled -%}
 static void web_router(const char *p, float v) {
     if (!p) return;
     {% for r in hv_manifest.receives -%}
     {% if r.name.startswith('web') -%}
     if (!strcmp(p, "{{ r.name }}")) {
-        hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
+        hv_send_float_lock(&pd_prog, {{ r.hash }}, v);
         return;
     }
     {%- endif %}
     {% endfor %}
 }
+{%- endif %}
 
+{% if board.web and board.web.osc_enabled -%}
 static void hv_osc_router(const char *a, float v) {
     if (!a) return;
     {% for r in hv_manifest.receives -%}
     {% if r.name.startswith('osc') -%}
-    if (!strcmp(a, "/{{ r.name }}")) hv_sendFloatToReceiver(&pd_prog, {{ r.hash }}, v);
+    if (!strcmp(a, "/{{ r.name }}")) {
+        hv_send_float_lock(&pd_prog, {{ r.hash }}, v);
+    }
     {%- endif %}
     {% endfor %}
 }
@@ -646,12 +653,12 @@ int main() {
     {%- endif %}
 
     {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' %}
-        {% if board.web.enabled %}
-    // Web Mode: Initialize full WiFi stack
-    init_wifi();
+        {% if board.web and board.web.enabled %}
+        // Web Mode: Initialize full WiFi stack
+        init_wifi();
         {% else %}
-    // Standard Mode: Basic wireless initialization (for LED/system)
-    cyw43_arch_init();
+        // Standard Mode: Basic initialization for LED
+        cyw43_arch_init();
         {% endif %}
     {% endif %}
 
@@ -819,14 +826,17 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
     float target_val; 
     int led_idx;
 
-    {% if board.web is defined and board.web.enabled -%}
-    osc_hv_handler = hv_osc_router;
+    {% if board.web and board.web.enabled -%}
     web_float_handler = web_router;
+    {%- endif %}
+
+    {% if board.web and board.web.osc_enabled -%}
+    osc_hv_handler = hv_osc_router;
     {%- endif %}
 
     while (true) {
 
-        {% if board.web is defined and board.web.enabled -%}
+        {% if board.web and board.web.enabled -%}
         web_poll(); 
         {%- endif %}
 
