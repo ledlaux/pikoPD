@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os, json, shutil, subprocess, jinja2, argparse, time, glob, sys
 
-
 class PicoUF2Generator:
     def __init__(self, pd_path, project_root, src_dir=None, verbose=False):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -205,6 +204,7 @@ class PicoUF2Generator:
             sys.exit(1)
 
         # 1. Heavy Compiler Step
+        
         if not skip_hvcc:
             self.print_progress(0.1, "Heavy Compiler")
             hvcc_cmd = [
@@ -221,6 +221,7 @@ class PicoUF2Generator:
             print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
 
         # 2. Load Configuration
+        
         self.print_progress(0.3, "Setup")
         settings = {"pico_board": "pico2", "midi_mode": "usb"}
 
@@ -237,7 +238,7 @@ class PicoUF2Generator:
         print(f"\033[32m  -> Using config: {config_filename}\033[0m")
 
         # 3. Parse Configurations and Feature Flags
-        # 3. Parse Configurations and Feature Flags
+
         masterfx = settings.get("masterfx") or {}
         inputs = settings.get("inputs") or {}
         sensors = inputs.get("sensors") or {}
@@ -249,12 +250,14 @@ class PicoUF2Generator:
         display_enabled = display_config.get("enabled", False)
 
         # Strictly check that the sensor list exists AND has items inside it
+        
         distance_enabled = isinstance(sensors.get("hc-sr04"), list) and len(sensors.get("hc-sr04")) > 0
         cny_enabled = isinstance(sensors.get("cny70"), list) and len(sensors.get("cny70")) > 0
         mpr121_enabled = isinstance(sensors.get("mpr121"), list) and len(sensors.get("mpr121")) > 0
         air_enabled = isinstance(sensors.get("hx710"), list) and len(sensors.get("hx710")) > 0
 
         # Build Ignore List for File Copying
+        
         ignored_patterns = set()
 
         if web_enabled:
@@ -274,7 +277,8 @@ class PicoUF2Generator:
         if not air_enabled:
             ignored_patterns.update(["hx710.h", "hx710.cpp"])
 
-       # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
+        # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
+        
         os.makedirs(self.c_dir, exist_ok=True)
 
         if os.path.exists(self.src_dir):
@@ -285,16 +289,17 @@ class PicoUF2Generator:
                         continue
 
                     # Check parent directory rules to filter out disabled subfolders
+                    
                     if not web_enabled and "web" in root: continue
                     if web_enabled and "usb" in root: continue
                     if not display_enabled and "screen" in root: continue
                     
                     # Strictly check individual hardware file flags
+                    
                     if "hx710" in file and not air_enabled: continue
                     if "mpr121" in file and not mpr121_enabled: continue
                     if "cny70" in file and not cny_enabled: continue
                     if ("hc-sr04" in file or file.endswith(".pio")) and not distance_enabled: continue
-
                     if "delay" in file.lower() and not masterfx.get('delay', False): continue
                     if ("reverb" in file.lower() or "freeverb" in file.lower()) and not masterfx.get('reverb', False): continue
 
@@ -305,6 +310,7 @@ class PicoUF2Generator:
                         shutil.copy2(s, d)
 
         # Handle CMakeLists.txt separately for the project root
+        
         cmake_src = os.path.join(self.src_dir, "CMakeLists.txt")
         cmake_dest = os.path.join(self.project_root, "CMakeLists.txt")
         if os.path.exists(cmake_src):
@@ -312,6 +318,7 @@ class PicoUF2Generator:
                 shutil.copy2(cmake_src, cmake_dest)
 
         # 5. Generate main.cpp Template
+        
         self.print_progress(0.5, "Updating C++ & Manifest")
         manifest = self.collect_and_save_manifest()
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(self.templates))
@@ -321,6 +328,7 @@ class PicoUF2Generator:
             f.write(new_main)
 
         # 6. CMake Configuration
+        
         sdk = os.environ.get("PICO_SDK_PATH")
         board = settings.get("pico_board", "pico")
         sdk_target = "pico_w" if board == "pico_w" else ("pico" if board == "zero" else board)
@@ -342,6 +350,7 @@ class PicoUF2Generator:
         ]
 
         # Web & MIDI Logic
+        
         if web_enabled:
             mode = web_config.get("active_mode", 0)
             creds = web_config.get("ap" if mode == 0 else "sta", {})
@@ -372,6 +381,7 @@ class PicoUF2Generator:
                 print("\033[32m  -> USB MIDI Device Mode enabled\033[0m")
 
         # Console & Extra Flags
+        
         cmake_cmd.extend([
             f"-DENABLE_DEBUG={1 if settings.get('console') else 0}",
             f"-DENABLE_DISPLAY={1 if display_enabled else 0}",
@@ -391,6 +401,7 @@ class PicoUF2Generator:
         self.run_cmd(cmake_cmd, cwd=self.build_dir, step_name="CMake")
 
         # 7. Compilation & Flash
+        
         self.print_progress(0.85, "Compiling")
         self.run_cmd(["ninja", "-j10"], cwd=self.build_dir, step_name="Ninja")
 
@@ -410,7 +421,6 @@ class PicoUF2Generator:
         sys.stdout.write("\n")
         if serial and flash_success:
             self.open_serial()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
