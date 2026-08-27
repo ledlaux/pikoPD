@@ -149,7 +149,7 @@ This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mappe
 
 Set in `board.json`:
   
-    - board (pico, pico_w, zero, pico2)
+    - board (pico, pico_w, zero, pico2, pico2_w)
     - core frequency
     - sample rate
     - audio mode (I2S, PWM) and pins
