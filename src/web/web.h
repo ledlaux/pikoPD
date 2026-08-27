@@ -11,7 +11,6 @@ extern "C" {
 #include "lwip/netif.h"
 #include "lwip/apps/fs.h"
 
-// AP mode
 #if (ACTIVE_MODE == 0)
 #include "dhcpserver.h"
 #endif
@@ -21,6 +20,8 @@ extern "C" {
 #endif
 
 #include <stddef.h> 
+#include <cstring>
+#include <cstdlib>
 #include "ssi.h"
 #include "osc.h"
 #include "pico/cyw43_arch.h"
@@ -44,93 +45,41 @@ extern "C" {
 #endif
 
 static ip_addr_t computer_ip;
-static uint16_t computer_port = 9000; 
+static uint16_t computer_port = 8001; 
 static bool computer_discovered = false;
 static struct udp_pcb* osc_out_pcb = nullptr;
 
 typedef void (*web_float_handler_t)(const char *param, float value);
-
 extern web_float_handler_t web_float_handler;
 
-// --- CGI HANDLER ---
+// --- CGI HANDLER (Robust Key/Value Mapping) ---
 const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
+    const char *target_param = nullptr;
+    float raw_val = 0.0f;
+
     for (int i = 0; i < iNumParams; i++) {
-
-        float raw_val = atof(pcValue[i]);
-
         if (strcmp(pcParam[i], "v") == 0) {
-            if (web_float_handler) {
-                web_float_handler(pcParam[i], raw_val);
-            }
+            raw_val = (float)atof(pcValue[i]);
+        } else {
+            target_param = pcParam[i];
         }
+    }
+
+    if (target_param && web_float_handler) {
+        web_float_handler(target_param, raw_val);
     }
     return NULL; 
 }
+
 static const tCGI cgi_handlers[] = {
     { "/update_pd.cgi", cgi_pd_handler },
 };
 
 typedef void (*osc_hv_float_handler_t)(const char *address, float value);
-
 extern osc_hv_float_handler_t osc_hv_handler;
 
-
 #if OSC_ENABLED
-
-// static void osc_internal_callback(void *arg,
-//                                   struct udp_pcb *pcb,
-//                                   struct pbuf *p,
-//                                   const ip_addr_t *addr,
-//                                   u16_t port)
-// {
-//     if (!p) return;
-
-//     if (!computer_discovered || !ip_addr_cmp(&computer_ip, addr)) {
-//         ip_addr_set(&computer_ip, addr);
-//         computer_discovered = true;
-//         computer_port = 9000;
-//         printf(">>> OSC Peer Discovered: %s\n", ipaddr_ntoa(addr));
-//     }
-
-//     char address[64];
-//     size_t len = (p->len < 63) ? p->len : 63;
-//     std::memcpy(address, p->payload, len);
-//     address[len] = '\0';
-
-//     if (address[0] != '/') {
-//         pbuf_free(p);
-//         return;
-//     }
-
-//     int tag_idx = (int)std::strlen(address) + 1;
-//     while (tag_idx % 4 != 0 && tag_idx < p->len) tag_idx++;
-
-//     char *tags = (char*)p->payload + tag_idx;
-
-//     if (tag_idx < p->len && tags[0] == ',' && tags[1] == 'f') {
-
-//         int data_idx = tag_idx + (int)std::strlen(tags) + 1;
-//         while (data_idx % 4 != 0 && data_idx < p->len) data_idx++;
-
-//         if (data_idx + 4 <= p->len) {
-
-//             uint32_t raw;
-//             std::memcpy(&raw, (uint8_t*)p->payload + data_idx, 4);
-
-//             union { uint32_t i; float f; } u;
-//             u.i = __builtin_bswap32(raw);
-
-//             float val = u.f;
-
-//             if (osc_hv_handler) {
-//                 osc_hv_handler(address, val);
-//             }
-//         }
-//     }
-
-//     pbuf_free(p);
-// }
-
+// ---------------- RECEIVE (Safe Fragmented Pbuf Handling) ----------------
 static void osc_internal_callback(void *arg,
                                   struct udp_pcb *pcb,
                                   struct pbuf *p,
@@ -139,25 +88,25 @@ static void osc_internal_callback(void *arg,
 {
     if (!p) return;
 
-    // 1. Maintain context safety boundaries against packet chaining
     uint16_t total_packet_len = p->tot_len;
 
     if (!computer_discovered || !ip_addr_cmp(&computer_ip, addr)) {
         ip_addr_set(&computer_ip, addr);
         computer_discovered = true;
-        computer_port = 9000;
         printf(">>> OSC Peer Discovered: %s\n", ipaddr_ntoa(addr));
     }
 
-    // 2. Safely parse the OSC Address layout string
-    char address[64];
-    size_t len = (total_packet_len < 63) ? total_packet_len : 63;
-    
-    // Copy safely out of the pbuf payload layout
-    std::memcpy(address, p->payload, len);
-    address[len] = '\0';
+    if (total_packet_len < 2) {
+        pbuf_free(p);
+        return;
+    }
 
-    // Basic structural validation
+    // Safely copy address using pbuf_copy_partial to handle packet chaining seamlessly
+    char address[64];
+    size_t copy_len = (total_packet_len < 63) ? total_packet_len : 63;
+    u16_t extracted_len = pbuf_copy_partial(p, address, copy_len, 0);
+    address[extracted_len] = '\0';
+
     if (address[0] != '/') {
         pbuf_free(p);
         return;
@@ -167,30 +116,28 @@ static void osc_internal_callback(void *arg,
     int tag_idx = (int)address_len + 1;
     while (tag_idx % 4 != 0 && tag_idx < total_packet_len) tag_idx++;
 
-    // 3. Boundary check before reading type tags
     if (tag_idx >= total_packet_len) {
         pbuf_free(p);
         return;
     }
 
-    char *tags = (char*)p->payload + tag_idx;
+    // Extract tags safely using partial copy or direct safe indexing if within first pbuf chunk
+    char tags[16] = {0};
+    pbuf_copy_partial(p, tags, sizeof(tags) - 1, tag_idx);
 
     if (tags[0] == ',' && tags[1] == 'f') {
         int data_idx = tag_idx + (int)std::strlen(tags) + 1;
         while (data_idx % 4 != 0 && data_idx < total_packet_len) data_idx++;
 
-        // Strict validation: Verify the full 4-byte float payload fits within the packet bounds
         if (data_idx + 4 <= total_packet_len) {
-            uint32_t raw;
-            std::memcpy(&raw, (uint8_t*)p->payload + data_idx, 4);
+            uint32_t raw = 0;
+            pbuf_copy_partial(p, &raw, 4, data_idx);
 
             union { uint32_t i; float f; } u;
             u.i = __builtin_bswap32(raw);
 
-            float val = u.f;
-
             if (osc_hv_handler) {
-                osc_hv_handler(address, val);
+                osc_hv_handler(address, u.f);
             }
         }
     }
@@ -198,14 +145,11 @@ static void osc_internal_callback(void *arg,
     pbuf_free(p);
 }
 
-
 // ---------------- SEND ----------------
-
 static inline void osc_send_float(const char *name, float value) {
     if (!computer_discovered || osc_out_pcb == nullptr) return;
 
     picoosc::OSCMessage msg;
-
     char address[64];
     snprintf(address, sizeof(address), "/%s", name);
 
@@ -216,7 +160,6 @@ static inline void osc_send_float(const char *name, float value) {
     if (!pb) return;
 
     std::memcpy(pb->payload, msg.data(), msg.size());
-
     udp_sendto(osc_out_pcb, pb, &computer_ip, computer_port);
     pbuf_free(pb);
 }
@@ -227,7 +170,6 @@ static inline void osc_send_bang(const char *name) {
 
 #endif
 
-
 bool init_wifi() {
     if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
         printf("Wi-Fi Hardware Init Failed\n");
@@ -235,7 +177,6 @@ bool init_wifi() {
     }
 
 #if (ACTIVE_MODE == 0)
-    // --- MODE 0: ACCESS POINT (AP) ---
     cyw43_arch_enable_ap_mode(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
 
     struct netif *n = &cyw43_state.netif[CYW43_ITF_AP];
@@ -245,13 +186,11 @@ bool init_wifi() {
     IP4_ADDR(&gw, 192, 168, 4, 1);
     netif_set_addr(n, &ip, &mask, &gw);
 
-    // Initialize DHCP server so clients get IPs automatically
     static dhcp_server_t dhcp_server;
     dhcp_server_init(&dhcp_server, &gw, &mask);
     
     const char* mode_str = "Access Point";
 #else
-    // --- MODE 1: STATION (STA) ---
     cyw43_arch_enable_sta_mode();
     printf("Connecting to Wi-Fi: %s...\n", WIFI_SSID);
     if (cyw43_arch_wifi_connect_blocking(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK)) {
@@ -261,7 +200,6 @@ bool init_wifi() {
     const char* mode_str = "Station";
 #endif
 
-    // Common Web Services Setup
     cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
 
     httpd_init();
@@ -285,7 +223,6 @@ bool init_wifi() {
     printf("OSC Port:   %d\n", OSC_PORT);
     printf("========================================\n\n");
 
-
     return true;
 }
 
@@ -293,4 +230,4 @@ static inline void web_poll() {
     cyw43_arch_poll();
 }
 
-#endif // WEB_ENABLED
+#endif 
