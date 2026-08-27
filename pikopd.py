@@ -333,7 +333,7 @@ class PicoUF2Generator:
         board = settings.get("pico_board", "pico")
         sdk_target = "pico_w" if board == "pico_w" else ("pico" if board == "zero" else board)
 
-        if board == "pico2":
+        if board == "pico2" or board == "pico2_w":
             toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
         else:
             toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
