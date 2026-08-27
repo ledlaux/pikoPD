@@ -559,7 +559,7 @@ Debug console will also output PD [print] objects, which are parsed automaticall
   }
 ```
 
-PikoPD supports WEB and OSC protocols for the PICO boards with WIFI chips. 
+This are very experimental feature, but after tests OSC is confirmed working without an issues. 
 
 See `patches/web.pd`
 
