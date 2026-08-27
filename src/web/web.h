@@ -147,7 +147,7 @@ static void osc_internal_callback(void *arg,
 
 // ---------------- SEND ----------------
 static inline void osc_send_float(const char *name, float value) {
-    if (!computer_discovered || osc_out_pcb == nullptr) return;
+    if (osc_out_pcb == nullptr) return;
 
     picoosc::OSCMessage msg;
     char address[64];
@@ -160,7 +160,11 @@ static inline void osc_send_float(const char *name, float value) {
     if (!pb) return;
 
     std::memcpy(pb->payload, msg.data(), msg.size());
-    udp_sendto(osc_out_pcb, pb, &computer_ip, computer_port);
+
+    ip_addr_t broadcast_ip;
+    IP4_ADDR(&broadcast_ip, 255, 255, 255, 255);
+
+    udp_sendto(osc_out_pcb, pb, &broadcast_ip, computer_port);
     pbuf_free(pb);
 }
 
@@ -212,6 +216,10 @@ bool init_wifi() {
     mdns_resp_announce(netif_default);
 
     osc_out_pcb = udp_new();
+    if (osc_out_pcb != nullptr) {
+        // Enable socket option for broadcasting
+        ip_set_option(osc_out_pcb, SOF_BROADCAST);
+    }
     static picoosc::OSCServer osc_receiver(OSC_PORT, osc_internal_callback);
 
     printf("\n========================================\n");
