@@ -574,8 +574,8 @@ For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.
 After that put generated `htmldata.c` inside `/src/web` and rebuild. 
 
 ## OSC
-- To receive OSC messages on channel 8000 use PD objects with keyword OSC - [r osc @hv_param]  
-- To send messages from the pikoPD device on channel 8001 use [s osc @hv_param]
+- To receive OSC messages on port 8000 use PD objects with keyword OSC - [r osc @hv_param]  
+- To send messages from the pikoPD device on port 8001 use [s osc @hv_param]
 
 Parameter and Event names may only contain alphanumeric characters or underscore (r osc1 @hv_param not /ch/osc1).
 
