@@ -165,7 +165,7 @@ if(NOT WEB)
     )
 endif()
 
-if("${PICO_BOARD}" STREQUAL "pico_w")
+if("${PICO_BOARD}" STREQUAL "pico_w" OR "${PICO_BOARD}" STREQUAL "pico2_w")
     target_compile_definitions(pikopd PRIVATE PICO_W=1)
     if(WEB)
         target_link_libraries(pikopd PRIVATE 
