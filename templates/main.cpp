@@ -23,7 +23,7 @@ MIT Licence
 #include "control.h"
 #include "midi.h"
 
-{% if board.pico_board == 'pico_w' -%}
+{% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' -%}
 #include "pico/cyw43_arch.h"
 #include "web.h"
 {%- endif %}
@@ -645,7 +645,7 @@ int main() {
     Pico::init_neopixel();
     {%- endif %}
 
-   {% if board.pico_board == 'pico_w' %}
+    {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' %}
         {% if board.web.enabled %}
     // Web Mode: Initialize full WiFi stack
     init_wifi();
