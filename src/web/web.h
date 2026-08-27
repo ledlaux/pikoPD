@@ -22,8 +22,8 @@ extern "C" {
 #include <stddef.h> 
 #include <cstring>
 #include <cstdlib>
-#include "ssi.h"
 #include "osc.h"
+// #include "ssi.h"
 #include "pico/cyw43_arch.h"
 
 #ifndef WIFI_SSID
@@ -52,23 +52,29 @@ static struct udp_pcb* osc_out_pcb = nullptr;
 typedef void (*web_float_handler_t)(const char *param, float value);
 extern web_float_handler_t web_float_handler;
 
-// --- CGI HANDLER (Robust Key/Value Mapping) ---
+// --- CGI HANDLER ---
 const char * cgi_pd_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
-    const char *target_param = nullptr;
-    float raw_val = 0.0f;
+    char target_param[32] = {0};
+    float val = 0.0f;
+    bool found_param = false;
 
     for (int i = 0; i < iNumParams; i++) {
-        if (strcmp(pcParam[i], "v") == 0) {
-            raw_val = (float)atof(pcValue[i]);
-        } else {
-            target_param = pcParam[i];
+        if (pcParam[i] && pcValue[i]) {
+            if (strcmp(pcParam[i], "p") == 0) {
+                snprintf(target_param, sizeof(target_param), "%s", pcValue[i]);
+                found_param = true;
+            } else if (strcmp(pcParam[i], "v") == 0) {
+                char val_str[32];
+                snprintf(val_str, sizeof(val_str), "%s", pcValue[i]);
+                val = (float)atof(val_str);
+            }
         }
     }
 
-    if (target_param && web_float_handler) {
-        web_float_handler(target_param, raw_val);
+    if (found_param && web_float_handler) {
+        web_float_handler(target_param, val);
     }
-    return NULL; 
+    return "/index.shtml"; 
 }
 
 static const tCGI cgi_handlers[] = {
@@ -76,10 +82,10 @@ static const tCGI cgi_handlers[] = {
 };
 
 typedef void (*osc_hv_float_handler_t)(const char *address, float value);
-extern osc_hv_float_handler_t osc_hv_handler;
 
 #if OSC_ENABLED
-// ---------------- RECEIVE (Safe Fragmented Pbuf Handling) ----------------
+extern osc_hv_float_handler_t osc_hv_handler;
+
 static void osc_internal_callback(void *arg,
                                   struct udp_pcb *pcb,
                                   struct pbuf *p,
@@ -101,7 +107,6 @@ static void osc_internal_callback(void *arg,
         return;
     }
 
-    // Safely copy address using pbuf_copy_partial to handle packet chaining seamlessly
     char address[64];
     size_t copy_len = (total_packet_len < 63) ? total_packet_len : 63;
     u16_t extracted_len = pbuf_copy_partial(p, address, copy_len, 0);
@@ -121,7 +126,6 @@ static void osc_internal_callback(void *arg,
         return;
     }
 
-    // Extract tags safely using partial copy or direct safe indexing if within first pbuf chunk
     char tags[16] = {0};
     pbuf_copy_partial(p, tags, sizeof(tags) - 1, tag_idx);
 
@@ -145,7 +149,6 @@ static void osc_internal_callback(void *arg,
     pbuf_free(p);
 }
 
-// ---------------- SEND ----------------
 static inline void osc_send_float(const char *name, float value) {
     if (osc_out_pcb == nullptr) return;
 
@@ -208,7 +211,8 @@ bool init_wifi() {
 
     httpd_init();
     http_set_cgi_handlers(cgi_handlers, 1); 
-    ssi_init();
+    
+    // ssi_init();
 
     mdns_resp_init();
     mdns_resp_add_netif(netif_default, "pikopd");
@@ -217,7 +221,6 @@ bool init_wifi() {
 
     osc_out_pcb = udp_new();
     if (osc_out_pcb != nullptr) {
-        // Enable socket option for broadcasting
         ip_set_option(osc_out_pcb, SOF_BROADCAST);
     }
     static picoosc::OSCServer osc_receiver(OSC_PORT, osc_internal_callback);
@@ -238,4 +241,4 @@ static inline void web_poll() {
     cyw43_arch_poll();
 }
 
-#endif 
+#endif
