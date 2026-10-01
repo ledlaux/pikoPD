@@ -700,16 +700,16 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
 
 // ---- HX710 init ----
 
-{%- for hx in active_hx710 -%}
+{% for hx in active_hx710 %}
     Pico::HX710Config sensor_config_{{ loop.index0 }} = {
-        .sck_pin = {{ hx.sck_pin }},
-        .dout_pin = {{ hx.dout_pin }},
-        .min_raw = {{ hx.min_raw }},
-        .max_raw = {{ hx.max_raw }},
-        .fall_factor = {{ hx.fall_factor }}f,
-        .send_interval = {{ hx.send_interval }},
-        .rise_step = {{ hx.rise_step }},
-        .mode = Pico::OutputMode::{{ hx.mode | upper }}
+        {{ hx.sck_pin }},
+        {{ hx.dout_pin }},
+        {{ hx.min_raw }},
+        {{ hx.max_raw }},
+        {{ hx.fall_factor }},
+        {{ hx.send_interval }},
+        {{ hx.rise_step }},
+        Pico::OutputMode::{{ hx.mode | upper }}
     };
 
     Pico::HX710 sensor_{{ loop.index0 }}(sensor_config_{{ loop.index0 }});
@@ -717,7 +717,7 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
     if (!sensor_{{ loop.index0 }}.tryInit()) {
         printf("Failed to initialize sensor {{ hx.name }}\n");
     }
-{%- endfor -%}
+{% endfor %}
 
 // ---- MPR121 init ----
 
