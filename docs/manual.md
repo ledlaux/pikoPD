@@ -10,10 +10,12 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 
 ## Table of Contents
 - [Toolchain Setup](#toolchain-setup)
+- [Architecture](#architecture)
 - [Hardware Configuration](#hardware-configuration)
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
   - [ADC](#adc)
+  - [DAC](#dac)
   - [LED](#led)
   - [Joystick](#joystick)
   - [Encoder](#encoder)
@@ -21,11 +23,12 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [MPR121](#mpr121)
     - [HC-SR04](#hc-sr04)
     - [CNY70](#cny70)
+    - [HX710](#hx710)
   - [Display](#display)
 - [Project Configuration](#project-configuration)
   - [Build](#build)
-- [Polyphonic Input](#polyphonic-input)
 - [MIDI](#midi)
+- [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
 - [Serial Monitor](#serial-monitor) 
 - [Web Control and OSC](#web-control-and-osc)
@@ -41,11 +44,12 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - jinja2
 
 
-## CMake and arm-none-eabi-gcc
+## CMake, Ninja and arm-none-eabi-gcc
 
 ### Mac:
 ```bash
 brew install cmake
+brew install ninja
 brew install git  
 xcode-select --install  
 brew install arm-none-eabi-gcc
@@ -69,7 +73,7 @@ echo 'export PATH="/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin:$PA
 ```
 ### Linux:  
 ```bash
-sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib
+sudo apt install cmake git python3 build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi- newlib ninja
 ```  
 
 ## Heavy compiler (hvcc) 
@@ -123,6 +127,20 @@ cmake .. -DPICO_SDK_PATH=$PICO_SDK_PATH
 make -j8
 sudo make install
 ```
+# Architecture
+
+`pikoPD` separates audio processing from hardware control by using both cores of the Raspberry Pi PICO/PICO2:
+
+### Core 0 — Hardware & Control
+* Reads buttons, sensors, GPIO, and analog inputs using polling and PIO.
+* Handles ADC/CV inputs and MIDI communication.
+* Maps hardware controls to Pure Data patch parameters.
+
+### Core 1 — Audio Engine
+* Runs the compiled HVCC Pure Data audio code.
+* Handles real-time audio generation without interruptions.
+* Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
+* Provides stable audio performance with low jitter and fewer dropouts.
 
 # Hardware Configuration
 
@@ -131,13 +149,14 @@ This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mappe
 
 Set in `board.json`:
   
-    - board (pico, pico_w, zero, pico2)
+    - board (pico, pico_w, zero, pico2, pico2_w)
     - core frequency
     - sample rate
     - audio mode (I2S, PWM) and pins
     - voice count
     - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
+    - dac pins (cv out, v/oct)
     - rotary encoder 
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
@@ -146,9 +165,12 @@ Set in `board.json`:
       - uart (pins tx 0, rx 1 )
     - debug console
     - sensors
-      - cny70
+      - cny70 
       - mpr121
       - hc-sr04
+      - hx710
+    - display
+    - web & OSC 
     - masterfx (delay, reverb, limiter)
 
 
@@ -203,8 +225,36 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `knob`  | Analog control such as a potentiometer (smoothed) |
 | `cv_in` | Control voltage input for external analog signals (0–3.3V)       |
 
+! Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc (will be added in near future).
 
-Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc.
+
+## DAC
+
+```json
+"outputs": {
+    "mcp4725": [
+      {
+        "name": "note_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "note"
+      },
+      {
+        "name": "cv_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "cv"
+      }
+    ]
+  }
+```
+
+| Type    | Description                                             |
+| ------- | ------------------------------------------------------- |
+| `cv`  | Directly outputs a 0.0 to 3.3V control voltage based on floating-point input values (0.0 to 1.0).  |
+| `note_out` | Converts MIDI note numbers (36.0 to 96.0) into standard Volt-per-Octave pitch control voltages.    |
+
+Create objects `s cv_out @hv_param` or `s note_out @hv_param` inside the PD patch for coresponding mode. 
 
 ## LED 
 
@@ -233,7 +283,6 @@ PikoPD boards support 4 LED modes.
 | Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
 
 Code supports up to 12 different led connection.
-
 
 **RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
 Use `[pack f f]` object before `[s ledRGB]` to send 2 values. 
@@ -270,7 +319,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 ## Sensors
 
 
-### MPR121 
+### MPR121 - Touch sensor
 
 ```json
 "sensors": {
@@ -292,7 +341,7 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-### HC-SR04 
+### HC-SR04 - Distance sensor
 
 ```json
   "sensors": {
@@ -305,7 +354,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
 
 
-### CNY70 
+### CNY70 - Optical sensor
 
 
 ```json
@@ -327,6 +376,31 @@ When you place a finger or an object in front of the sensor (within a few millim
 Because there are multiple manufacturers of these sensors, the pin layouts and wiring can differ. Refer to this 3.3V common wiring [scheme](https://app.cirkitdesigner.com/project/fa619fa3-0145-456f-aaa3-b2f01b14e3e7) for Raspberry Pi Pico boards. Note that because infrared light is invisible to the human eye, you will need to look at the LED through a smartphone camera lens to verify that it is turned on and glowing.
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
+
+### HX710 - Air pressure sensor
+
+```json
+"sensors": {
+      "hx710": [
+        {
+          "name": "air",
+          "sck_pin": 2,
+          "dout_pin": 3,
+          "min_raw": 800000,
+          "max_raw": 1200000,
+          "fall_factor": 0.95,
+          "send_interval": 50,
+          "rise_step": 1,
+          "mode": "midi"
+        }
+      ]
+    }
+```
+
+The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors (such as the UPC barometric pressure sensors) for touchless breath, wind, or pressure control. Calibration Parameters: min_raw and max_raw define the expected raw sensor boundaries to normalize output values. Filtering & Smoothing: Includes adjustable fall_factor, rise_step, and send_interval parameters to smooth erratic pressure fluctuations and manage data transmission rates.
+
+Mode Selection: Supports both raw ("RAW) and MIDI mapping options.
+
 
 ## Display
 
@@ -406,22 +480,6 @@ optional arguments:
   -v, --verbose        Enable verbose compiler console debug output
 ```
 
-
-
-# Polyphonic Input
-
-The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
-
-To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
-
-To use the custom system:  
-1. Set **voice count** to 2 or more in `board.json`.  
-2. Add `[NOTE1, [NOTE2]...` objects for each voice.
-4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
-
-Check example in the patch folder. 
-
-
 # MIDI 
 
 ```json
@@ -448,6 +506,20 @@ Midi clock and start/stop messages work with PD `[midirealtimein]` object.
 | 120       | Debug Toggle            |
 
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. 
+
+
+# Polyphonic Input
+
+The Pure Data `[poly]` object works with `[notein]` on PICO, but it is resource-intensive.      
+
+To make MIDI note processing lightweight, a custom voice allocation system with oldest voice stealing was implemented using `[r NOTE]` objects.  
+
+To use the custom system:  
+1. Set **voice count** to 2 or more in `board.json`.  
+2. Add `[NOTE1, [NOTE2]...` objects for each voice.
+4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
+
+Check example in the patch folder. 
 
 # Sample Loading
 
@@ -487,7 +559,7 @@ Debug console will also output PD [print] objects, which are parsed automaticall
   }
 ```
 
-PikoPD supports WEB and OSC protocols for the PICO boards with WIFI chips. 
+This are very experimental feature, but after tests OSC is confirmed working without an issues. 
 
 See `patches/web.pd`
 
@@ -502,8 +574,10 @@ For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.
 After that put generated `htmldata.c` inside `/src/web` and rebuild. 
 
 ## OSC
-- To receive OSC messages use PD objects with keyword OSC - [r osc @hv_param]  
-- To send messages to the device use [s osc @hv_param]  
+- To receive OSC messages on port 8000 use PD objects with keyword OSC - [r osc @hv_param]  
+- To send messages from the pikoPD device on port 8001 use [s osc @hv_param]
+
+Parameter and Event names may only contain alphanumeric characters or underscore (r osc1 @hv_param not /ch/osc1).
 
 To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
 

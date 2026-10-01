@@ -14,14 +14,11 @@
         label { font-size: 10px; text-transform: uppercase; color: var(--text); display: block; margin-bottom: 8px; font-weight: 700; }
         .val-out { float: right; color: var(--neon); font-family: monospace; }
         
-        /* Sliders */
         input[type=range] { width: 100%; accent-color: var(--neon); margin: 10px 0 20px 0; background: #000; height: 6px; border-radius: 3px; cursor: pointer; }
         
-        /* Select & Inputs */
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        select { background: #000; border: 1px solid var(--border); color: var(--neon); padding: 8px; border-radius: 4px; font-size: 12px; outline: none; }
+        select { background: #000; border: 1px solid var(--border); color: var(--neon); padding: 8px; border-radius: 4px; font-size: 12px; outline: none; width: 100%; }
         
-        /* Controls */
         button { background: #000; border: 1px solid var(--border); color: var(--neon); padding: 15px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; text-transform: uppercase; font-size: 11px; }
         button:active { background: var(--neon); color: #000; }
         
@@ -33,7 +30,6 @@
         input:checked + .slider-box { background-color: #004422; }
         input:checked + .slider-box:before { transform: translateX(20px); }
 
-        /* Console & Telemetry */
         .console { background: #000; border: 1px solid var(--border); height: 120px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; padding: 10px; overflow-y: auto; color: #00cc66; line-height: 1.4; }
         .telemetry { display: flex; justify-content: space-between; font-size: 9px; color: var(--text); margin-top: 10px; }
         .telemetry span { color: var(--neon); }
@@ -45,10 +41,10 @@
     <div class="card">
         <h2>DSP CONTROL</h2>
         
-        <label>Main Parameter <span class="val-out" id="v_disp">64</span></label>
-        <input type="range" min="0" max="127" value="64" id="mainSlider">
+        <label>Web Parameter (web1) <span class="val-out" id="v_disp">0.50</span></label>
+        <input type="range" min="0" max="1" step="0.01" value="0.5" id="mainSlider">
 
-        <label>Logic Switch</label>
+        <label>Logic Switch (web2)</label>
         <div class="switch-wrap">
             <span style="font-size: 10px;">SIGNAL ENABLE</span>
             <label class="switch">
@@ -57,7 +53,7 @@
             </label>
         </div>
 
-        <label style="margin-top:20px;">Trigger</label>
+        <label style="margin-top:20px;">Trigger (web1)</label>
         <button id="triggerBtn">Send Impulse</button>
     </div>
 
@@ -89,42 +85,46 @@
             <div>> Kernel Link Established...</div>
         </div>
         <div class="telemetry">
-            <div>TEMP: <span></span></div>
-            <div>CORE: <span></span></div>
-            <div>STATUS: <span></span></div>
+            <div>TEMP: <span id="temp_val"><!--#temp--></span></div>
+            <div>CORE: <span id="core_val"><!--#core--></span></div>
+            <div>STATUS: <span id="status_val"><!--#status--></span></div>
         </div>
     </div>
 </div>
 
 <script>
     let lastSent = 0;
-    const throttleMs = 35;
+    const throttleMs = 50;
+    let sliderTimer = null;
 
-    function send(param, val, extra = "") {
+    function send(paramName, val, extra = "") {
         const now = Date.now();
-        if (now - lastSent < throttleMs && (param === 'v' || param === 'm')) return;
+        if (now - lastSent < throttleMs && paramName === 'web1') return;
         lastSent = now;
         
-        let url = `/update_pd.cgi?p=${param}&v=${val}${extra}`;
+        let url = `/update_pd.cgi?p=${paramName}&v=${val}${extra}`;
         fetch(url, { keepalive: true }).catch(() => {});
     }
 
-    // DSP Listeners
     document.getElementById('mainSlider').oninput = (e) => {
-        document.getElementById('v_disp').innerText = e.target.value;
-        send('v', e.target.value);
+        const val = e.target.value;
+        document.getElementById('v_disp').innerText = Number(val).toFixed(2);
+        
+        if (sliderTimer) clearTimeout(sliderTimer);
+        sliderTimer = setTimeout(() => {
+            send('web1', val);
+        }, 40);
     };
 
     document.getElementById('mainSwitch').onchange = (e) => {
-        send('s', e.target.checked ? 1 : 0);
+        send('web2', e.target.checked ? 1 : 0);
     };
 
     const btn = document.getElementById('triggerBtn');
-    const trigger = (v) => send('t', v);
+    const trigger = (v) => send('web1', v);
     btn.onmousedown = () => trigger(1);
     btn.onmouseup = () => trigger(0);
 
-    // MIDI Listener
     document.getElementById('ccSlider').oninput = (e) => {
         const chan = document.getElementById('midiChan').value;
         const cc = document.getElementById('midiCC').value;
@@ -132,18 +132,22 @@
         send('m', e.target.value, `&c=${chan}&n=${cc}`);
     };
 
-    // Console Polling (Every 2 seconds to save bandwidth)
     setInterval(async () => {
         try {
-            // We fetch the page itself to grab the fresh SSI telemetry values
-            const res = await fetch(location.href);
+            const res = await fetch(location.href, { headers: { 'Cache-Control': 'no-cache' } });
             const html = await res.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const newTele = doc.querySelector('.telemetry').innerHTML;
-            document.querySelector('.telemetry').innerHTML = newTele;
+            
+            const newTemp = doc.getElementById('temp_val').innerText;
+            const newCore = doc.getElementById('core_val').innerText;
+            const newStatus = doc.getElementById('status_val').innerText;
+            
+            if (newTemp && !newTemp.includes('#')) document.getElementById('temp_val').innerText = newTemp;
+            if (newCore && !newCore.includes('#')) document.getElementById('core_val').innerText = newCore;
+            if (newStatus && !newStatus.includes('#')) document.getElementById('status_val').innerText = newStatus;
         } catch(e) {}
-    }, 2000);
+    }, 4000);
 </script>
 </body>
 </html>

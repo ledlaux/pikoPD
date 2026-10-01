@@ -7,8 +7,8 @@
 #include "hardware/i2c.h"
 
 extern "C" {
-    #include "screen/ssd1306.h"
-    #include "screen/font.h"
+    #include "ssd1306.h"
+    #include "font.h"
 }
 
 #include <stdio.h>

@@ -17,6 +17,8 @@
 
 #pragma once
 
+#if MPR121_ENABLED
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
@@ -156,3 +158,4 @@ public:
 
 } // namespace Pico
 
+#endif

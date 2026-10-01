@@ -11,11 +11,11 @@
 #include <algorithm>
 
 #ifdef USE_REVERB
-#include "masterfx/freeverb.h"
+#include "freeverb.h"
 #endif
 
 #ifdef USE_DELAY
-#include "masterfx/delayline.h"
+#include "delayline.h"
 #endif
 
 #define USE_PWM_AUDIO

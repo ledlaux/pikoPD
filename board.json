@@ -1,6 +1,7 @@
+
 {
   "name": "heavy",
-  "pico_board": "pico2",
+  "pico_board": "pico",
   "core_freq": 240000,
   "audio_mode": "I2S",
   "sample_rate": 48000,
@@ -22,9 +23,9 @@
     ],
 
     "buttons": [
-      { "name": "btn1", "pin": 23, "mode": "switch" },
-      { "name": "btn2", "pin": 11, "mode": "switch" },
-      { "name": "btn3", "pin": 14, "mode": "bang" }
+      { "name": "btn1", "pin": 23, "mode": "bang" },
+      { "name": "btn2", "pin": 11, "mode": "toggle" },
+      { "name": "btn3", "pin": 14, "mode": "switch" }
     ],
 
     "gate_in": [
@@ -51,16 +52,43 @@
        
        "hc-sr04": [
         { "name": "distance", "trigger": 2, "echo": 3}
-    
-      ]
-    }
-  },
+      ],
 
-  "outputs": {
+      "hx710": [
+    {
+        "name": "air",
+        "sck_pin": 14,
+        "dout_pin": 12,
+        "min_raw": 704000,
+        "max_raw": 1004000,
+        "fall_factor": 0.95,
+        "send_interval": 20,
+        "rise_step": 2,
+        "mode": "MIDI"
+    }
+]
     
+  }
+},
+
+"outputs": {
     "gate_out": [
       { "name": "gate", "pin": 2, "mode": "gate" },
       { "name": "trigger", "pin": 3, "mode": "trigger" }
+    ],
+    "mcp4725": [
+      {
+        "name": "note_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "note"
+      },
+      {
+        "name": "cv_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "cv"
+      }
     ]
   },
 
@@ -69,11 +97,11 @@
     { "name": "status", "pin": 24, "mode": "status" },
     { "name": "clock", "pin": 23, "mode": "clock" },
     { "name": "ledRGB", "pin": 16, "is_rgb": true, "mode": "midi" }
-  ], 
+  ],  
   
   "masterfx": {
     "delay": false,
-    "reverb": true,
+    "reverb": false,
     "limiter": true
   },
 

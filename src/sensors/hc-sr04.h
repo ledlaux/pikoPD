@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef DISTANCE_SENSOR_ENABLED
+#if DISTANCE_SENSOR_ENABLED
 
 #include "pico/stdlib.h"
 #include "hardware/pio.h"

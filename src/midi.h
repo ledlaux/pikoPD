@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 
+
 #if defined(WEB) && (WEB == 1)
 #else
     #ifdef MIDI_HOST
@@ -18,14 +19,14 @@
             #define BOARD_TUH_RHPORT 0
         #endif
         
-        #include "usb/tusb_config.h"
+        #include "tusb_config.h"
         #include "tusb.h"
         #include "host/usbh.h"
         #include "class/midi/midi_host.h"
     #else
-        #include "usb/tusb_config.h"
+        #include "tusb_config.h"
         #include "tusb.h"
-        #include "usb/cdc_stdio_lib.h" 
+        #include "cdc_stdio_lib.h" 
     #endif
 #endif
 
@@ -295,7 +296,7 @@ void midi_task() {
             }
         #endif
     #endif
-} // Function always closes correctly now
+} 
 
     extern "C" void on_uart_rx() {
         while (uart_is_readable(uart0)) {
@@ -329,7 +330,7 @@ void print_queue(const char** names, int num_names, bool debug)
     {
         uint32_t idx;
 
-        // non-blocking FIFO drain (IMPORTANT for stability)
+        // non-blocking FIFO drain 
         if (!multicore_fifo_pop_timeout_us(0, &idx)) {
             break;
         }
@@ -340,7 +341,7 @@ void print_queue(const char** names, int num_names, bool debug)
 
         PrintMsg* m = &print_pool[idx];
 
-        // ---- SAFE ownership release (no struct copy, no race) ----
+        // ---- SAFE ownership release ----
         bool expected = true;
         if (!m->busy.compare_exchange_strong(
                 expected,
@@ -350,41 +351,202 @@ void print_queue(const char** names, int num_names, bool debug)
             continue;
         }
 
+// #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
+// #if ENABLE_DEBUG
+
+//         if (debug && tud_cdc_connected())
+//         {
+//             const char* name = "print";
+
+//             int id = m->id;
+//             if (names && id >= 0 && id < num_names && names[id]) {
+//                 name = names[id];
+//             }
+
+//             float val = m->val;
+
+//             // ---- SAFE float formatting ----
+//             int v = (int)(val * 1000.0f);
+//             int whole = v / 1000;
+//             int frac  = (v < 0) ? -(v % 1000) : (v % 1000);
+
+//             char buf[96];
+
+//             int len = snprintf(buf, sizeof(buf),
+//                                "%d.%03d\r\n",      // "[%s] %d.%03d\r\n" - This makes crash on RP2350
+//                             //   name,
+//                                whole,
+//                                frac);
+
+//             if (len > 0 && len < (int)sizeof(buf))
+//             {
+//                 fputs(buf, stdout);
+//             }
+//         }
+
+// #endif
+// #endif
+
+// #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
+// #if ENABLE_DEBUG
+
+//         if (debug && tud_cdc_connected())
+//         {
+//             // 1. Safe Name Resolution
+//             const char* name = "print";
+//             int id = m->id;
+            
+//             // Ensure names pointer itself is not null before checking bounds
+//             if (names && id >= 0 && id < num_names && names[id] != NULL) {
+//                 name = names[id];
+//             }
+
+//             float val = m->val;
+
+//             // ---- SAFE float formatting ----
+//             int v = (int)(val * 1000.0f);
+//             int whole = v / 1000;
+//             int frac  = (v < 0) ? -(v % 1000) : (v % 1000);
+
+//             char buf[128]; // Increased slightly to comfortably fit long names
+
+//             // 2. Safe snprintf execution with string (%s) enabled
+//             int len = snprintf(buf, sizeof(buf),
+//                                "[%s] %d.%03d\r\n",
+//                                name,
+//                                whole,
+//                                frac);
+
+//             if (len > 0 && len < (int)sizeof(buf))
+//             {
+//                 fputs(buf, stdout);
+//             }
+//         }
+
+// #endif
+// #endif
+
 #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
 #if ENABLE_DEBUG
 
         if (debug && tud_cdc_connected())
         {
-            const char* name = "print";
-
             int id = m->id;
-            if (names && id >= 0 && id < num_names && names[id]) {
+            float val = m->val;
+
+            // Resolve the string safely
+            const char* name = "print";
+            if (names && id >= 0 && id < num_names && names[id] != NULL) {
                 name = names[id];
             }
 
-            float val = m->val;
-
-            // ---- SAFE float formatting (avoid libc float instability) ----
+            // SAFE float formatting
             int v = (int)(val * 1000.0f);
             int whole = v / 1000;
             int frac  = (v < 0) ? -(v % 1000) : (v % 1000);
 
-            char buf[96];
-
+            // Minimal format: name value
+            char buf[128];
             int len = snprintf(buf, sizeof(buf),
-                               "%d.%03d\r\n",      // "[%s] %d.%03d\r\n" - This makes crash on RP2350
-                            //   name,
+                               "%s %d.%03d\r\n",
+                               name,
                                whole,
                                frac);
 
             if (len > 0 && len < (int)sizeof(buf))
             {
                 fputs(buf, stdout);
+                sleep_us(100); 
             }
         }
 
 #endif
 #endif
+
+// #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
+// #if ENABLE_DEBUG
+
+//         if (debug && tud_cdc_connected())
+//         {
+//             int id = m->id;
+//             float val = m->val;
+
+//             const char* name = "print";
+//             if (names && id >= 0 && id < num_names && names[id] != NULL) {
+//                 name = names[id];
+//             }
+
+//             char buf[128];
+//             int len = 0;
+
+//             // DYNAMIC CHECK: If value is exactly 0, assume it's just a text trigger/bang
+//             if (val == 0.0f) 
+//             {
+//                 len = snprintf(buf, sizeof(buf), "%s\r\n", name);
+//             }
+//             else 
+//             {
+//                 int v = (int)(val * 1000.0f);
+//                 int whole = v / 1000;
+//                 int frac  = (v < 0) ? -(v % 1000) : (v % 1000);
+
+//                 len = snprintf(buf, sizeof(buf), "%s %d.%03d\r\n", name, whole, frac);
+//             }
+
+//             if (len > 0 && len < (int)sizeof(buf))
+//             {
+//                 fputs(buf, stdout);
+//                 sleep_us(100); 
+//             }
+//         }
+
+// #endif
+// #endif
+
+// #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
+// #if ENABLE_DEBUG
+
+//         if (debug && tud_cdc_connected())
+//         {
+//             int id = m->id;
+//             float val = m->val;
+
+//             // Resolve the name/symbol string safely
+//             const char* name = "print";
+//             if (names && id >= 0 && id < num_names && names[id] != NULL) {
+//                 name = names[id];
+//             }
+
+//             char buf[128];
+//             int len = 0;
+
+//             // DYNAMIC: Output format based on whether it is a plain text/trigger or value list
+//             if (val == 0.0f) 
+//             {
+//                 // Prints just the selector symbol name (e.g., "print")
+//                 len = snprintf(buf, sizeof(buf), "%s\r\n", name);
+//             }
+//             else 
+//             {
+//                 // Convert float payload safely
+//                 int v = (int)(val * 1000.0f);
+//                 int whole = v / 1000;
+//                 int frac  = (v < 0) ? -(v % 1000) : (v % 1000);
+
+//                 // Prints PD style list: "selector value" (e.g., "print 0.500")
+//                 len = snprintf(buf, sizeof(buf), "%s %d.%03d\r\n", name, whole, frac);
+//             }
+
+//             if (len > 0 && len < (int)sizeof(buf))
+//             {
+//                 fputs(buf, stdout);
+//                 sleep_us(100); // USB safety throttle
+//             }
+//         }
+
+// #endif
+// #endif
+
     }
 }
 

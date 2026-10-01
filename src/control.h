@@ -3,24 +3,35 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
-#include "hardware/pwm.h"
-#include "hardware/pio.h"
+#include "hardware/i2c.h"
+#include "led.h"
 #include "pico/time.h"
 #include <atomic>
 #include <cmath>
 #include <cstdio>
 
-#ifdef PICO_ZERO
+#if PICO_ZERO
 #include "ws2812.pio.h" 
 #endif
 
-#ifdef MPR121_ENABLED
-#include "sensors/MPR121.h"
+#if MPR121_ENABLED
+#include "mpr121.h"
 #endif
 
-#ifdef DISTANCE_SENSOR_ENABLED
-#include "sensors/HC-SR04.h"
+#if DISTANCE_SENSOR_ENABLED
+#include "hc-sr04.h"
 #endif
+
+#if HX710_ENABLED
+#include "hx710.h"
+#endif
+
+#if CNY70_ENABLED
+#include "cny70.h"
+#endif
+
+#include "mcp4725.h" 
+
 
 namespace Pico {
 
@@ -54,14 +65,6 @@ namespace Pico {
         float coeff; 
     };
 
-    struct Led {
-        uint32_t pin;
-        uint slice;
-        uint chan;
-        bool is_rgb; 
-        uint8_t r, g, b;
-    };
-
     struct Encoder {
         uint32_t pinA;
         uint32_t pinB;
@@ -84,42 +87,19 @@ namespace Pico {
         float lastSentY = -1.0f;
     };
 
-    struct CNY70 {
-        int adc_ch;
-        float smooth_value;
-        float last_val; 
-        float alpha;
-        int threshold;
-        int max_sensor;
-        int dead_zone;
-        int output_id;
-    };
-
     // --- State Storage ---
 
     inline Button btns[12];
     inline Knob knobs[4];
-    inline Led leds[12];
     inline Encoder encoder[4];
     inline Joystick joystick[2];
-    inline CNY70 cny70[1];
-
+ 
     inline int n_btn = 0;
     inline int n_knob = 0;
-    inline int n_led = 0;
     inline int n_encoder = 0;
     inline int n_joystick = 0;
-    inline int n_cny70 = 0;
-
-    inline std::atomic<float> led_vals[12];
-    inline std::atomic<float> led_hue[12];        
-    inline std::atomic<float> led_intensity[12];
-    inline uint32_t led_framebuffer[12] = {0};
-    inline float smooth_hue[12] = {0.0f};
 
     inline bool adc_initialized = false;
-
-    // --- Logic Implementation ---
 
     inline void start_adc() {
         if (!adc_initialized) {
@@ -186,20 +166,6 @@ namespace Pico {
         if (index >= n_encoder) n_encoder = index + 1;
     }
 
-    inline void addLed(int index, uint32_t pin) {
-        gpio_set_function(pin, GPIO_FUNC_PWM);
-        uint slice = pwm_gpio_to_slice_num(pin);
-        uint chan = pwm_gpio_to_channel(pin);
-        pwm_set_wrap(slice, 255);
-        pwm_set_enabled(slice, true);
-        
-        leds[index].pin = pin;
-        leds[index].slice = slice;
-        leds[index].chan = chan;
-        leds[index].is_rgb = false;
-        if (index >= n_led) n_led = index + 1;
-    }
-
     inline void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
         start_adc();
         adc_gpio_init(pinX);
@@ -215,21 +181,6 @@ namespace Pico {
         joystick[index].x.store(0, std::memory_order_relaxed);
         joystick[index].y.store(0, std::memory_order_relaxed);
         if (index >= n_joystick) n_joystick = index + 1;
-    }
-
-    inline void addCNY70(int pin, int threshold, int max_sensor, float alpha, int dead_zone, int output_id) {
-        start_adc();
-        adc_gpio_init(pin);
-        auto &s = cny70[0];
-        s.adc_ch = pin - 26;
-        s.threshold = threshold;
-        s.max_sensor = max_sensor;
-        s.alpha = alpha;
-        s.dead_zone = dead_zone;
-        s.output_id = output_id;
-        s.last_val = -1.0f; 
-        s.smooth_value = 0.0f;
-        n_cny70++;
     }
 
     inline void update(uint32_t now) {
@@ -376,112 +327,5 @@ namespace Pico {
         if (cY) { outY = newY; joystick[id].lastSentY = newY; }
         return (cX || cY);
     }
-
-    inline void __not_in_flash_func(setLedHardware)(int index, float value) {
-        if (index >= 12 || leds[index].is_rgb) return;
-        uint16_t level = (uint16_t)(value * value * 255.0f);
-        pwm_set_chan_level(leds[index].slice, leds[index].chan, level);
-    }
-
-    inline void updateLed(int index, float val) {
-        if (index < 12) {
-            led_vals[index].store(val, std::memory_order_relaxed);
-            if (!leds[index].is_rgb) setLedHardware(index, val);
-        }
-    }
-
-    inline bool processCNY70(int i, float &outVal, float &rawOut) {
-        if (i < 0 || i >= n_cny70) return false;
-        auto &s = cny70[i];
-    
-        adc_select_input(s.adc_ch);
-        uint32_t sum = 0;
-        for (int j = 0; j < 16; j++) {
-            sum += adc_read();
-        }
-        
-        // Average of 16 samples scaled up to 12-bit ADC range equivalent (sum / 16.0f * 4.0f)
-        rawOut = (float)sum / 64.0f; 
-    
-        // Calculate normalized value above threshold
-        float current_norm = 0.0f;
-        if (rawOut > (float)s.threshold) {
-            float range = fmaxf(1.0f, (float)s.max_sensor - (float)s.threshold);
-            current_norm = fminf(1.0f, (rawOut - (float)s.threshold) / range);
-        }
-    
-        // Exponential moving average filter
-        if (s.last_val < -0.5f) {
-            s.smooth_value = current_norm;
-            s.last_val = 0.0f;
-        } else {
-            s.smooth_value += (current_norm - s.smooth_value) * s.alpha;
-        }
-    
-        // Dead-zone and boundary check to trigger updates
-        float dz = (float)s.dead_zone * 0.001f;
-        if (fabsf(s.smooth_value - s.last_val) > dz || s.smooth_value == 0.0f || s.smooth_value == 1.0f) {
-            s.last_val = s.smooth_value;
-            outVal = s.smooth_value;
-            return true;
-        }
-    
-        return false;
-    }
-
-#ifdef PICO_ZERO
-    inline void init_neopixel() {
-        static bool initialized = false;
-        if (initialized) return;
-        PIO pio = pio1;
-        if (!pio_can_add_program(pio, &ws2812_program)) return;
-        uint offset = pio_add_program(pio, &ws2812_program);
-        ws2812_program_init(pio, 0, offset, 16, 800000, false); 
-        pio_sm_set_enabled(pio, 0, true);
-        initialized = true;
-    }
-
-    inline void addRgbLed(int index, uint32_t pin, uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) {
-        init_neopixel(); 
-        leds[index].pin = pin;
-        leds[index].is_rgb = true;
-        leds[index].r = r; leds[index].g = g; leds[index].b = b;
-        if (index >= n_led) n_led = index + 1;
-    }
-
-    inline void updateRGB(int index, float hue, float intensity) {
-        if (index < 0 || index >= 12) return;
-        float diff = hue - smooth_hue[index];
-        if (diff > 0.5f) diff -= 1.0f;
-        if (diff < -0.5f) diff += 1.0f;
-        smooth_hue[index] += diff * 0.15f; 
-        if (smooth_hue[index] >= 1.0f) smooth_hue[index] -= 1.0f;
-        if (smooth_hue[index] < 0.0f) smooth_hue[index] += 1.0f;
-
-        float r = 0, g = 0, b = 0;
-        float h = smooth_hue[index] * 6.0f;
-        int i = (int)h;
-        float f = h - i;
-        float q = 1.0f - f;
-        switch (i % 6) {
-            case 0: r = 1.0f; g = f;    b = 0.0f; break;
-            case 1: r = q;    g = 1.0f; b = 0.0f; break;
-            case 2: r = 0.0f; g = 1.0f; b = f;    break;
-            case 3: r = 0.0f; g = q;    b = 1.0f; break;
-            case 4: r = f;    g = 0.0f; b = 1.0f; break;
-            case 5: r = 1.0f; g = 0.0f; b = q;    break;
-        }
-        float gamma = intensity * intensity;
-        uint8_t uR = (uint8_t)(r * gamma * 255.0f);
-        uint8_t uG = (uint8_t)(g * gamma * 255.0f);
-        uint8_t uB = (uint8_t)(b * gamma * 255.0f);
-        led_framebuffer[index] = ((uint32_t)(uG) << 16) | ((uint32_t)(uR) << 8) | ((uint32_t)(uB));
-    }
-
-    inline void showRGB() {
-        if (pio_sm_get_tx_fifo_level(pio1, 0) > 4) return;
-        pio1->txf[0] = led_framebuffer[0];
-        pio1->txf[0] = 0; pio1->txf[0] = 0; pio1->txf[0] = 0;
-    }
-#endif
 }
+
