@@ -29,9 +29,9 @@ Build folder contains compiled binary with test.
 
 ## Hardware
 
-- Raspberry Pi Pico / RP2040 board
+- Raspberry Pi Pico / RP2040 or RP2350 board
 - PCM1802 I2S ADC
-- I2S DAC
+- I2S PCM5102 DAC
 
 ## Stable Configuration
 
