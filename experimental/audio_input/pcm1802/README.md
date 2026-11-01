@@ -33,7 +33,7 @@ Build folder contains compiled binary with test.
 - PCM1802 I2S ADC
 - I2S DAC
 
-## Configuration
+## Stable Configuration
 
 | Setting | Value |
 |---|---:|
