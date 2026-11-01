@@ -35,21 +35,27 @@ Build folder contains compiled binary with test.
 
 ## Stable Configuration
 
+I2S library author suggests to set system clock to stabile, tested 192Mhz and also informs that sample rate of 44100 can't be set because of an invalid clock divider. We need to take in account also PD block size. To squeeze more processing power some other values were tested. But 192Mhz is still the most stabile. Need to conduct more tests with different dsp processing inside the PD patches. 
+
+**RP2040:**
+
 | Setting | Value |
 |---|---:|
-| System clock | 250 MHz |
+| System clock | 190 or 250 MHz |
 | Sample rate | 22,050 Hz |
 | Heavy block size | 64 samples |
 | Audio buffer | 2,048 words |
 | DSP queue | 4 buffers |
 
-## PCM1802 Solder Pads
+**RP2350:**
+| Setting | Value |
+|---|---:|
+| System clock | 192 MHz |
+| Sample rate | 32,000 Hz |
+| Heavy block size | 64-128 samples |
+| Audio buffer | 2,048 words |
+| DSP queue | 4 buffers |
 
-Solder a bridge between the `FMT0` pad and the `+` pad.
-
-On some faulty PCM1802 modules, this modification may not be sufficient. In that case, connect the `FMT0` pad directly to the module's `3.3V` pin using a wire.
-
-Reference: [PCM1802 breakout board modification](https://www.pjrc.com/pcm1802-breakout-board-needs-hack/).
 
 ## Wiring
 
@@ -64,6 +70,14 @@ Reference: [PCM1802 breakout board modification](https://www.pjrc.com/pcm1802-br
 | DOUT | GPIO19 | Audio data output |
 | FSY | 3V3 | Can connect to Pico 3V3 or module 3.3V |
 | POW | 3V3 | Can connect to Pico 3V3 or module 3.3V |
+
+## PCM1802 Solder Pads
+
+Solder a bridge between the `FMT0` pad and the `+` pad.
+
+On some faulty PCM1802 modules, this modification may not be sufficient. In that case, connect the `FMT0` pad directly to the module's `3.3V` pin using a wire.
+
+Reference: [PCM1802 breakout board modification](https://www.pjrc.com/pcm1802-breakout-board-needs-hack/).
 
 ## I2S DAC Wiring
 
