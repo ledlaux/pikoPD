@@ -66,8 +66,15 @@ Reference: [PCM1802 breakout board modification](https://www.pjrc.com/pcm1802-br
 
 ## Building
 
-This project uses the Raspberry Pi Pico SDK and CMake.
+This project uses HVCC compiler, Raspberry Pi Pico SDK and CMake.
 
+To convert .pd file to C code use HVCC compiler not pikoPD script (will be integrated in future):
+```bash
+hvcc audio.pd -o hvcc_output -n audio
+```
+And copy output to the hvcc folder.
+
+In the project folder:
 ```bash
 mkdir build
 cd build
@@ -85,7 +92,7 @@ Flash the generated UF2 file to your RP2040 board.
 - Raspberry Pi Pico SDK
 
 
-MIT License
+## MIT License
 
 Copyright (c) 2026 ledlaux.github.com
 
