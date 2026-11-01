@@ -2,12 +2,21 @@
 
 # PikoPD - RP2040 I2S Audio Processing
 
-Real-time audio input and output using the Raspberry Pi RP2040, PIO-based I2S, DMA, and [Heavy (hvcc)](https://github.com/Wasted-Audio/hvcc) for DSP processing.
+Real-time audio input and output using the Raspberry Pi RP2040, PIO-based I2S, DMA, and [Heavy (hvcc)](https://github.com/Wasted-Audio/hvcc) for DSP processing.  
+
+Due to the complexity of integrating this into the main project branch, particularly because of the tricky PIO, DMA, and clock configurations, it will remain in a separate folder for now.     
 
 > [!WARNING]
  **Highly Experimental**
 
-Due to the complexity of integrating this into the main project branch, particularly because of the tricky PIO, DMA, and clock configurations, it will remain in a separate folder for now.
+⚠️ Audio Pop at Startup
+
+The first few audio samples may produce a loud pop or noise burst during startup. Do not turn up the volume immediately after powering on the device. This issue is currently under investigation.  
+
+It works by placing [adc] and [dac] objects inside the PD patch. Different processing can be placed between those, like delay. For the safety don't forget to limit sound volume before outputing.
+
+Build folder contains compiled binary with test.     
+
 
 
 ## Features
