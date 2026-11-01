@@ -105,6 +105,10 @@ Video of using MPR121 with samples loaded in PD on RP2040:
 
 https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
+## Audio Input
+
+Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. Some audio input tests can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder of the Develop branch.  
+
 
 ## Default Patch
 
