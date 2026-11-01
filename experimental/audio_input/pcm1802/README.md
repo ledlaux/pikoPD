@@ -1,8 +1,8 @@
 
 
-# PikoPD - RP2040 I2S Audio Processing
+# PikoPD - Pico I2S Audio Processing
 
-Real-time audio input and output using the Raspberry Pi RP2040, PIO-based I2S, DMA, and [Heavy (hvcc)](https://github.com/Wasted-Audio/hvcc) for DSP processing.  
+Real-time audio input and output using the Raspberry Pi RP2040 and RP2350, PIO-based I2S, DMA, and [Heavy (hvcc)](https://github.com/Wasted-Audio/hvcc) for DSP processing.  
 
 Due to the complexity of integrating this into the main project branch, particularly because of the tricky PIO, DMA, and clock configurations, it will remain in a separate folder for now.     
 
