@@ -43,17 +43,17 @@ I2S library author suggests to set system clock to stabile, tested 192Mhz and al
 |---|---:|
 | System clock | 190 or 250 MHz |
 | Sample rate | 22,050 Hz |
-| Heavy block size | 64 samples |
-| Audio buffer | 2,048 words |
+| Heavy block size | 64  |
+| Audio buffer | 2,048 |
 | DSP queue | 4 buffers |
 
 **RP2350:**
 | Setting | Value |
 |---|---:|
 | System clock | 192 MHz |
-| Sample rate | 32,000 Hz |
-| Heavy block size | 64-128 samples |
-| Audio buffer | 2,048 words |
+| Sample rate | 48,000 Hz |
+| Heavy block size | 64  |
+| Audio buffer | 512 |
 | DSP queue | 4 buffers |
 
 
