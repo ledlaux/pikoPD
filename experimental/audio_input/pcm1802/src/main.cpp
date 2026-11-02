@@ -5,7 +5,6 @@
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-
 #include "hardware/clocks.h"
 #include "hardware/pio.h"
 #include "hardware/sync.h"
@@ -23,11 +22,10 @@
 // Heavy DSP configuration
 // ---------------------------------------------------------
 
-#define SAMPLE_RATE 22050 //rp2040 
-#define BLOCK_SIZE  64    //rp2040 don't change
-
-#define AUDIO_BUFFER_WORDS 2048
-
+#define SAMPLE_RATE 48000 //RP2350 
+#define BLOCK_SIZE  64   //RP2350
+#define DMA_BUFFER_SIZE 512 //RP2350
+ 
 #define DSP_QUEUE_COUNT 4
 
 // ---------------------------------------------------------
@@ -54,7 +52,7 @@ Heavy_audio pd_prog((double)SAMPLE_RATE);
 // Core 0 produces input buffers.
 // Core 1 consumes input buffers.
 
-static uint32_t input_queue[DSP_QUEUE_COUNT][AUDIO_BUFFER_WORDS];
+static uint32_t input_queue[DSP_QUEUE_COUNT][DMA_BUFFER_SIZE];
 
 static volatile uint32_t input_write_index = 0;
 static volatile uint32_t input_read_index = 0;
@@ -62,7 +60,7 @@ static volatile uint32_t input_read_index = 0;
 // Core 1 produces processed buffers.
 // Core 0 consumes processed buffers.
 
-static uint32_t output_queue[DSP_QUEUE_COUNT][AUDIO_BUFFER_WORDS];
+static uint32_t output_queue[DSP_QUEUE_COUNT][DMA_BUFFER_SIZE];
 
 static volatile uint32_t output_write_index = 0;
 static volatile uint32_t output_read_index = 0;
@@ -231,7 +229,7 @@ static void heavyProcessingCore()
             BLOCK_SIZE * 2;
 
         for (size_t offset = 0;
-             offset + heavy_block_words <= AUDIO_BUFFER_WORDS;
+             offset + heavy_block_words <= DMA_BUFFER_SIZE;
              offset += heavy_block_words)
         {
             processAudioBlock(
@@ -266,7 +264,7 @@ void buffer_pre_read_callback(
     volatile uint32_t *buffer,
     size_t buffer_size)
 {
-    if (buffer_size != AUDIO_BUFFER_WORDS)
+    if (buffer_size != DMA_BUFFER_SIZE)
     {
         for (size_t i = 0; i < buffer_size; i++)
         {
@@ -351,7 +349,7 @@ int main()
     // Clock configuration - unchanged
     // -----------------------------------------------------
 
-    const uint32_t sys_freq = 250000000UL;
+    const uint32_t sys_freq = 192000000UL;
 
     set_sys_clock_hz(sys_freq, true);
 
@@ -419,7 +417,7 @@ int main()
     // Existing BufferQueue - unchanged
     // -----------------------------------------------------
 
-    BufferQueue buffer_queue(8, AUDIO_BUFFER_WORDS);
+    BufferQueue buffer_queue(8, DMA_BUFFER_SIZE);
 
     buffer_queue.clearBuffers();
 
@@ -502,19 +500,10 @@ int main()
         to_ms_since_boot(get_absolute_time());
 
     while (true)
-    {
-        uint64_t current_time =
-            to_ms_since_boot(get_absolute_time());
-
-        if (current_time - previous_time > 500)
-        {
-            gpio_xor_mask(1u << LED_PIN);
-
-            previous_time = current_time;
-        }
-
-        tight_loop_contents();
-    }
+{
+    gpio_put(LED_PIN, 1);
+    tight_loop_contents();
+}
 }
 
 // ---------------------------------------------------------
