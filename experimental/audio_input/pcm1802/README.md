@@ -11,7 +11,7 @@ Due to the complexity of integrating this into the main project branch, particul
 
 ⚠️ Audio Pop at Startup
 
-The first few audio samples may produce a loud pop or noise burst during startup. Do not turn up the volume immediately after powering on the device. This issue is currently under investigation. Also input is set to mono.
+On some settings the first few audio samples may produce a loud pop or noise burst during startup. Do not turn up the volume immediately after powering on the device. This issue is currently under investigation. Also input is set to mono.
 
 It works by placing [adc] and [dac] objects inside the PD patch. Different processing can be placed between those, like delay. For the safety don't forget to limit sound volume before outputing.
 
