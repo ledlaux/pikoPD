@@ -346,7 +346,7 @@ void buffer_pre_read_callback(
 int main()
 {
     // -----------------------------------------------------
-    // Clock configuration - unchanged
+    // Clock configuration. 
     // -----------------------------------------------------
 
     const uint32_t sys_freq = 192000000UL;
@@ -360,7 +360,7 @@ int main()
 #endif
 
     // -----------------------------------------------------
-    // DCDC power control - unchanged
+    // DCDC power control. 
     // -----------------------------------------------------
 
     const uint32_t DCDC_PSM_CTRL_PIN = 23;
@@ -414,7 +414,7 @@ int main()
     );
 
     // -----------------------------------------------------
-    // Existing BufferQueue - unchanged
+    // Existing BufferQueue.
     // -----------------------------------------------------
 
     BufferQueue buffer_queue(8, DMA_BUFFER_SIZE);
@@ -463,7 +463,7 @@ int main()
     multicore_launch_core1(heavyProcessingCore);
 
     // -----------------------------------------------------
-    // DMA configuration - unchanged
+    // DMA configuration.
     // -----------------------------------------------------
 
     DMAReader dma_reader(
@@ -479,7 +479,7 @@ int main()
     );
 
     // -----------------------------------------------------
-    // Start I2S - unchanged.
+    // Start I2S.
     // Keep these calls adjacent and in this order.
     // -----------------------------------------------------
 
@@ -507,7 +507,7 @@ int main()
 }
 
 // ---------------------------------------------------------
-// Pico atomic compatibility stubs 
+// Pico atomic compatibility stubs. 
 // ---------------------------------------------------------
 
 #if defined(PICO_PLATFORM) || defined(PICO_RP2040)
