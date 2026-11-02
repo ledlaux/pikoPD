@@ -86,6 +86,7 @@ Reference: [PCM1802 breakout board modification](https://www.pjrc.com/pcm1802-br
 | BCLK | GPIO10 |
 | LRCK | GPIO11 |
 | DATA | GPIO9 |
+| SCK | GND |
 
 ## Building
 
