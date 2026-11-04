@@ -29,7 +29,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040|RP2350  v0.0.2 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.3 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
@@ -406,14 +406,34 @@ class PicoUF2Generator:
         self.run_cmd(["ninja", "-j10"], cwd=self.build_dir, step_name="Ninja")
 
         flash_success = False
+
         if flash:
-            if self.check_pico_bootsel():
-                self.print_progress(0.95, "Flashing")
-                uf2 = glob.glob(os.path.join(self.build_dir, "*.uf2"))[0]
-                self.run_cmd(["picotool", "load", "-f", "-x", uf2], step_name="Flash")
+            self.print_progress(0.95, "Flashing")
+
+            uf2_files = glob.glob(os.path.join(self.build_dir, "*.uf2"))
+
+            if not uf2_files:
+                print("❌ ERROR: No UF2 firmware found.")
+                sys.exit(1)
+
+            uf2 = uf2_files[0]
+
+            try:
+                self.run_cmd(
+                    ["picotool", "load", "-f", "-x", uf2],
+                    step_name="Flash"
+                )
                 flash_success = True
-            else:
-                print("\033[91m❌ STOP: Pico not in BOOTSEL mode.\033[0m")
+                print("✔ Firmware flashed successfully.")
+
+            except (Exception, SystemExit) as e:
+                print(f"❌ Flash failed: {e}")
+
+                if not self.check_pico_bootsel():
+                    print("⚠ Pico did not enter BOOTSEL mode or is not detected.")
+                else:
+                    print("⚠ Pico is in BOOTSEL mode, but flashing failed.")
+
                 sys.exit(1)
 
         duration = time.time() - start_time

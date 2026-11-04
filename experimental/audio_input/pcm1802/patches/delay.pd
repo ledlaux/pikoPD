@@ -1,0 +1,15 @@
+#N canvas 386 206 1077 604 12;
+#X obj 991 793 adc~;
+#X obj 991 969 dac~;
+#X obj 1067 896 hsl 128 17 0 250 0 1 empty empty empty -2 -8 0 10 #e4e4e4 #4d4d4d #373737 7987 1;
+#X obj 1041 843 delwrite~ buf 500;
+#X obj 1041 926 delread~ buf 250;
+#X obj 1041 871 r time @hv_param 0 499 250;
+#X connect 0 0 1 0;
+#X connect 0 0 3 0;
+#X connect 0 1 1 1;
+#X connect 0 1 3 0;
+#X connect 2 0 4 0;
+#X connect 4 0 1 1;
+#X connect 4 0 1 0;
+#X connect 5 0 2 0;

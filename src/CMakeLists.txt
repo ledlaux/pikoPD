@@ -165,10 +165,15 @@ if(NOT WEB)
     )
 endif()
 
-if("${PICO_BOARD}" STREQUAL "pico_w" OR "${PICO_BOARD}" STREQUAL "pico2_w")
+if("${PICO_BOARD}" STREQUAL "pico_w")
     target_compile_definitions(pikopd PRIVATE PICO_W=1)
+elseif("${PICO_BOARD}" STREQUAL "pico2_w")
+    target_compile_definitions(pikopd PRIVATE PICO2_W=1)
+endif()
+
+if("${PICO_BOARD}" STREQUAL "pico_w" OR "${PICO_BOARD}" STREQUAL "pico2_w")
     if(WEB)
-        target_link_libraries(pikopd PRIVATE 
+        target_link_libraries(pikopd PRIVATE
             pico_cyw43_arch_lwip_threadsafe_background
             pico_lwip_http
             pico_lwip_mdns
