@@ -78,7 +78,7 @@ pikopd.py
 - Uses `main.cpp` as a project template
 - Builds firmware using **CMake** in a `build/` folder  
 - Switches device to BOOTSEL mode automatically
-- Flashes UF2 firmware to PICO board and restarts device
+- Flashes UF2 firmware to the PICO board and restarts device
 
 
 ### Usage
