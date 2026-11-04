@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.3)
+/* pikoPD (v0.0.4)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -559,94 +559,38 @@ static void hv_osc_router(const char *a, float v) {
 }
 {%- endif %}
 
-/* ---  Print handler --- */
 
-{%- if board.console %}
-#define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
-PrintMsg print_pool[PRINT_POOL_SIZE];
+//-----------------------------------------
 
-static const char* printNames[NUM_PRINT_NAMES] = {
-{% for p in hv_manifest.prints -%}
-    "{{ p.name }}"{% if not loop.last %}, {% endif %}
-{% endfor %}
-};
+// Main audio function on Core1
 
-
-static int16_t get_print_id(const char *name) {
-    if (!name || name[0] == '\0') return -1; 
-    for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
-        if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
-    }
-    return -1;
-}
-
-
-void hv_print_handler(HeavyContextInterface* context,
-                      const char* printName,
-                      const char* str,
-                      const HvMessage* msg)
+void __not_in_flash_func(audioFunc)(float* buffer, int frames)
 {
-    static uint32_t last_print_ms = 0;
-    uint32_t now = to_ms_since_boot(get_absolute_time());
-
-    if (now - last_print_ms < 10) {
-        return;
-    }
-
-    int slot = -1;
-
-    for (int i = 0; i < PRINT_POOL_SIZE; i++) {
-        bool expected = false;
-
-        if (print_pool[i].busy.compare_exchange_strong(
-                expected, true,
-                std::memory_order_acq_rel))
-        {
-            slot = i;
-            break;
-        }
-    }
-
-    if (slot < 0) {
-        return;
-    }
-
-    PrintMsg &m = print_pool[slot];
-
-    int id = get_print_id(printName);
-
-    m.id       = id;
-    m.val      = msg ? msg_getFloat(msg, 0) : 0.0f;
-    m.is_float = (msg != nullptr);
-
-    std::atomic_thread_fence(std::memory_order_release);
-
-    if (!multicore_fifo_push_timeout_us(slot, 50)) {
-        m.busy.store(false, std::memory_order_release);
-        return;
-    }
-
-    last_print_ms = now;
-}
-{% endif %}
-
-
-void audioFunc(float* buffer, int frames) {
     pd_prog.processInlineInterleaved(buffer, buffer, frames);
 }
+
+//-----------------------------------------
+
+{%- if board.console %}
+
+void hv_print_handler(
+    HeavyContextInterface* context,
+    const char* printName,
+    const char* str,
+    const HvMessage* msg)
+{
+    (void)context;
+    (void)str;
+
+    print_push(printName, msg);
+}
+
+{% endif %}
 
 
 int main() {
     set_sys_clock_khz({{ board.core_freq }}, true);
     stdio_init_all(); 
-
-    {%- if board.console %}
-    #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
-        #ifndef MIDI_HOST
-        cdc_stdio_lib_init();
-        #endif
-    #endif
-    {%- endif %}
 
  // --- I2C Initialization ---
 
@@ -703,15 +647,16 @@ int main() {
      masterFX.init();
 
 // ---- MCP4725 CV Out init ----
-{%- for mcp in active_mcp4725 %}
-Pico::MCP4725 cv_out_{{ loop.index0 }}
-({{ mcp.address | default("0x60") }});
-cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
-{%- endfor %}
+
+    {%- for mcp in active_mcp4725 %}
+    Pico::MCP4725 cv_out_{{ loop.index0 }}
+    ({{ mcp.address | default("0x60") }});
+    cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
+    {%- endfor %}
 
 // ---- HX710 init ----
 
-{% for hx in active_hx710 %}
+    {% for hx in active_hx710 %}
     Pico::HX710Config sensor_config_{{ loop.index0 }} = {
         {{ hx.sck_pin }},
         {{ hx.dout_pin }},
@@ -728,30 +673,30 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
     if (!sensor_{{ loop.index0 }}.tryInit()) {
         printf("Failed to initialize sensor {{ hx.name }}\n");
     }
-{% endfor %}
+    {% endfor %}
 
 // ---- MPR121 init ----
 
-{% if active_mpr_pads and active_mpr_pads|length > 0 -%}
-    #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
+    {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
+        #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
 
-    Pico::MPR121Config cfg[NUM_SENSORS] = {
-    {%- set unique_sensors = [] -%}
-    {%- for pad in active_mpr_pads -%}
-        {%- set s_idx = pad.sensor_idx -%}
-        {%- if s_idx not in unique_sensors -%}
-            {%- set _ = unique_sensors.append(s_idx) -%}
-            {%- set sensor = board.inputs.sensors.mpr121[s_idx] -%}
-        { 
-            {{ sensor.i2c_bus }}, 
-            {{ sensor.sda }}, 
-            {{ sensor.scl }}, 
-            {{ sensor.irq }}, 
-            {{ sensor.addr_index }} 
-        }{{ "," if not loop.last }}
-        {%- endif -%}
-    {%- endfor %}
-    };
+        Pico::MPR121Config cfg[NUM_SENSORS] = {
+        {%- set unique_sensors = [] -%}
+        {%- for pad in active_mpr_pads -%}
+            {%- set s_idx = pad.sensor_idx -%}
+            {%- if s_idx not in unique_sensors -%}
+                {%- set _ = unique_sensors.append(s_idx) -%}
+                {%- set sensor = board.inputs.sensors.mpr121[s_idx] -%}
+            { 
+                {{ sensor.i2c_bus }}, 
+                {{ sensor.sda }}, 
+                {{ sensor.scl }}, 
+                {{ sensor.irq }}, 
+                {{ sensor.addr_index }} 
+            }{{ "," if not loop.last }}
+            {%- endif -%}
+        {%- endfor %}
+        };
 
     Pico::MPR121 sensor_array[NUM_SENSORS] = {
         {%- for i in range(unique_sensors | length) %}
@@ -766,21 +711,21 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-{%- endif %}
+    {%- endif %}
 
 // ---- Display init ----
 
-{% if board.display is defined and board.display.enabled -%}
-    Pico::Screen::init(
-        &display_inst, 
-        {{ board.display.i2c_bus }}, 
-        {{ board.display.sda }}, 
-        {{ board.display.scl }}, 
-        {{ board.display.width }}, 
-        {{ board.display.height }},
-        Pico::SCREEN_MODE_{{ board.display.mode | upper }}
-    );
-    {%- endif %}
+    {% if board.display is defined and board.display.enabled -%}
+        Pico::Screen::init(
+            &display_inst, 
+            {{ board.display.i2c_bus }}, 
+            {{ board.display.sda }}, 
+            {{ board.display.scl }}, 
+            {{ board.display.width }}, 
+            {{ board.display.height }},
+            Pico::SCREEN_MODE_{{ board.display.mode | upper }}
+        );
+        {%- endif %}
 
 // ---- Peripherals init ----
 
@@ -854,12 +799,17 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
         uint32_t now = to_ms_since_boot(get_absolute_time()); 
 
         midi_task();
+
+        // Print function call
         
         #if !defined(MIDI_HOST) && ENABLE_DEBUG
-            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
+            print_queue(debug_enabled);
         #else
             best_effort_wfe_or_timeout(make_timeout_time_ms(1));
         #endif
+
+        
+        // Display
 
         {% if board.display is defined and board.display.enabled -%}
             for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
@@ -972,11 +922,11 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
 // ---- Joysticks ----
 
             {
-                float vx = 0.0f, vy = 0.0f;
-                bool cX = false, cY = false;
-                if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
-                    if (cX) hv_send_float_lock(&pd_prog, {{ joy.hash_x }}, vx);
-                    if (cY) hv_send_float_lock(&pd_prog, {{ joy.hash_y }}, vy);
+            float vx = 0.0f, vy = 0.0f;
+            bool cX = false, cY = false;
+            if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
+                if (cX) hv_send_float_lock(&pd_prog, {{ joy.hash_x }}, vx);
+                if (cY) hv_send_float_lock(&pd_prog, {{ joy.hash_y }}, vy);
                 }
             }
             {%- endfor %}
