@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.2)
+/* pikoPD (v0.0.3)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -286,28 +286,37 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 inline void hv_send_msg1_lock(uint32_t hash, float a) {
     spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
     uint32_t irq = spin_lock_blocking(lock);
-    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "f", a);
+
+    pd_prog.sendMessageToReceiverV(hash, 0.0, "f", a);
+
     spin_unlock(lock, irq);
 }
 
 inline void hv_send_msg2_lock(uint32_t hash, float a, float b) {
     spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
     uint32_t irq = spin_lock_blocking(lock);
-    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "ff", a, b);
+
+    pd_prog.sendMessageToReceiverV(hash, 0.0, "ff", a, b);
+
     spin_unlock(lock, irq);
 }
 
 inline void hv_send_msg3_lock(uint32_t hash, float a, float b, float c) {
     spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
     uint32_t irq = spin_lock_blocking(lock);
-    hv_sendMessageToReceiverV(&pd_prog, hash, 0.0f, "fff", a, b, c);
+
+    pd_prog.sendMessageToReceiverV(hash, 0.0, "fff", a, b, c);
+
     spin_unlock(lock, irq);
 }
 
-inline void hv_send_float_lock(HeavyContextInterface* ctx, uint32_t hash, float v) {
+inline void hv_send_float_lock(HeavyContextInterface* ctx,
+                               uint32_t hash, float v) {
     spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
     uint32_t irq = spin_lock_blocking(lock);
-    hv_sendFloatToReceiver(ctx, hash, v);
+
+    ctx->sendFloatToReceiver(hash, v);
+
     spin_unlock(lock, irq);
 }
 
@@ -412,20 +421,20 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     uint8_t midiMsg[3] = {0, 0, 0};
     
     // Heavy passes the channel as 0-indexed (0-15)
-    int zeroBasedCh = (hv_msg_getNumElements(m) >= 3) ? (int)hv_msg_getFloat(m, 2) : 0;
+    int zeroBasedCh = (msg_getNumElements(m) >= 3) ? (int)msg_getFloat(m, 2) : 0;
     
     zeroBasedCh = std::clamp(zeroBasedCh, 0, 15);
 
     if (receiverHash == HV_NOTEOUT_HASH) {
-        int note = (int)hv_msg_getFloat(m, 0);
-        int vel  = (int)hv_msg_getFloat(m, 1);
+        int note = (int)msg_getFloat(m, 0);
+        int vel  = (int)msg_getFloat(m, 1);
         midiMsg[0] = (vel > 0 ? 0x90 : 0x80) | zeroBasedCh;
         midiMsg[1] = note & 0x7F;
         midiMsg[2] = vel & 0x7F;
     } 
     else if (receiverHash == HV_CTL_OUT_HASH) {
-        int val = (int)hv_msg_getFloat(m, 0);
-        int cc  = (int)hv_msg_getFloat(m, 1);
+        int val = (int)msg_getFloat(m, 0);
+        int cc  = (int)msg_getFloat(m, 1);
         midiMsg[0] = 0xB0 | zeroBasedCh;
         midiMsg[1] = cc & 0x7F;
         midiMsg[2] = val & 0x7F;
@@ -453,9 +462,9 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
 
 void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
 
-    if (hv_msg_getNumElements(m) < 1) return;
+    if (msg_getNumElements(m) < 1) return;
 
-    float val0 = hv_msg_getFloat(m, 0);
+    float val0 = msg_getFloat(m, 0);
 
     switch (hash) {
 
@@ -466,8 +475,8 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
         case {{ s.hash }}U: 
             {% if l.is_rgb -%}
             Pico::led_hue[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
-            if (hv_msg_getNumElements(m) >= 2) 
-                Pico::led_intensity[{{ loop.index0 }}].store(hv_msg_getFloat(m, 1), std::memory_order_relaxed);
+            if (msg_getNumElements(m) >= 2) 
+                Pico::led_intensity[{{ loop.index0 }}].store(msg_getFloat(m, 1), std::memory_order_relaxed);
             {%- else -%}
             Pico::led_vals[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
             {%- endif %}
@@ -479,7 +488,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 
     {% for mcp in active_mcp4725 -%}
         case {{ mcp.hash }}U:
-            if (hv_msg_isFloat(m, 0)) {
+            if (msg_isFloat(m, 0)) {
                 cv_out_{{ loop.index0 }}_val = val0;
                 cv_out_{{ loop.index0 }}_dirty = true;
             //    printf("DEBUG: Received value %f for %s\n", val0, "{{ mcp.name }}");
@@ -605,7 +614,7 @@ void hv_print_handler(HeavyContextInterface* context,
     int id = get_print_id(printName);
 
     m.id       = id;
-    m.val      = msg ? hv_msg_getFloat(msg, 0) : 0.0f;
+    m.val      = msg ? msg_getFloat(msg, 0) : 0.0f;
     m.is_float = (msg != nullptr);
 
     std::atomic_thread_fence(std::memory_order_release);
