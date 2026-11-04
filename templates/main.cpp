@@ -459,8 +459,8 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     {%- endif %}
 }
 
-
-void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash, const HvMessage *m) {
+void sendHookHandler(HeavyContextInterface *vc, const char *name,
+                     uint32_t hash, const HvMessage *m) {
 
     if (msg_getNumElements(m) < 1) return;
 
@@ -468,58 +468,60 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name, uint32_t hash,
 
     switch (hash) {
 
-/* --- LEDs --- */
+        /* --- LEDs --- */
 
-    {% for l in board.leds -%}
-        {%- for s in hv_manifest.sends if s.name == l.name -%}
-        case {{ s.hash }}U: 
+        {% for l in board.leds -%}
+            {%- for s in hv_manifest.sends if s.name == l.name -%}
+        case {{ s.hash }}U:
             {% if l.is_rgb -%}
             Pico::led_hue[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
-            if (msg_getNumElements(m) >= 2) 
-                Pico::led_intensity[{{ loop.index0 }}].store(msg_getFloat(m, 1), std::memory_order_relaxed);
+            if (msg_getNumElements(m) >= 2)
+                Pico::led_intensity[{{ loop.index0 }}].store(
+                    msg_getFloat(m, 1), std::memory_order_relaxed);
             {%- else -%}
-            Pico::led_vals[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
+            Pico::led_vals[{{ loop.index0 }}].store(
+                val0, std::memory_order_relaxed);
             {%- endif %}
-            break; 
-        {%- endfor -%}
-    {%- endfor %}
+            break;
+            {%- endfor -%}
+        {%- endfor %}
 
-/* --- Hardware MCP4725 CV Outputs --- */
+        /* --- Hardware MCP4725 CV Outputs --- */
 
-    {% for mcp in active_mcp4725 -%}
+        {% for mcp in active_mcp4725 -%}
         case {{ mcp.hash }}U:
             if (msg_isFloat(m, 0)) {
                 cv_out_{{ loop.index0 }}_val = val0;
                 cv_out_{{ loop.index0 }}_dirty = true;
-            //    printf("DEBUG: Received value %f for %s\n", val0, "{{ mcp.name }}");
             }
             break;
-    {% endfor -%}
+        {% endfor %}
 
-/* --- Web (SSI Sync) & OSC Routing --- */
-    {% if board.web and board.web.enabled -%}
-    {% set web_count = namespace(index=0) %}
-    {% for s in hv_manifest.sends -%}
+        /* --- Web (SSI Sync) & OSC Routing --- */
+
+        {% if board.web and board.web.enabled -%}
+        {% set web_count = namespace(index=0) %}
+        {% for s in hv_manifest.sends -%}
+            {% if s.name.startswith('web') %}
         case {{ s.hash }}U:
-            {% if s.name.startswith('web') -%}
             web_values[{{ web_count.index }}] = val0;
             {% set web_count.index = web_count.index + 1 %}
-
-            if (web_float_handler) web_float_handler("{{ s.name }}", val0);
+            if (web_float_handler)
+                web_float_handler("{{ s.name }}", val0);
             return;
 
-            {%- elif s.name.startswith('osc') -%}
+            {% elif s.name.startswith('osc') %}
+        case {{ s.hash }}U:
             osc_send_float("{{ s.name }}", val0);
             return;
-            {%- endif %}
-            break;
-    {% endfor %}
-    {%- endif %}
+            {% endif %}
+        {% endfor %}
+        {%- endif %}
 
         default:
             heavyMidiOutHook(vc, name, hash, m);
             break;
-    } 
+    }
 }
 
 // Global handler pointers defined in web.h
@@ -927,10 +929,10 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
                         {%- if led.mode == 'midi' %} val = midi_val; {% endif %}
                         {%- if led.mode == 'clock' %} val = clock_val; {% endif %}
 
-                        {%- if board.pico_board == 'pico_w' and (led.pin == 25) -%}
-                            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, val > 0.01f);
-                        {%- else -%}
-                            Pico::updateLed({{ idx }}, val);
+                        Pico::updateLed({{ idx }}, val);
+
+                        {%- if board.pico_board in ['pico_w', 'pico2_w'] and led.pin == 25 %}
+                        Pico::updateCyw43Led({{ idx }});
                         {%- endif %}
 
                     {%- endif %}
