@@ -11,6 +11,8 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 ## Table of Contents
 - [Toolchain Setup](#toolchain-setup)
 - [Architecture](#architecture)
+- [Project Configuration](#project-configuration)
+  - [Build](#build)
 - [Hardware Configuration](#hardware-configuration)
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
@@ -25,8 +27,6 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
     - [CNY70](#cny70)
     - [HX710](#hx710)
   - [Display](#display)
-- [Project Configuration](#project-configuration)
-  - [Build](#build)
 - [MIDI](#midi)
 - [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
