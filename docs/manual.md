@@ -560,10 +560,9 @@ Works on pico_w and should work on pico_2w (not tested yet).
     "osc_port": 8000
   }
 ```
-This are very experimental feature, but after tests OSC is confirmed working. Check here https://github.com/ledlaux/pikoPD/discussions/12.
-Also one important thing: use simple words as OSC message send and receive names in PD and not slashed (/) address pattern at this stage (will not compile with hvcc and needs to be processed somehow inside c++ template manually). 
+This are very experimental features. Check: https://github.com/ledlaux/pikoPD/discussions/12.
 
-See `patches/web.pd` and helper patch inside /tools folder for examples. 
+See `patches/web.pd`
 
 ## Web
 - To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
