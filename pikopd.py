@@ -354,18 +354,18 @@ class PicoUF2Generator:
         if web_enabled:
             mode = web_config.get("active_mode", 0)
             creds = web_config.get("ap" if mode == 0 else "sta", {})
-            osc = web_config.get("osc", {})
-            
+            osc_enabled = web_config.get("osc_enabled", False)
+
             cmake_cmd.extend([
                 "-DWEB=1",
                 f"-DACTIVE_MODE={mode}",
-                f'-DWIFI_SSID="{creds.get("ssid", "")}"',
-                f'-DWIFI_PASSWORD="{creds.get("password", "")}"',
-                f'-DMDNS_NAME="{web_config.get("mdns_name", "pikopd")}"',
-                f"-DOSC_ENABLED={1 if osc.get('enabled', True) else 0}",
-                f'-DOSC_PORT={web_config.get("osc_port", 8000)}',
-                "-DMIDI_HOST_ENABLED=0",  
-                "-DMIDI_UART_ENABLED=1"   
+                f"-DWIFI_SSID={creds.get('ssid', '')}",
+                f"-DWIFI_PASSWORD={creds.get('password', '')}",
+                f"-DMDNS_NAME={web_config.get('mdns_name', 'pikopd')}",
+                f"-DOSC_ENABLED={1 if osc_enabled else 0}",
+                f"-DOSC_PORT={web_config.get('osc_port', 8000)}",
+                "-DMIDI_HOST_ENABLED=0",
+                "-DMIDI_UART_ENABLED=1"
             ])
             print("\033[32m  -> Web Enabled: MIDI Host disabled, UART MIDI enabled\033[0m")
         else:
@@ -419,10 +419,20 @@ class PicoUF2Generator:
             uf2 = uf2_files[0]
 
             try:
+                # Enter BOOTSEL mode
                 self.run_cmd(
-                    ["picotool", "load", "-f", "-x", uf2],
+                    ["picotool", "reboot", "-u"],
+                    step_name="Enter BOOTSEL"
+                )
+
+                time.sleep(2)
+
+                # Flash and reboot into application
+                self.run_cmd(
+                    ["picotool", "load",  "-f", "-x", uf2],
                     step_name="Flash"
                 )
+
                 flash_success = True
                 print("✔ Firmware flashed successfully.")
 
@@ -435,7 +445,7 @@ class PicoUF2Generator:
                     print("⚠ Pico is in BOOTSEL mode, but flashing failed.")
 
                 sys.exit(1)
-
+                
         duration = time.time() - start_time
         self.print_progress(1.0, f"Finished in {duration:.1f}s")
         sys.stdout.write("\n")
