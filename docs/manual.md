@@ -560,7 +560,7 @@ Works on pico_w and should work on pico_2w (not tested yet).
     "osc_port": 8000
   }
 ```
-This are very experimental features. Check: https://github.com/ledlaux/pikoPD/discussions/12.
+These are very experimental features. Some examples: https://github.com/ledlaux/pikoPD/discussions/12.
 
 See `patches/web.pd`
 
