@@ -88,6 +88,7 @@ list(REMOVE_ITEM ALL_SOURCES "${CMAKE_CURRENT_LIST_DIR}/htmldata.c")
 # ==============================================================================
 add_executable(pikopd ${ALL_SOURCES})
 
+
 # Explicit suffix mapping prevents conflicts during pico_add_extra_outputs
 set_target_properties(pikopd PROPERTIES SUFFIX ".elf")
 
