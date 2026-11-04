@@ -278,9 +278,11 @@ PikoPD boards support 4 LED modes.
 | Board     | Pin | Notes                             |
 | --------- | --- | --------------------------------- |
 | Pico      | 25  | Single-color LED                  |
-| Pico W    | 25  | Single-color LED                  |
-| Pico 2    | 25  | Single-color LED                  |
+| Pico W    | 25  | Single-color LED (Cyw43)          |
 | Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
+| Pico 2    | 25  | Single-color LED                  |
+| Pico 2w   | 25  | Single-color LED (Cyw43)          |
+
 
 Code supports up to 12 different led connection.
 
@@ -317,7 +319,6 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 - Adjust `mod` to set the number of encoder steps (e.g., `mod 8`, `mod 16`)
 
 ## Sensors
-
 
 ### MPR121 - Touch sensor
 
@@ -532,11 +533,12 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
 ```json
   "console": true
 ```
-
-Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
+Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can (crash)[https://github.com/ledlaux/pikoPD/issues/25] app. 
 
 
 # WEB Control and OSC
+
+Works on pico_w and should work on pico_2w (not tested yet).
 
 ```json
  "web": {
@@ -558,10 +560,10 @@ Debug console will also output PD [print] objects, which are parsed automaticall
     "osc_port": 8000
   }
 ```
+This are very experimental feature, but after tests OSC is confirmed working. Check here https://github.com/ledlaux/pikoPD/discussions/12.
+Also one important thing: use simple words as OSC message send and receive names in PD and not slashed (/) address pattern at this stage (will not compile with hvcc and needs to be processed somehow inside c++ template manually). 
 
-This are very experimental feature, but after tests OSC is confirmed working without an issues. 
-
-See `patches/web.pd`
+See `patches/web.pd` and helper patch inside /tools folder for examples. 
 
 ## Web
 - To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
