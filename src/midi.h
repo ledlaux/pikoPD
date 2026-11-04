@@ -65,12 +65,203 @@
 #define MIDI_IN_BUF  256
 #define MIDI_OUT_BUF 256
 
+// MIDI input and output buffers must be powers of two.
+static_assert((MIDI_IN_BUF & (MIDI_IN_BUF - 1)) == 0,
+              "MIDI_IN_BUF must be a power of two");
+
+static_assert((MIDI_OUT_BUF & (MIDI_OUT_BUF - 1)) == 0,
+              "MIDI_OUT_BUF must be a power of two");
+
 // Print queue must have a power-of-two capacity.
 #define PRINT_QUEUE_SIZE 256
 #define PRINT_QUEUE_MASK (PRINT_QUEUE_SIZE - 1)
 #define PRINT_NAME_SIZE  128
 #define PRINT_TEXT_SIZE  128
 #define PRINT_INTERVAL_MS 40
+
+static_assert((PRINT_QUEUE_SIZE & PRINT_QUEUE_MASK) == 0,
+              "PRINT_QUEUE_SIZE must be a power of two");
+
+
+// ============================================================
+// HEAVY INPUT SPSC QUEUE
+// ============================================================
+//
+// Producer: Core 0 only.
+// Consumer: Core 1 only.
+//
+// Core 0:
+//   - Parses raw MIDI input.
+//   - Enqueues MIDI events.
+//   - Enqueues hardware/web/OSC float inputs.
+//
+// Core 1:
+//   - Dequeues events.
+//   - Calls handle_midi_message().
+//   - Calls pd_prog.sendFloatToReceiver().
+//
+// Do not push into this queue from an IRQ or Core 1.
+// ============================================================
+
+#define HEAVY_INPUT_QUEUE_SIZE 256
+#define HEAVY_INPUT_QUEUE_MASK (HEAVY_INPUT_QUEUE_SIZE - 1)
+
+static_assert(
+    (HEAVY_INPUT_QUEUE_SIZE & HEAVY_INPUT_QUEUE_MASK) == 0,
+    "HEAVY_INPUT_QUEUE_SIZE must be a power of two"
+);
+
+enum HeavyInputType : uint8_t {
+    HEAVY_INPUT_MIDI,
+    HEAVY_INPUT_FLOAT
+};
+
+struct HeavyInputEvent {
+    HeavyInputType type;
+
+    uint8_t status;
+    uint8_t data1;
+    uint8_t data2;
+
+    uint32_t hash;
+    float value;
+};
+
+struct HeavyInputQueue {
+    HeavyInputEvent data[HEAVY_INPUT_QUEUE_SIZE];
+
+    // Written only by Core 0.
+    std::atomic<uint32_t> head{0};
+
+    // Written only by Core 1.
+    std::atomic<uint32_t> tail{0};
+
+    std::atomic<uint32_t> dropped{0};
+};
+
+inline HeavyInputQueue heavy_input_rb;
+
+
+// ------------------------------------------------------------
+// Core 0: enqueue MIDI event
+// ------------------------------------------------------------
+
+inline bool heavy_input_push_midi(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
+
+    event.type = HEAVY_INPUT_MIDI;
+
+    event.status = status;
+    event.data1 = data1;
+    event.data2 = data2;
+
+    event.hash = 0;
+    event.value = 0.0f;
+
+    // Publish the completed event.
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+
+// ------------------------------------------------------------
+// Core 0: enqueue float receiver event
+// ------------------------------------------------------------
+
+inline bool heavy_input_push_float(
+    uint32_t hash,
+    float value)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
+
+    event.type = HEAVY_INPUT_FLOAT;
+
+    event.status = 0;
+    event.data1 = 0;
+    event.data2 = 0;
+
+    event.hash = hash;
+    event.value = value;
+
+    // Publish the completed event.
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+
+// ------------------------------------------------------------
+// Core 1: dequeue Heavy input event
+// ------------------------------------------------------------
+
+inline bool heavy_input_pop(HeavyInputEvent& event)
+{
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_relaxed);
+
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_acquire);
+
+    if (tail == head) {
+        return false;
+    }
+
+    event = heavy_input_rb.data[
+        tail & HEAVY_INPUT_QUEUE_MASK
+    ];
+
+    // Release the consumed slot.
+    heavy_input_rb.tail.store(
+        tail + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
 
 // ============================================================
 // VOICE MANAGEMENT
@@ -171,6 +362,8 @@ inline int allocateVoice(uint8_t note)
 struct MidiInputBuffer {
     uint8_t data[MIDI_IN_BUF];
 
+    // Producer: one active MIDI input source.
+    // Consumer: Core 0 MIDI parser.
     std::atomic<uint32_t> head{0};
     std::atomic<uint32_t> tail{0};
 
@@ -190,6 +383,8 @@ struct MidiInputBuffer {
 struct MidiOutputBuffer {
     uint32_t data[MIDI_OUT_BUF];
 
+    // Producer: Core 1 Heavy MIDI output hook.
+    // Consumer: Core 0 USB MIDI output task.
     std::atomic<uint32_t> head{0};
     std::atomic<uint32_t> tail{0};
 
@@ -213,9 +408,15 @@ inline MidiInputBuffer midi_in_rb;
 // ============================================================
 // MIDI INPUT RING BUFFER
 // ============================================================
-
-// Producer: UART / USB MIDI callback.
+//
+// Producer: UART IRQ OR USB MIDI callback.
 // Consumer: Core 0 MIDI parser.
+//
+// Important:
+// Only one input source should produce into this queue at a
+// time. If UART and USB can produce concurrently, serialize
+// their calls to midi_push().
+// ============================================================
 
 inline void midi_push(uint8_t byte)
 {
@@ -259,6 +460,7 @@ inline bool midi_pop(uint8_t& byte)
     return true;
 }
 
+
 // ============================================================
 // HEAVY PRINT SPSC QUEUE
 // Producer: Core 1
@@ -272,6 +474,7 @@ struct PrintMsg {
 
 struct PrintQueue {
     PrintMsg data[PRINT_QUEUE_SIZE];
+
     std::atomic<uint32_t> head{0};
     std::atomic<uint32_t> tail{0};
     std::atomic<uint32_t> dropped{0};
@@ -287,26 +490,45 @@ inline PrintQueue print_queue_rb;
 inline bool print_push(const char* name, const HvMessage* hvMsg)
 {
 #if ENABLE_DEBUG
-    if (!hvMsg) return false;
 
-    uint32_t head = print_queue_rb.head.load(std::memory_order_relaxed);
-    uint32_t tail = print_queue_rb.tail.load(std::memory_order_acquire);
-
-    if (head - tail >= PRINT_QUEUE_SIZE) {
-        print_queue_rb.dropped.fetch_add(1, std::memory_order_relaxed);
+    if (!hvMsg) {
         return false;
     }
 
-    PrintMsg& msg = print_queue_rb.data[head & PRINT_QUEUE_MASK];
+    uint32_t head =
+        print_queue_rb.head.load(std::memory_order_relaxed);
 
-    auto copy_string = [](char* dst, size_t capacity, const char* src) {
-        if (!src) src = "";
+    uint32_t tail =
+        print_queue_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= PRINT_QUEUE_SIZE) {
+        print_queue_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    PrintMsg& msg =
+        print_queue_rb.data[head & PRINT_QUEUE_MASK];
+
+    auto copy_string = [](
+        char* dst,
+        size_t capacity,
+        const char* src)
+    {
+        if (!src) {
+            src = "";
+        }
 
         size_t i = 0;
+
         while (i < capacity - 1 && src[i]) {
             dst[i] = src[i];
             ++i;
         }
+
         dst[i] = '\0';
     };
 
@@ -315,42 +537,66 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
     size_t used = 0;
     const int count = msg_getNumElements(hvMsg);
 
-    for (int i = 0; i < count && used < sizeof(msg.text) - 1; ++i) {
+    for (int i = 0;
+         i < count && used < sizeof(msg.text) - 1;
+         ++i)
+    {
         char atom[32];
         int len = 0;
 
         switch (msg_getType(hvMsg, i)) {
+
             case HV_MSG_FLOAT:
-                len = snprintf(atom, sizeof(atom), "%.3f",
-                               (double)msg_getFloat(hvMsg, i));
+                len = snprintf(
+                    atom,
+                    sizeof(atom),
+                    "%.3f",
+                    (double)msg_getFloat(hvMsg, i)
+                );
                 break;
 
             case HV_MSG_SYMBOL:
-                len = snprintf(atom, sizeof(atom), "%s",
-                               msg_getSymbol(hvMsg, i));
+                len = snprintf(
+                    atom,
+                    sizeof(atom),
+                    "%s",
+                    msg_getSymbol(hvMsg, i)
+                );
                 break;
 
             case HV_MSG_BANG:
-                len = snprintf(atom, sizeof(atom), "bang");
+                len = snprintf(
+                    atom,
+                    sizeof(atom),
+                    "bang"
+                );
                 break;
 
             case HV_MSG_HASH:
-                len = snprintf(atom, sizeof(atom), "0x%08lx",
-                               (unsigned long)msg_getHash(hvMsg, i));
+                len = snprintf(
+                    atom,
+                    sizeof(atom),
+                    "0x%08lx",
+                    (unsigned long)msg_getHash(hvMsg, i)
+                );
                 break;
 
             default:
                 continue;
         }
 
-        if (len < 0) continue;
+        if (len < 0) {
+            continue;
+        }
 
         if (i > 0 && used < sizeof(msg.text) - 1) {
             msg.text[used++] = ' ';
         }
 
         size_t available = sizeof(msg.text) - 1 - used;
-        size_t copyLen = (size_t)len < available ? (size_t)len : available;
+
+        size_t copyLen =
+            (size_t)len < available ? (size_t)len : available;
 
         memcpy(msg.text + used, atom, copyLen);
         used += copyLen;
@@ -358,14 +604,23 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
 
     msg.text[used] = '\0';
 
-    print_queue_rb.head.store(head + 1, std::memory_order_release);
+    print_queue_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
     return true;
+
 #else
+
     (void)name;
     (void)hvMsg;
+
     return false;
+
 #endif
 }
+
 
 // ------------------------------------------------------------
 // Consumer: Core 0
@@ -375,20 +630,30 @@ inline void print_queue(bool debug)
 {
 #if ENABLE_DEBUG && !defined(MIDI_HOST) && !WEB
 
-    if (!debug || !tud_cdc_connected()) return;
+    if (!debug || !tud_cdc_connected()) {
+        return;
+    }
 
     constexpr uint32_t MAX_MESSAGES = 4;
 
     for (uint32_t i = 0; i < MAX_MESSAGES; ++i) {
 
-        uint32_t tail = print_queue_rb.tail.load(std::memory_order_relaxed);
-        uint32_t head = print_queue_rb.head.load(std::memory_order_acquire);
+        uint32_t tail =
+            print_queue_rb.tail.load(std::memory_order_relaxed);
 
-        if (tail == head) break;
+        uint32_t head =
+            print_queue_rb.head.load(std::memory_order_acquire);
 
-        const PrintMsg& msg = print_queue_rb.data[tail & PRINT_QUEUE_MASK];
+        if (tail == head) {
+            break;
+        }
 
-        char output[PRINT_NAME_SIZE + PRINT_TEXT_SIZE + 4];
+        const PrintMsg& msg =
+            print_queue_rb.data[tail & PRINT_QUEUE_MASK];
+
+        char output[
+            PRINT_NAME_SIZE + PRINT_TEXT_SIZE + 4
+        ];
 
         int len = snprintf(
             output,
@@ -399,27 +664,43 @@ inline void print_queue(bool debug)
         );
 
         if (len <= 0 || len >= (int)sizeof(output)) {
-            print_queue_rb.tail.store(tail + 1, std::memory_order_release);
+
+            print_queue_rb.tail.store(
+                tail + 1,
+                std::memory_order_release
+            );
+
             continue;
         }
 
         uint32_t available = tud_cdc_write_available();
 
-        if (available < (uint32_t)len) break;
+        if (available < (uint32_t)len) {
+            break;
+        }
 
-        uint32_t written = tud_cdc_write(output, (uint32_t)len);
+        uint32_t written =
+            tud_cdc_write(output, (uint32_t)len);
 
-        if (written != (uint32_t)len) break;
+        if (written != (uint32_t)len) {
+            break;
+        }
 
-        print_queue_rb.tail.store(tail + 1, std::memory_order_release);
+        print_queue_rb.tail.store(
+            tail + 1,
+            std::memory_order_release
+        );
     }
 
     tud_cdc_write_flush();
 
 #else
+
     (void)debug;
+
 #endif
 }
+
 
 // ============================================================
 // MIDI PARSER
@@ -430,7 +711,6 @@ struct MidiParser {
     int idx = 0;
     int expected = 0;
 };
-
 
 inline MidiParser core0_parser;
 
@@ -498,6 +778,27 @@ inline void parse_raw_midi_byte(
 
 
 // ============================================================
+// MIDI -> HEAVY QUEUE HANDLER
+// ============================================================
+//
+// Called by the Core 0 MIDI parser.
+// It does not call Heavy directly.
+// ============================================================
+
+inline void midi_queue_handler(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2)
+{
+    heavy_input_push_midi(
+        status,
+        data1,
+        data2
+    );
+}
+
+
+// ============================================================
 // USB MIDI DEVICE STATE
 // ============================================================
 
@@ -531,10 +832,14 @@ inline void usb_init()
 // Call from Core 0.
 //
 // Processes:
-//   1. TinyUSB tasks
-//   2. Incoming MIDI ring buffer
-//   3. Outgoing MIDI ring buffer
+//   1. TinyUSB tasks.
+//   2. Incoming raw MIDI bytes.
+//   3. Parsed MIDI events -> Heavy SPSC queue.
+//   4. Outgoing MIDI events.
 //
+// IMPORTANT:
+// handle_midi_message() is NOT called here.
+// It is called by Core 1 after heavy_input_pop().
 // ============================================================
 
 void handle_midi_message(
@@ -576,7 +881,7 @@ inline void midi_task()
         parse_raw_midi_byte(
             b,
             core0_parser,
-            handle_midi_message
+            midi_queue_handler
         );
     }
 
@@ -594,8 +899,8 @@ inline void midi_task()
         // ----------------------------------------------------
 
         if (usb_midi_dev0 != -1 &&
-            tuh_midi_mounted(usb_midi_dev0)) {
-
+            tuh_midi_mounted(usb_midi_dev0))
+        {
             uint32_t head =
                 midi_out_rb.head.load(std::memory_order_acquire);
 
@@ -607,7 +912,9 @@ inline void midi_task()
             while (tail != head && out_count++ < 64) {
 
                 uint32_t m =
-                    midi_out_rb.data[tail & (MIDI_OUT_BUF - 1)];
+                    midi_out_rb.data[
+                        tail & (MIDI_OUT_BUF - 1)
+                    ];
 
                 uint8_t status = (uint8_t)(m >> 16);
 
@@ -652,7 +959,9 @@ inline void midi_task()
             while (tail != head && out_count++ < 64) {
 
                 uint32_t m =
-                    midi_out_rb.data[tail & (MIDI_OUT_BUF - 1)];
+                    midi_out_rb.data[
+                        tail & (MIDI_OUT_BUF - 1)
+                    ];
 
                 uint8_t status = (uint8_t)(m >> 16);
 
@@ -713,11 +1022,21 @@ inline void uart_midi_init()
     uart_set_hw_flow(uart0, false, false);
     uart_set_fifo_enabled(uart0, true);
 
-    irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
+    irq_set_exclusive_handler(
+        UART0_IRQ,
+        on_uart_rx
+    );
 
-    uart_set_irq_enables(uart0, true, false);
+    uart_set_irq_enables(
+        uart0,
+        true,
+        false
+    );
 
-    irq_set_enabled(UART0_IRQ, true);
+    irq_set_enabled(
+        UART0_IRQ,
+        true
+    );
 }
 
 
@@ -871,24 +1190,36 @@ extern "C" {
 #endif
 
 
-// This stubs are not thread safe but atleast works for RP2040
+// ============================================================
+// RP2040 ATOMIC STUBS
+// ============================================================
+// These are not thread-safe implementations. They should not
+// be relied upon for synchronization between cores.
+// The SPSC queues above use atomic 32-bit head/tail counters
+// and do not depend on these stubs.
+// ============================================================
 
 #if defined(PICO_PLATFORM) || defined(PICO_RP2040)
 
 extern "C" {
 
-bool __atomic_test_and_set(volatile void* ptr, int memorder) {
+bool __atomic_test_and_set(volatile void* ptr, int memorder)
+{
     (void)memorder;
+
     bool old = *(volatile bool*)ptr;
     *(volatile bool*)ptr = true;
+
     return old;
 }
 
-void __atomic_clear(volatile void* ptr, int memorder) {
+void __atomic_clear(volatile void* ptr, int memorder)
+{
     (void)memorder;
+
     *(volatile bool*)ptr = false;
 }
 
-} 
+}
 
 #endif
