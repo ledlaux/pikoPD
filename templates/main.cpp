@@ -243,6 +243,15 @@ static const uint32_t screen_slots[4] = {
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
+#define CLOCK_TICK_DIVIDER   12
+
+// CLOCK_TICK_DIVIDER settings:
+// - 24 — once per beat
+// - 12 — twice per beat
+// - 6 — four times per beat
+// - 3 — eight times per beat
+// - 1 — every MIDI clock tick
+
 static std::atomic<uint32_t> midi_activity_timer{0};
 static std::atomic<uint8_t> last_midi_velocity{0};
 static uint8_t current_midi_note = 60;
@@ -339,7 +348,7 @@ void handle_midi_message(
 
             case MIDI_RT_CLOCK:
 
-                if (clock_running && ++clock_count >= 24) {
+                if (clock_running && ++clock_count >= CLOCK_TICK_DIVIDER) {
                     clock_count = 0;
 
                     midi_clock_timer.store(
