@@ -73,11 +73,14 @@ static_assert((MIDI_OUT_BUF & (MIDI_OUT_BUF - 1)) == 0,
               "MIDI_OUT_BUF must be a power of two");
 
 // Print queue must have a power-of-two capacity.
-#define PRINT_QUEUE_SIZE 256
+#define PRINT_QUEUE_SIZE 128
 #define PRINT_QUEUE_MASK (PRINT_QUEUE_SIZE - 1)
-#define PRINT_NAME_SIZE  128
 #define PRINT_TEXT_SIZE  128
+#define PRINT_NAME_SIZE   32
+#define PRINT_SYMBOL_SIZE 24
+#define PRINT_MAX_ATOMS   8
 #define PRINT_INTERVAL_MS 40
+
 
 static_assert((PRINT_QUEUE_SIZE & PRINT_QUEUE_MASK) == 0,
               "PRINT_QUEUE_SIZE must be a power of two");
@@ -467,9 +470,27 @@ inline bool midi_pop(uint8_t& byte)
 // Consumer: Core 0
 // ============================================================
 
+enum PrintAtomType : uint8_t {
+    PRINT_ATOM_FLOAT,
+    PRINT_ATOM_SYMBOL,
+    PRINT_ATOM_BANG,
+    PRINT_ATOM_HASH
+};
+
+struct PrintAtom {
+    uint8_t type;
+
+    union {
+        float value;
+        uint32_t hash;
+        char symbol[PRINT_SYMBOL_SIZE];
+    };
+};
+
 struct PrintMsg {
     char name[PRINT_NAME_SIZE];
-    char text[PRINT_TEXT_SIZE];
+    uint8_t atom_count;
+    PrintAtom atoms[PRINT_MAX_ATOMS];
 };
 
 struct PrintQueue {
@@ -487,6 +508,7 @@ inline PrintQueue print_queue_rb;
 // Producer: Core 1
 // ------------------------------------------------------------
 
+
 inline bool print_push(const char* name, const HvMessage* hvMsg)
 {
 #if ENABLE_DEBUG
@@ -494,6 +516,25 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
     if (!hvMsg) {
         return false;
     }
+
+    // --------------------------------------------------------
+    // Rate-limit Heavy print producer (Core 1)
+    // --------------------------------------------------------
+
+    static uint32_t lastPrintTime = 0;
+
+    const uint32_t now =
+        to_ms_since_boot(get_absolute_time());
+
+    if ((uint32_t)(now - lastPrintTime) < PRINT_INTERVAL_MS) {
+        return false;
+    }
+
+    lastPrintTime = now;
+
+    // --------------------------------------------------------
+    // Check queue capacity
+    // --------------------------------------------------------
 
     uint32_t head =
         print_queue_rb.head.load(std::memory_order_relaxed);
@@ -513,96 +554,87 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
     PrintMsg& msg =
         print_queue_rb.data[head & PRINT_QUEUE_MASK];
 
-    auto copy_string = [](
-        char* dst,
-        size_t capacity,
-        const char* src)
-    {
-        if (!src) {
-            src = "";
-        }
+    // --------------------------------------------------------
+    // Copy message name
+    // --------------------------------------------------------
 
-        size_t i = 0;
+    if (!name) {
+        name = "";
+    }
 
-        while (i < capacity - 1 && src[i]) {
-            dst[i] = src[i];
-            ++i;
-        }
+    size_t nameLen = 0;
 
-        dst[i] = '\0';
-    };
+    while (nameLen < PRINT_NAME_SIZE - 1 && name[nameLen]) {
+        msg.name[nameLen] = name[nameLen];
+        ++nameLen;
+    }
 
-    copy_string(msg.name, sizeof(msg.name), name);
+    msg.name[nameLen] = '\0';
 
-    size_t used = 0;
+    // --------------------------------------------------------
+    // Capture Heavy atoms without formatting
+    // --------------------------------------------------------
+
+    msg.atom_count = 0;
+
     const int count = msg_getNumElements(hvMsg);
 
     for (int i = 0;
-         i < count && used < sizeof(msg.text) - 1;
+         i < count && msg.atom_count < PRINT_MAX_ATOMS;
          ++i)
     {
-        char atom[32];
-        int len = 0;
+        PrintAtom& atom = msg.atoms[msg.atom_count];
 
         switch (msg_getType(hvMsg, i)) {
 
             case HV_MSG_FLOAT:
-                len = snprintf(
-                    atom,
-                    sizeof(atom),
-                    "%.3f",
-                    (double)msg_getFloat(hvMsg, i)
-                );
+                atom.type = PRINT_ATOM_FLOAT;
+                atom.value = msg_getFloat(hvMsg, i);
                 break;
 
             case HV_MSG_SYMBOL:
-                len = snprintf(
-                    atom,
-                    sizeof(atom),
-                    "%s",
-                    msg_getSymbol(hvMsg, i)
-                );
+            {
+                atom.type = PRINT_ATOM_SYMBOL;
+
+                const char* symbol = msg_getSymbol(hvMsg, i);
+
+                if (!symbol) {
+                    symbol = "";
+                }
+
+                size_t len = 0;
+
+                while (
+                    len < PRINT_SYMBOL_SIZE - 1 &&
+                    symbol[len]
+                ) {
+                    atom.symbol[len] = symbol[len];
+                    ++len;
+                }
+
+                atom.symbol[len] = '\0';
                 break;
+            }
 
             case HV_MSG_BANG:
-                len = snprintf(
-                    atom,
-                    sizeof(atom),
-                    "bang"
-                );
+                atom.type = PRINT_ATOM_BANG;
                 break;
 
             case HV_MSG_HASH:
-                len = snprintf(
-                    atom,
-                    sizeof(atom),
-                    "0x%08lx",
-                    (unsigned long)msg_getHash(hvMsg, i)
-                );
+                atom.type = PRINT_ATOM_HASH;
+                atom.hash = msg_getHash(hvMsg, i);
                 break;
 
             default:
                 continue;
         }
 
-        if (len < 0) {
-            continue;
-        }
-
-        if (i > 0 && used < sizeof(msg.text) - 1) {
-            msg.text[used++] = ' ';
-        }
-
-        size_t available = sizeof(msg.text) - 1 - used;
-
-        size_t copyLen =
-            (size_t)len < available ? (size_t)len : available;
-
-        memcpy(msg.text + used, atom, copyLen);
-        used += copyLen;
+        ++msg.atom_count;
     }
 
-    msg.text[used] = '\0';
+    // --------------------------------------------------------
+    // Publish message to Core 0
+    // --------------------------------------------------------
 
     print_queue_rb.head.store(
         head + 1,
@@ -628,7 +660,7 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
 
 inline void print_queue(bool debug)
 {
-#if ENABLE_DEBUG && !defined(MIDI_HOST) && !WEB
+#if ENABLE_DEBUG && !defined(MIDI_HOST) //&& !WEB
 
     if (!debug || !tud_cdc_connected()) {
         return;
@@ -636,53 +668,175 @@ inline void print_queue(bool debug)
 
     constexpr uint32_t MAX_MESSAGES = 4;
 
+    constexpr size_t OUTPUT_SIZE =
+        PRINT_NAME_SIZE +
+        PRINT_MAX_ATOMS * (PRINT_SYMBOL_SIZE + 16) +
+        16;
+
+    // Core 0 only: retain progress if CDC accepts a partial write.
+    static uint32_t pending_tail = UINT32_MAX;
+    static uint32_t pending_offset = 0;
+    static size_t pending_length = 0;
+    static char pending_output[OUTPUT_SIZE];
+
+    // Rate-limit CDC flushing, not message processing.
+    static uint32_t lastFlushTime = 0;
+
+    const uint32_t now =
+        to_ms_since_boot(get_absolute_time());
+
+    bool flush_needed = false;
+
     for (uint32_t i = 0; i < MAX_MESSAGES; ++i) {
 
-        uint32_t tail =
+        const uint32_t tail =
             print_queue_rb.tail.load(std::memory_order_relaxed);
 
-        uint32_t head =
+        const uint32_t head =
             print_queue_rb.head.load(std::memory_order_acquire);
 
         if (tail == head) {
+            pending_tail = UINT32_MAX;
+            pending_offset = 0;
+            pending_length = 0;
             break;
         }
 
-        const PrintMsg& msg =
-            print_queue_rb.data[tail & PRINT_QUEUE_MASK];
+        // Format only when starting a new message.
+        if (pending_tail != tail) {
 
-        char output[
-            PRINT_NAME_SIZE + PRINT_TEXT_SIZE + 4
-        ];
+            const PrintMsg& msg =
+                print_queue_rb.data[tail & PRINT_QUEUE_MASK];
 
-        int len = snprintf(
-            output,
-            sizeof(output),
-            "%s: %s\r\n",
-            msg.name,
-            msg.text
-        );
+            size_t used = 0;
 
-        if (len <= 0 || len >= (int)sizeof(output)) {
-
-            print_queue_rb.tail.store(
-                tail + 1,
-                std::memory_order_release
+            int n = snprintf(
+                pending_output,
+                sizeof(pending_output),
+                "%s: ",
+                msg.name
             );
 
-            continue;
+            if (n < 0 || (size_t)n >= sizeof(pending_output)) {
+                print_queue_rb.tail.store(
+                    tail + 1,
+                    std::memory_order_release
+                );
+                continue;
+            }
+
+            used = (size_t)n;
+
+            for (uint8_t atom_index = 0;
+                 atom_index < msg.atom_count;
+                 ++atom_index)
+            {
+                const PrintAtom& atom = msg.atoms[atom_index];
+
+                if (atom_index > 0) {
+                    if (used >= sizeof(pending_output)) {
+                        break;
+                    }
+                    pending_output[used++] = ' ';
+                }
+
+                if (used >= sizeof(pending_output)) {
+                    break;
+                }
+
+                switch (atom.type) {
+
+                    case PRINT_ATOM_FLOAT:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "%.3f",
+                            atom.value
+                        );
+                        break;
+
+                    case PRINT_ATOM_SYMBOL:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "%s",
+                            atom.symbol
+                        );
+                        break;
+
+                    case PRINT_ATOM_BANG:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "bang"
+                        );
+                        break;
+
+                    case PRINT_ATOM_HASH:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "0x%08lX",
+                            (unsigned long)atom.hash
+                        );
+                        break;
+
+                    default:
+                        n = 0;
+                        break;
+                }
+
+                if (n < 0 || (size_t)n >=
+                    sizeof(pending_output) - used) {
+                    used = 0;
+                    break;
+                }
+
+                used += (size_t)n;
+            }
+
+            if (used == 0 || used + 2 >= sizeof(pending_output)) {
+                print_queue_rb.tail.store(
+                    tail + 1,
+                    std::memory_order_release
+                );
+                continue;
+            }
+
+            pending_output[used++] = '\r';
+            pending_output[used++] = '\n';
+
+            pending_tail = tail;
+            pending_offset = 0;
+            pending_length = used;
         }
 
-        uint32_t available = tud_cdc_write_available();
+        const uint32_t remaining =
+            (uint32_t)pending_length - pending_offset;
 
-        if (available < (uint32_t)len) {
+        const uint32_t available =
+            tud_cdc_write_available();
+
+        if (available == 0) {
             break;
         }
 
-        uint32_t written =
-            tud_cdc_write(output, (uint32_t)len);
+        const uint32_t to_write =
+            (available < remaining) ? available : remaining;
 
-        if (written != (uint32_t)len) {
+        const uint32_t written =
+            tud_cdc_write(
+                pending_output + pending_offset,
+                to_write
+            );
+
+        if (written > 0) {
+            pending_offset += written;
+            flush_needed = true;
+        }
+
+        // Preserve partial writes for the next invocation.
+        if (pending_offset < pending_length) {
             break;
         }
 
@@ -690,9 +844,19 @@ inline void print_queue(bool debug)
             tail + 1,
             std::memory_order_release
         );
+
+        pending_tail = UINT32_MAX;
+        pending_offset = 0;
+        pending_length = 0;
     }
 
-    tud_cdc_write_flush();
+    // Flush at most once per PRINT_INTERVAL_MS.
+    if (flush_needed &&
+        (uint32_t)(now - lastFlushTime) >= PRINT_INTERVAL_MS)
+    {
+        tud_cdc_write_flush();
+        lastFlushTime = now;
+    }
 
 #else
 
@@ -700,6 +864,7 @@ inline void print_queue(bool debug)
 
 #endif
 }
+
 
 
 // ============================================================
