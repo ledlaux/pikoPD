@@ -263,7 +263,7 @@ PikoPD boards support 4 LED modes.
 - **pd** – Maps a Pure Data `[send]` object directly to the LED.
 - **status** – LED turns on when the board is powered and working correctly.
 - **midi** – LED blinks in response to incoming MIDI messages.
-- **clock** – LED blinks in response to incoming MIDI clock.
+- **clock** – LED blinks in response to incoming MIDI clock (send START/STOP midi)
 
 ```json
 "leds": [
