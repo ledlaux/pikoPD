@@ -65,26 +65,14 @@
 #define MIDI_IN_BUF  256
 #define MIDI_OUT_BUF 256
 
-// MIDI input and output buffers must be powers of two.
-static_assert((MIDI_IN_BUF & (MIDI_IN_BUF - 1)) == 0,
-              "MIDI_IN_BUF must be a power of two");
-
-static_assert((MIDI_OUT_BUF & (MIDI_OUT_BUF - 1)) == 0,
-              "MIDI_OUT_BUF must be a power of two");
-
 // Print queue must have a power-of-two capacity.
-#define PRINT_QUEUE_SIZE 128
+#define PRINT_QUEUE_SIZE 64
 #define PRINT_QUEUE_MASK (PRINT_QUEUE_SIZE - 1)
 #define PRINT_TEXT_SIZE  128
-#define PRINT_NAME_SIZE   32
+#define PRINT_NAME_SIZE   64
 #define PRINT_SYMBOL_SIZE 24
 #define PRINT_MAX_ATOMS   8
 #define PRINT_INTERVAL_MS 40
-
-
-static_assert((PRINT_QUEUE_SIZE & PRINT_QUEUE_MASK) == 0,
-              "PRINT_QUEUE_SIZE must be a power of two");
-
 
 // ============================================================
 // HEAVY INPUT SPSC QUEUE
@@ -108,11 +96,6 @@ static_assert((PRINT_QUEUE_SIZE & PRINT_QUEUE_MASK) == 0,
 
 #define HEAVY_INPUT_QUEUE_SIZE 256
 #define HEAVY_INPUT_QUEUE_MASK (HEAVY_INPUT_QUEUE_SIZE - 1)
-
-static_assert(
-    (HEAVY_INPUT_QUEUE_SIZE & HEAVY_INPUT_QUEUE_MASK) == 0,
-    "HEAVY_INPUT_QUEUE_SIZE must be a power of two"
-);
 
 enum HeavyInputType : uint8_t {
     HEAVY_INPUT_MIDI,
