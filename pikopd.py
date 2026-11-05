@@ -255,6 +255,7 @@ class PicoUF2Generator:
         cny_enabled = isinstance(sensors.get("cny70"), list) and len(sensors.get("cny70")) > 0
         mpr121_enabled = isinstance(sensors.get("mpr121"), list) and len(sensors.get("mpr121")) > 0
         air_enabled = isinstance(sensors.get("hx710"), list) and len(sensors.get("hx710")) > 0
+        loadcell_enabled = isinstance(sensors.get("hx711"), list) and len(sensors.get("hx711")) > 0
 
         # Build Ignore List for File Copying
         
@@ -277,6 +278,9 @@ class PicoUF2Generator:
         if not air_enabled:
             ignored_patterns.update(["hx710.h", "hx710.cpp"])
 
+        if not loadcell_enabled:
+            ignored_patterns.update(["hx711.h", "hx711.cpp"])
+
         # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
         
         os.makedirs(self.c_dir, exist_ok=True)
@@ -297,6 +301,7 @@ class PicoUF2Generator:
                     # Strictly check individual hardware file flags
                     
                     if "hx710" in file and not air_enabled: continue
+                    if "hx711" in file and not loadcell_enabled: continue
                     if "mpr121" in file and not mpr121_enabled: continue
                     if "cny70" in file and not cny_enabled: continue
                     if ("hc-sr04" in file or file.endswith(".pio")) and not distance_enabled: continue
@@ -389,6 +394,7 @@ class PicoUF2Generator:
             f"-DCNY70_ENABLED={1 if cny_enabled else 0}",
             f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}",
             f"-DHX710_ENABLED={1 if air_enabled else 0}",
+            f"-DHX711_ENABLED={1 if loadcell_enabled else 0}",
             f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}",
             f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}",
             f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}",
