@@ -472,13 +472,15 @@ Mode Selection: Supports both raw RAW and MIDI mapping options.
       "name": "loadcell",
       "sck_pin": 2,
       "dout_pin": 3,
-      "mode": "MIDI"
+      "mode": "midi" 
     }
   ]
 }
 ```
 
-RAW, FLOAT(0-1.0) and MIDI output modes. To make calibration set RAW mode and then adjust min_raw/max_raw values in /src/sensors/hx711.h 
+Output modes:  raw, float (0-1.0), midi (0-127)
+            
+To make calibration set RAW mode and then adjust min_raw/max_raw values in /src/sensors/hx711.h.
 
 Connect the standard four-wire output of your load cell to the input terminals of the HX711 module as detailed in the table below:
 
