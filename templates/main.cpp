@@ -175,6 +175,19 @@ MasterFX masterFX;
     }) -%}
 {%- endfor -%}
 
+
+{%- set active_hx711 = [] -%}
+{%- set hx711_sensors = sensors.get('hx711', []) -%}
+{%- for hx in hx711_sensors if hx.name in receives -%}
+    {%- set _ = active_hx711.append({
+        'name': hx.name,
+        'hash': receives[hx.name],
+        'sck_pin': hx.sck_pin,
+        'dout_pin': hx.dout_pin,
+        'mode': hx.mode | default('MIDI') | upper
+    }) -%}
+{%- endfor -%}
+
 {%- set active_mcp4725 = [] -%}
 {%- for cv_out in board.get('outputs', {}).get('mcp4725', []) if cv_out.name in sends -%}
     {%- set _ = active_mcp4725.append({
@@ -890,6 +903,34 @@ int main() {
     }
     {% endfor %}
 
+
+// ====================================================
+// HX711 LOAD CELL init
+// ====================================================
+
+{% for hx in active_hx711 %}
+
+Pico::HX711Config hx711_config_{{ loop.index0 }} = {
+    {{ hx.sck_pin }},
+    {{ hx.dout_pin }}
+};
+
+hx711_config_{{ loop.index0 }}.mode =
+    Pico::OutputMode::{{ hx.mode | upper }};
+
+Pico::HX711 hx711_sensor_{{ loop.index0 }}(
+    hx711_config_{{ loop.index0 }}
+);
+
+if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
+    printf("Failed to initialize HX711: {{ hx.name }}\n");
+} else {
+    printf("HX711 ready: {{ hx.name }} | Zero: %ld\n",
+        hx711_sensor_{{ loop.index0 }}.getZeroOffset());
+}
+
+{% endfor %}
+
 // ---- MPR121 init ----
 
     {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
@@ -1396,6 +1437,61 @@ int main() {
 
         {% endfor %}
 
+        // ====================================================
+        // HX711 LOAD CELL
+        // ====================================================
+
+        {% for hx in active_hx711 %}
+
+        if (hx711_sensor_{{ loop.index0 }}.isReady()) {
+            hx711_sensor_{{ loop.index0 }}.read();
+        }
+
+        {% if hx.mode == 'RAW' %}
+
+        {
+            int32_t output_value = 0;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    static_cast<float>(output_value)
+                );
+            }
+        }
+
+        {% elif hx.mode == 'FLOAT' %}
+
+        {
+            float output_value = 0.0f;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    output_value
+                );
+            }
+        }
+
+        {% elif hx.mode == 'MIDI' %}
+
+        {
+            uint8_t output_value = 0;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    static_cast<float>(output_value)
+                );
+            }
+        }
+
+        {% endif %}
+
+        {% endfor %}
 
         // ====================================================
         // MPR121
