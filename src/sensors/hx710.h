@@ -1,10 +1,10 @@
 /*
-    Portions copyright (c) 2026 ledlaux 
-    Rewritten and adapted 
+    Portions copyright (c) 2026 ledlaux
+    Adapted for pikoPD
 
     Original library:
     https://github.com/PBernalPolo/HX710
-    
+
     Copyright (c) 2022 PBernalPolo
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,16 +19,14 @@
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 */
 
 #pragma once
 
-#include <stdio.h>
+#include <stdint.h>
+#include <algorithm>
+
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include "hardware/gpio.h"
@@ -37,27 +35,44 @@ namespace Pico {
 
 enum class OutputMode {
     RAW,
+    FLOAT,
     MIDI
 };
 
 struct HX710Config {
     uint sck_pin;
     uint dout_pin;
-    long min_raw;
-    long max_raw;
-    float fall_factor;
-    uint32_t send_interval;
-    uint8_t rise_step;
-    OutputMode mode;
+
+    long min_raw = 704000;
+    long max_raw = 1004000;
+
+    float release = 0.50f;
+
+    // 0.99	Very slow 
+    // 0.95	Slow 
+    // 0.80	Medium-fast 
+    // 0.50	Fast 
+    // 0.20	Very fast 
+
+    uint32_t send_interval = 20;
+    uint8_t rise_step = 2;
+
+    OutputMode mode = OutputMode::MIDI;
 };
 
 class HX710 {
 public:
     explicit HX710(const HX710Config& cfg)
-        : _cfg(cfg), _last_differential_input(0), _initialized(false),
-          _min_threshold(cfg.min_raw + 5000), _last_val(0), _last_send(0) {}
+        : _cfg(cfg),
+          _last_differential_input(0),
+          _initialized(false),
+          _last_val(0),
+          _last_send(0),
+          _has_reading(false) {}
 
-    bool initialized() const { return _initialized; }
+    bool initialized() const {
+        return _initialized;
+    }
 
     bool tryInit() {
         if (_initialized) return true;
@@ -74,26 +89,34 @@ public:
     }
 
     bool isReady() const {
-        return gpio_get(_cfg.dout_pin) == 0;
+        return _initialized && gpio_get(_cfg.dout_pin) == 0;
     }
 
-    void read() {
-        if (!_initialized) return;
+    // Read one complete 24-bit conversion.
+    bool read() {
+        if (!_initialized || !isReady()) {
+            return false;
+        }
 
         uint32_t value = 0;
         uint32_t save_flags = save_and_disable_interrupts();
 
-        for (int i = 0; i < 24; i++) {
+        for (int i = 0; i < 24; ++i) {
             gpio_put(_cfg.sck_pin, 1);
             sleep_us(1);
-            value = (value << 1);
+
+            value <<= 1;
+
             gpio_put(_cfg.sck_pin, 0);
+
             if (gpio_get(_cfg.dout_pin)) {
                 value++;
             }
+
             sleep_us(1);
         }
 
+        // 25th pulse selects the next conversion.
         gpio_put(_cfg.sck_pin, 1);
         sleep_us(1);
         gpio_put(_cfg.sck_pin, 0);
@@ -101,81 +124,159 @@ public:
 
         restore_interrupts(save_flags);
 
+        // Sign-extend 24-bit two's-complement value.
         if (value & 0x800000) {
             value |= 0xFF000000;
         }
 
-        _last_differential_input = (long)value;
+        _last_differential_input = static_cast<int32_t>(value);
+        _has_reading = true;
+
+        return true;
     }
 
     long getLastReading() const {
         return _last_differential_input;
     }
 
-    bool process(int32_t *out_val) {
-        long raw = _last_differential_input;
-
-        if (_cfg.mode == OutputMode::RAW) {
-            uint32_t current_time = to_ms_since_boot(get_absolute_time());
-            if (current_time - _last_send >= _cfg.send_interval) {
-                _last_send = current_time;
-                *out_val = raw;
-                return true;
-            }
+    // RAW: signed sensor reading.
+    // MIDI: smoothed value from 0 to 127.
+    bool process(int32_t* out_val) {
+        if (!out_val || !_initialized || !_has_reading) {
             return false;
         }
 
-        uint8_t target_val = 0;
-        if (raw >= _min_threshold) {
-            target_val = pressure_to_value(raw);
+        if (_cfg.mode == OutputMode::FLOAT) {
+            return false;
         }
 
-        uint32_t current_time = to_ms_since_boot(get_absolute_time());
+        const uint32_t now =
+            to_ms_since_boot(get_absolute_time());
 
-        if (current_time - _last_send >= _cfg.send_interval) {
-            if (target_val > _last_val) {
-                uint16_t temp = _last_val + _cfg.rise_step;
-                _last_val = (temp > target_val) ? target_val : (uint8_t)temp;
-            } else if (target_val < _last_val) {
-                _last_val = (uint8_t)((float)_last_val * _cfg.fall_factor);
-                if (_last_val < target_val) _last_val = target_val;
-            } else if (target_val == 0 && _last_val != 0) {
-                _last_val = 0;
-            } else {
-                return false;
-            }
+        if (now - _last_send < _cfg.send_interval) {
+            return false;
+        }
 
-            _last_send = current_time;
-            *out_val = _last_val;
+        if (_cfg.mode == OutputMode::RAW) {
+            *out_val = static_cast<int32_t>(_last_differential_input);
+            _last_send = now;
             return true;
         }
 
-        return false;
+        if (_cfg.mode != OutputMode::MIDI) {
+            return false;
+        }
+
+        uint8_t target = 0;
+
+        if (_last_differential_input >= _cfg.min_raw + 5000) {
+            target = pressureToValue(_last_differential_input);
+        }
+
+        if (target > _last_val) {
+            const uint16_t next =
+                static_cast<uint16_t>(_last_val) + _cfg.rise_step;
+
+            _last_val = (next > target)
+                ? target
+                : static_cast<uint8_t>(next);
+        } else if (target < _last_val) {
+            _last_val = static_cast<uint8_t>(
+                static_cast<float>(_last_val) * _cfg.release
+            );
+
+            if (_last_val < target) {
+                _last_val = target;
+            }
+        } else {
+            return false;
+        }
+
+        _last_send = now;
+        *out_val = _last_val;
+
+        return true;
+    }
+
+    // FLOAT: normalized calibration range from 0.0 to 1.0.
+    bool process(float* out_val) {
+        if (!out_val || !_initialized || !_has_reading) {
+            return false;
+        }
+
+        if (_cfg.mode != OutputMode::FLOAT) {
+            return false;
+        }
+
+        const uint32_t now =
+            to_ms_since_boot(get_absolute_time());
+
+        if (now - _last_send < _cfg.send_interval) {
+            return false;
+        }
+
+        _last_send = now;
+
+        if (_cfg.max_raw <= _cfg.min_raw) {
+            *out_val = 0.0f;
+            return true;
+        }
+
+        const float numerator = static_cast<float>(
+            static_cast<int64_t>(_last_differential_input) -
+            static_cast<int64_t>(_cfg.min_raw)
+        );
+
+        const float denominator = static_cast<float>(
+            static_cast<int64_t>(_cfg.max_raw) -
+            static_cast<int64_t>(_cfg.min_raw)
+        );
+
+        *out_val = std::clamp(
+            numerator / denominator,
+            0.0f,
+            1.0f
+        );
+
+        return true;
     }
 
 private:
     const HX710Config _cfg;
+
     long _last_differential_input;
     bool _initialized;
-    long _min_threshold;
     uint8_t _last_val;
     uint32_t _last_send;
+    bool _has_reading;
 
-    long constrain_long(long x, long xm, long xx) const {
-        if (x < xm) return xm;
-        if (x > xx) return xx;
-        return x;
+    long constrainLong(long value, long minimum, long maximum) const {
+        return std::clamp(value, minimum, maximum);
     }
 
-    long map_long(long x, long in_min, long in_max, long out_min, long out_max) const {
-        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-    }
+    uint8_t pressureToValue(long raw) const {
+        if (_cfg.max_raw <= _cfg.min_raw) {
+            return 0;
+        }
 
-    uint8_t pressure_to_value(long raw) const {
-        long constrained = constrain_long(raw, _cfg.min_raw, _cfg.max_raw);
-        return (uint8_t)map_long(constrained, _cfg.min_raw, _cfg.max_raw, 0, 127);
+        const long constrained = constrainLong(
+            raw,
+            _cfg.min_raw,
+            _cfg.max_raw
+        );
+
+        const float normalized =
+            static_cast<float>(
+                static_cast<int64_t>(constrained) - _cfg.min_raw
+            ) /
+            static_cast<float>(
+                static_cast<int64_t>(_cfg.max_raw) - _cfg.min_raw
+            );
+
+        return static_cast<uint8_t>(
+            std::clamp(normalized * 127.0f, 0.0f, 127.0f)
+        );
     }
 };
 
 } // namespace Pico
-
