@@ -22,10 +22,11 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - [Joystick](#joystick)
   - [Encoder](#encoder)
   - [Sensors](#sensors)
-    - [MPR121](#mpr121)
-    - [HC-SR04](#hc-sr04)
-    - [CNY70](#cny70)
-    - [HX710](#hx710)
+    - [MPR121 – Capacitive Touch](#mpr121--capacitive-touch)
+    - [HC-SR04 – Ultrasonic Distance](#hc-sr04--ultrasonic-distance)
+    - [CNY70 – Optical](#cny70--optical)
+    - [HX710 – Air Pressure](#hx710--air-pressure)
+    - [HX711 – Load Cell](#hx711--load-cell)
   - [Display](#display)
 - [MIDI](#midi)
 - [Polyphonic Input](#polyphonic-input)
@@ -228,6 +229,7 @@ Set in `board.json`:
       - mpr121
       - hc-sr04
       - hx710
+      - hx711
     - display
     - web & OSC 
     - masterfx (delay, reverb, limiter)
@@ -379,7 +381,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 
 ## Sensors
 
-### MPR121 
+### MPR121 – Capacitive Touch 
 
 ```json
 "sensors": {
@@ -401,7 +403,7 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-### HC-SR04 
+### HC-SR04 – Ultrasonic Distance 
 
 ```json
   "sensors": {
@@ -414,7 +416,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
 
 
-### CNY70 
+### CNY70 – Optical 
 
 
 ```json
@@ -437,7 +439,7 @@ Because there are multiple manufacturers of these sensors, the pin layouts and w
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
-### HX710 
+### HX710 – Air Pressure 
 
 ```json
 "sensors": {
@@ -459,7 +461,35 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
 
 The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors (such as the UPC barometric pressure sensors) for touchless breath, wind, or pressure control. Calibration Parameters: min_raw and max_raw define the expected raw sensor boundaries to normalize output values. Filtering & Smoothing: Includes adjustable fall_factor, rise_step, and send_interval parameters to smooth erratic pressure fluctuations and manage data transmission rates.
 
-Mode Selection: Supports both raw ("RAW) and MIDI mapping options.
+Mode Selection: Supports both raw RAW and MIDI mapping options.
+
+### HX711 – Load Cell
+
+```json
+"sensors": {   
+    "hx711": [
+    {
+      "name": "loadcell",
+      "sck_pin": 2,
+      "dout_pin": 3,
+      "mode": "MIDI"
+    }
+  ]
+}
+```
+
+RAW, FLOAT(0-1.0) and MIDI output modes. To make calibration set RAW mode and then adjust min_raw/max_raw values in /src/sensors/hx711.h 
+
+Connect the standard four-wire output of your load cell to the input terminals of the HX711 module as detailed in the table below:
+
+| Load Cell Wire Color | HX711 Terminal |
+| --- | --- |
+| Red | E+ |
+| Black | E- |
+| White | A- |
+| Green | A+ |
+
+Wire colours can vary between load cells. Always check your load cell's datasheet before connecting.
 
 
 ## Display
