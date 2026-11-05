@@ -63,7 +63,6 @@ MIT Licence
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
 
-
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
 MasterFX masterFX;
@@ -159,22 +158,16 @@ MasterFX masterFX;
 {%- endif -%}
 
 {%- set active_hx710 = [] -%}
-{%- set hx710_sensors = sensors.get('hx710', []) -%}
-{%- for hx in hx710_sensors if hx.name in receives -%}
+{%- for hx in sensors.get('hx710', []) if hx.name in receives -%}
     {%- set _ = active_hx710.append({
         'name': hx.name,
         'hash': receives[hx.name],
         'sck_pin': hx.sck_pin,
         'dout_pin': hx.dout_pin,
-        'min_raw': hx.min_raw,
-        'max_raw': hx.max_raw,
-        'fall_factor': hx.fall_factor,
-        'send_interval': hx.send_interval,
-        'rise_step': hx.rise_step,
-        'mode': hx.mode
+        'release': hx.release,
+        'mode': hx.mode | default('MIDI') | upper
     }) -%}
 {%- endfor -%}
-
 
 {%- set active_hx711 = [] -%}
 {%- set hx711_sensors = sensors.get('hx711', []) -%}
@@ -198,7 +191,6 @@ MasterFX masterFX;
         'mode': cv_out.mode | default('CV') | upper
     }) -%}
 {%- endfor -%}
-
 
 {# --- MPR121 Touch Sensor Block --- #}
 {%- set mpr_config = sensors.get('mpr121', []) -%}
@@ -817,10 +809,15 @@ void hv_print_handler(
 // ============================================================
 
 int main() {
+
     set_sys_clock_khz({{ board.core_freq }}, true);
+
     stdio_init_all(); 
 
- // --- I2C Initialization ---
+
+// ====================================================
+// I2C init
+// ====================================================
 
     {% if board.inputs.sensors.mpr121 -%}
     i2c_init(i2c0, 400 * 1000);
@@ -829,7 +826,9 @@ int main() {
     {% endif %}
     {%- endif %}
 
- // --------------------------
+// ====================================================
+// Other init
+// ====================================================
 
     {%- if board.pico_board == 'zero' %}
     Pico::init_neopixel();
@@ -856,7 +855,9 @@ int main() {
     {% endif %}
     pd_prog.setSendHook(&sendHookHandler);
 
-// ---- AUDIO init ----
+// ====================================================
+// AUDIO init 
+// ====================================================
 
     {% if board.audio_mode == "I2S" %}
     Pico::setupAudio(I2S, audioFunc, 
@@ -874,7 +875,9 @@ int main() {
 
      masterFX.init();
 
-// ---- MCP4725 CV Out init ----
+// ====================================================
+// MCP4725 CV Out init 
+// ====================================================
 
     {%- for mcp in active_mcp4725 %}
     Pico::MCP4725 cv_out_{{ loop.index0 }}
@@ -882,56 +885,63 @@ int main() {
     cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
     {%- endfor %}
 
-// ---- HX710 init ----
+// ====================================================
+// HX710 init 
+// ====================================================
 
     {% for hx in active_hx710 %}
+
     Pico::HX710Config sensor_config_{{ loop.index0 }} = {
         {{ hx.sck_pin }},
         {{ hx.dout_pin }},
-        {{ hx.min_raw }},
-        {{ hx.max_raw }},
-        {{ hx.fall_factor }},
-        {{ hx.send_interval }},
-        {{ hx.rise_step }},
-        Pico::OutputMode::{{ hx.mode | upper }}
     };
 
-    Pico::HX710 sensor_{{ loop.index0 }}(sensor_config_{{ loop.index0 }});
+    sensor_config_{{ loop.index0 }}.release =
+    {{ hx.release | default(0.50, true) }}f;
+
+    sensor_config_{{ loop.index0 }}.mode =
+        Pico::OutputMode::{{ hx.mode | upper }};
+
+    Pico::HX710 sensor_{{ loop.index0 }}(
+        sensor_config_{{ loop.index0 }}
+    );
 
     if (!sensor_{{ loop.index0 }}.tryInit()) {
         printf("Failed to initialize sensor {{ hx.name }}\n");
     }
-    {% endfor %}
 
+    {% endfor %}
 
 // ====================================================
 // HX711 LOAD CELL init
 // ====================================================
 
-{% for hx in active_hx711 %}
+    {% for hx in active_hx711 %}
 
-Pico::HX711Config hx711_config_{{ loop.index0 }} = {
-    {{ hx.sck_pin }},
-    {{ hx.dout_pin }}
-};
+    Pico::HX711Config hx711_config_{{ loop.index0 }} = {
+        {{ hx.sck_pin }},
+        {{ hx.dout_pin }}
+    };
 
-hx711_config_{{ loop.index0 }}.mode =
-    Pico::OutputMode::{{ hx.mode | upper }};
+    hx711_config_{{ loop.index0 }}.mode =
+        Pico::OutputMode::{{ hx.mode | upper }};
 
-Pico::HX711 hx711_sensor_{{ loop.index0 }}(
-    hx711_config_{{ loop.index0 }}
-);
+    Pico::HX711 hx711_sensor_{{ loop.index0 }}(
+        hx711_config_{{ loop.index0 }}
+    );
 
-if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
-    printf("Failed to initialize HX711: {{ hx.name }}\n");
-} else {
-    printf("HX711 ready: {{ hx.name }} | Zero: %ld\n",
-        hx711_sensor_{{ loop.index0 }}.getZeroOffset());
-}
+    if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
+        printf("Failed to initialize HX711: {{ hx.name }}\n");
+    } else {
+        printf("HX711 ready: {{ hx.name }} | Zero: %ld\n",
+            hx711_sensor_{{ loop.index0 }}.getZeroOffset());
+    }
 
-{% endfor %}
+    {% endfor %}
 
-// ---- MPR121 init ----
+// ====================================================
+// MPR121 init 
+// ====================================================
 
     {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
         #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
@@ -969,7 +979,9 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
     {%- endif %}
 
-// ---- Display init ----
+// ====================================================   
+// Display init 
+// ====================================================
 
     {% if board.display is defined and board.display.enabled -%}
         Pico::Screen::init(
@@ -983,7 +995,9 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
         );
         {%- endif %}
 
-// ---- Peripherals init ----
+// ====================================================
+// Peripherals init 
+// ====================================================
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -1366,7 +1380,7 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
 
 
         // ====================================================
-        // CNY70
+        // CNY70 - optical
         // ====================================================
 
         {% for cny in active_cny70 %}
@@ -1393,7 +1407,7 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
 
 
         // ====================================================
-        // HC-SR04
+        // HC-SR04 - distance 
         // ====================================================
 
         {% for d in active_dist %}
@@ -1413,32 +1427,38 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
         {% endfor %}
 
 
-        // ====================================================
-        // HX710
+        /// ====================================================
+        // HX710 - air pressure 
         // ====================================================
 
         {% for hx in active_hx710 %}
 
-        if (sensor_{{ loop.index0 }}.isReady()) {
+        if (sensor_{{ loop.index0 }}.isReady()) sensor_{{ loop.index0 }}.read();
 
-            sensor_{{ loop.index0 }}.read();
-
-            int32_t output_value = 0;
-
-            if (sensor_{{ loop.index0 }}.process(&output_value)) {
-
-                hv_send_float(
-                    &pd_prog,
-                    {{ hx.hash }}U,
-                    (float)output_value
-                );
-            }
+        {% if hx.mode == 'RAW' %}
+        {
+            int32_t value = 0;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, static_cast<float>(value));
         }
+        {% elif hx.mode == 'FLOAT' %}
+        {
+            float value = 0.0f;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, value);
+        }
+        {% elif hx.mode == 'MIDI' %}
+        {
+            int32_t value = 0;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, static_cast<float>(value));
+        }
+        {% endif %}
 
         {% endfor %}
 
         // ====================================================
-        // HX711 LOAD CELL
+        // HX711 load cell
         // ====================================================
 
         {% for hx in active_hx711 %}
@@ -1494,7 +1514,7 @@ if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
         {% endfor %}
 
         // ====================================================
-        // MPR121
+        // MPR121 - touch
         // ====================================================
 
         {% if active_mpr_pads and active_mpr_pads|length > 0 %}
