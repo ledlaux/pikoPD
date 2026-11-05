@@ -30,6 +30,10 @@
 #include "cny70.h"
 #endif
 
+#if HX711_ENABLED
+#include "hx711.h"
+#endif
+
 #include "mcp4725.h" 
 
 
