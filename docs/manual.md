@@ -142,6 +142,65 @@ sudo make install
 * Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
 * Provides stable audio performance with low jitter and fewer dropouts.
 
+
+# Project Configuration
+
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Tested on macOS.
+
+```
+workspace/
+├── pico-sdk/
+│   └── pico-extras/
+├── picotool/
+├── pikoPD/
+│   ├── docs/
+│   ├── lib/
+│   │   └── heavylib/
+│   ├── patches/           # pd patches folder
+│   ├── src/               # hardware config source files
+│   ├── templates/
+│   │   └── main.cpp       # template 
+│   ├── project/
+│   │   ├── build/         # build folder (uf2 file here)   
+│   │   ├── hvcc/          # hvcc compiler generated files
+│   │   ├── src/             
+│   │   └── CMakeLists.txt  
+│   ├── board.json         # user config file
+│   └── pikopd.py          # pikopd script
+```
+
+## Build
+
+pikopd.py
+
+- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
+- Copies config files into project folder from `/src`
+- Configures hardware using `board.json`
+- Uses main.cpp as a project template
+- Builds firmware using **CMake** in a `build/` folder  
+- Checks for device in BOOTSEL mode
+- Flashes UF2 firmware to PICO board and restarts device
+
+Enter bootloader mode by holding device boot button
+
+```
+python3 pikopd.py patches/heavy.pd project_name 
+
+optional arguments:
+  -h, --help           Show help message and exit
+  -b, --board          Path to custom json configuration file
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -v, --verbose        Enable verbose compiler console debug output
+```
+
 # Hardware Configuration
 
 Hardware configuration is done by adjusting the `board.json` file.  
@@ -422,64 +481,6 @@ PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.js
 
 1. console - outputs adjusted parameter [print] object.
 2. pd - outputs first 4 [print] objects as dashboard.
-
-# Project Configuration
-
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- Check PD patch examples in the folder.
-- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- Tested on macOS.
-
-```
-workspace/
-├── pico-sdk/
-│   └── pico-extras/
-├── picotool/
-├── pikoPD/
-│   ├── docs/
-│   ├── lib/
-│   │   └── heavylib/
-│   ├── patches/           # pd patches folder
-│   ├── src/               # hardware config source files
-│   ├── templates/
-│   │   └── main.cpp       # template 
-│   ├── project/
-│   │   ├── build/         # build folder (uf2 file here)   
-│   │   ├── hvcc/          # hvcc compiler generated files
-│   │   ├── src/             
-│   │   └── CMakeLists.txt  
-│   ├── board.json         # user config file
-│   └── pikopd.py          # pikopd script
-```
-
-## Build
-
-pikopd.py
-
-- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
-- Copies config files into project folder from `/src`
-- Configures hardware using `board.json`
-- Uses main.cpp as a project template
-- Builds firmware using **CMake** in a `build/` folder  
-- Checks for device in BOOTSEL mode
-- Flashes UF2 firmware to PICO board and restarts device
-
-Enter bootloader mode by holding device boot button
-
-```
-python3 pikopd.py patches/heavy.pd project_name 
-
-optional arguments:
-  -h, --help           Show help message and exit
-  -b, --board          Path to custom json configuration file
-  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot
-  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
-  -v, --verbose        Enable verbose compiler console debug output
-```
 
 # MIDI 
 
