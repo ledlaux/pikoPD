@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.3)
+/* pikoPD (v0.0.4)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -15,6 +15,7 @@ MIT Licence
 #include <string.h>
 #include <stdint.h>
 #include <atomic>
+#include <algorithm>
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "pico/multicore.h"
@@ -61,7 +62,6 @@ MIT Licence
 #define MIDI_RT_STOP            0xFC
 #define MIDI_RT_ACTIVESENSE     0xFE
 #define MIDI_RT_RESET           0xFF
-
 
 Heavy_{{ name }} pd_prog( {{ board.sample_rate }} );
 
@@ -158,19 +158,26 @@ MasterFX masterFX;
 {%- endif -%}
 
 {%- set active_hx710 = [] -%}
-{%- set hx710_sensors = sensors.get('hx710', []) -%}
-{%- for hx in hx710_sensors if hx.name in receives -%}
+{%- for hx in sensors.get('hx710', []) if hx.name in receives -%}
     {%- set _ = active_hx710.append({
         'name': hx.name,
         'hash': receives[hx.name],
         'sck_pin': hx.sck_pin,
         'dout_pin': hx.dout_pin,
-        'min_raw': hx.min_raw,
-        'max_raw': hx.max_raw,
-        'fall_factor': hx.fall_factor,
-        'send_interval': hx.send_interval,
-        'rise_step': hx.rise_step,
-        'mode': hx.mode
+        'release': hx.release,
+        'mode': hx.mode | default('MIDI') | upper
+    }) -%}
+{%- endfor -%}
+
+{%- set active_hx711 = [] -%}
+{%- set hx711_sensors = sensors.get('hx711', []) -%}
+{%- for hx in hx711_sensors if hx.name in receives -%}
+    {%- set _ = active_hx711.append({
+        'name': hx.name,
+        'hash': receives[hx.name],
+        'sck_pin': hx.sck_pin,
+        'dout_pin': hx.dout_pin,
+        'mode': hx.mode | default('MIDI') | upper
     }) -%}
 {%- endfor -%}
 
@@ -184,11 +191,6 @@ MasterFX masterFX;
         'mode': cv_out.mode | default('CV') | upper
     }) -%}
 {%- endfor -%}
-
-{%- for mcp in active_mcp4725 %}
-static float cv_out_{{ loop.index0 }}_val = 0.0f;
-static bool cv_out_{{ loop.index0 }}_dirty = false;
-{%- endfor %}
 
 {# --- MPR121 Touch Sensor Block --- #}
 {%- set mpr_config = sensors.get('mpr121', []) -%}
@@ -246,11 +248,20 @@ static const uint32_t screen_slots[4] = {
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
-static uint32_t midi_activity_timer = 0;
-static uint8_t last_midi_velocity = 0;
-static uint8_t current_midi_note = 60; 
+#define CLOCK_TICK_DIVIDER   12
+
+// CLOCK_TICK_DIVIDER settings:
+// - 24 — once per beat
+// - 12 — twice per beat
+// - 6 — four times per beat
+// - 3 — eight times per beat
+// - 1 — every MIDI clock tick
+
+static std::atomic<uint32_t> midi_activity_timer{0};
+static std::atomic<uint8_t> last_midi_velocity{0};
+static uint8_t current_midi_note = 60;
 static uint32_t last_led_tick = 0;
-static uint32_t midi_clock_timer = 0;
+static std::atomic<uint32_t> midi_clock_timer{0};
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
@@ -277,141 +288,304 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 {% endif %}
 
 
-// ---------------------------
+// ============================================================
+// HEAVY INPUT HELPERS
+// ============================================================
 
-// https://github.com/Wasted-Audio/hvcc/issues/175
+// These functions are called only from Core 1.
 
-#define HV_HEAVY_SPINLOCK 5
-
-inline void hv_send_msg1_lock(uint32_t hash, float a) {
-    spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
-    uint32_t irq = spin_lock_blocking(lock);
-
+inline void hv_send_msg1(uint32_t hash, float a)
+{
     pd_prog.sendMessageToReceiverV(hash, 0.0, "f", a);
-
-    spin_unlock(lock, irq);
 }
 
-inline void hv_send_msg2_lock(uint32_t hash, float a, float b) {
-    spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
-    uint32_t irq = spin_lock_blocking(lock);
-
+inline void hv_send_msg2(uint32_t hash, float a, float b)
+{
     pd_prog.sendMessageToReceiverV(hash, 0.0, "ff", a, b);
-
-    spin_unlock(lock, irq);
 }
 
-inline void hv_send_msg3_lock(uint32_t hash, float a, float b, float c) {
-    spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
-    uint32_t irq = spin_lock_blocking(lock);
-
+inline void hv_send_msg3(uint32_t hash, float a, float b, float c)
+{
     pd_prog.sendMessageToReceiverV(hash, 0.0, "fff", a, b, c);
-
-    spin_unlock(lock, irq);
 }
 
-inline void hv_send_float_lock(HeavyContextInterface* ctx,
-                               uint32_t hash, float v) {
-    spin_lock_t *lock = spin_lock_instance(HV_HEAVY_SPINLOCK);
-    uint32_t irq = spin_lock_blocking(lock);
+// Core 0 producer: enqueue float input for Core 1.
 
-    ctx->sendFloatToReceiver(hash, v);
-
-    spin_unlock(lock, irq);
+inline void hv_send_float(
+    HeavyContextInterface* ctx,
+    uint32_t hash,
+    float value)
+{
+    (void)ctx;
+    heavy_input_push_float(hash, value);
 }
 
 
-void handle_midi_message(uint8_t status, uint8_t data1, uint8_t data2) {
-
+void handle_midi_message(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2)
+{
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
+    // --------------------------------------------------------
+    // MIDI REALTIME
+    // --------------------------------------------------------
+
     if (status >= 0xF8) {
-        hv_send_msg1_lock(HV_MIDIREALTIMEIN_HASH, (float)status);
-        switch(status) {
-            case MIDI_RT_START:    clock_count = 23; clock_running = true; break;
-            case MIDI_RT_CONTINUE: clock_running = true; break;
-            case MIDI_RT_STOP:     clock_running = false; break;
-            case MIDI_RT_CLOCK:    
-                if(clock_running && ++clock_count >= 24) {
+
+        hv_send_msg1(HV_MIDIREALTIMEIN_HASH, (float)status);
+
+        switch (status) {
+
+            case MIDI_RT_START:
+                clock_count = 23;
+                clock_running = true;
+                break;
+
+            case MIDI_RT_CONTINUE:
+                clock_running = true;
+                break;
+
+            case MIDI_RT_STOP:
+                clock_running = false;
+                break;
+
+            case MIDI_RT_CLOCK:
+
+                if (clock_running && ++clock_count >= CLOCK_TICK_DIVIDER) {
                     clock_count = 0;
-                    midi_clock_timer = now + CLOCK_FLASH_MS;
+
+                    midi_clock_timer.store(
+                        now + CLOCK_FLASH_MS,
+                        std::memory_order_relaxed
+                    );
                 }
                 break;
         }
+
         return;
     }
 
     uint8_t type = status & 0xF0;
-    uint8_t chan = status & 0x0F;  // Hardware channel (0-15)
-    float f_chan = (float)chan + 1.0f;  // Converted to human channel (1-16) for Pd
+    uint8_t chan = status & 0x0F;
+    float f_chan = (float)chan + 1.0f;
 
-    switch(type) {
-        case 0x90: { 
+    switch (type) {
+
+        // ----------------------------------------------------
+        // NOTE ON
+        // ----------------------------------------------------
+
+        case 0x90: {
+
             if (data2 > 0) {
-                last_midi_velocity = data2;
+
+                last_midi_velocity.store(
+                    data2,
+                    std::memory_order_relaxed
+                );
+
                 current_midi_note = data1;
-                midi_activity_timer = now + FLASH_DURATION_MS;
-                
-                hv_send_msg3_lock(HV_NOTEIN_HASH, (float)data1, (float)data2, f_chan);
+
+                midi_activity_timer.store(
+                    now + FLASH_DURATION_MS,
+                    std::memory_order_relaxed
+                );
+
+                hv_send_msg3(
+                    HV_NOTEIN_HASH,
+                    (float)data1,
+                    (float)data2,
+                    f_chan
+                );
 
                 {%- if board.voice_count > 1 %}
                 {
-                    int v_idx = allocateVoice(data1); 
-                    hv_send_msg3_lock(VOICE_HASHES[v_idx], (float)data1, (float)data2, f_chan);
+                    int v_idx = allocateVoice(data1);
+
+                    hv_send_msg3(
+                        VOICE_HASHES[v_idx],
+                        (float)data1,
+                        (float)data2,
+                        f_chan
+                    );
                 }
                 {%- endif %}
-                break; 
+
+                break;
             }
+
             [[fallthrough]];
         }
 
-        case 0x80: { 
-             hv_send_msg3_lock(HV_NOTEIN_HASH, (float)data1, 0.0f, f_chan);
+        // ----------------------------------------------------
+        // NOTE OFF
+        // ----------------------------------------------------
+
+        case 0x80: {
+
+            hv_send_msg3(
+                HV_NOTEIN_HASH,
+                (float)data1,
+                0.0f,
+                f_chan
+            );
 
             {%- if board.voice_count > 1 %}
             {
                 int i = findVoiceByNote(data1);
+
                 if (i >= 0) {
+
                     sendVoiceNoteOff(i, data1);
-                    hv_send_msg3_lock(VOICE_HASHES[i], (float)data1, 0.0f, f_chan);
+
+                    hv_send_msg3(
+                        VOICE_HASHES[i],
+                        (float)data1,
+                        0.0f,
+                        f_chan
+                    );
                 }
             }
             {%- endif %}
-            break;
-        }
-        
-        case 0xB0: { 
-            float val = (float)data2 / 127.0f;
-            bool is_on = (data2 > 64);
-            
-            switch(data1) {
-                {%- if board.masterfx.limiter %}
-                case 7: masterFX.master_volume = val; break; 
-                case 8: masterFX.limiter.bypass = !is_on; break;
-                {%- endif %}
-                {%- if board.masterfx.delay %}
-                case 90: masterFX.delay.set_time(val); break;
-                case 91: masterFX.delay.targetLevel = val * 0.8f; break;
-                case 92: masterFX.delay.targetFb = val * 0.95f; break;
-                case 93: masterFX.delay.bypass = !is_on; break;
-                {%- endif %}
-                {%- if board.masterfx.reverb %}
-                case 94: masterFX.reverb_mix = val; break;      
-                case 95: masterFX.reverb.roomsize(val * 0.98f); break; 
-                case 96: masterFX.reverb.damping(val); break;      
-                case 97: masterFX.reverb.reverb_width = val; break;       
-                case 98: masterFX.reverb.reverb_predelay = val; break;    
-                case 99: masterFX.reverb_bypass = !is_on; break;
-                {%- endif %}
-            }
-            hv_send_msg3_lock(HV_CTLIN_HASH, (float)data2, (float)data1, f_chan);
+
             break;
         }
 
-        case 0xE0: { 
-            int bend = (data2 << 7) | data1;
-            hv_send_msg2_lock(HV_BENDIN_HASH, (float)bend, f_chan);
+        // ----------------------------------------------------
+        // CONTROL CHANGE
+        // ----------------------------------------------------
+
+        case 0xB0: {
+
+            float val = (float)data2 / 127.0f;
+            bool is_on = (data2 > 64);
+
+            switch (data1) {
+
+                {%- if board.masterfx.limiter %}
+                case 7:
+                    masterFX.master_volume = val;
+                    break;
+
+                case 8:
+                    masterFX.limiter.bypass = !is_on;
+                    break;
+                {%- endif %}
+
+                {%- if board.masterfx.delay %}
+                case 90:
+                    masterFX.delay.set_time(val);
+                    break;
+
+                case 91:
+                    masterFX.delay.targetLevel = val * 0.8f;
+                    break;
+
+                case 92:
+                    masterFX.delay.targetFb = val * 0.95f;
+                    break;
+
+                case 93:
+                    masterFX.delay.bypass = !is_on;
+                    break;
+                {%- endif %}
+
+                {%- if board.masterfx.reverb %}
+                case 94:
+                    masterFX.reverb_mix = val;
+                    break;
+
+                case 95:
+                    masterFX.reverb.roomsize(val * 0.98f);
+                    break;
+
+                case 96:
+                    masterFX.reverb.damping(val);
+                    break;
+
+                case 97:
+                    masterFX.reverb.reverb_width = val;
+                    break;
+
+                case 98:
+                    masterFX.reverb.reverb_predelay = val;
+                    break;
+
+                case 99:
+                    masterFX.reverb_bypass = !is_on;
+                    break;
+                {%- endif %}
+            }
+
+            hv_send_msg3(
+                HV_CTLIN_HASH,
+                (float)data2,
+                (float)data1,
+                f_chan
+            );
+
             break;
+        }
+
+        // ----------------------------------------------------
+        // PITCH BEND
+        // ----------------------------------------------------
+
+        case 0xE0: {
+
+            int bend = (data2 << 7) | data1;
+
+            hv_send_msg2(
+                HV_BENDIN_HASH,
+                (float)bend,
+                f_chan
+            );
+
+            break;
+        }
+    }
+}
+
+
+// ============================================================
+// HEAVY INPUT DISPATCH
+// Consumer: Core 1
+// ============================================================
+
+inline void heavy_input_dispatch()
+{
+    constexpr uint32_t MAX_EVENTS_PER_BLOCK = 32;
+
+    HeavyInputEvent event;
+
+    for (uint32_t i = 0; i < MAX_EVENTS_PER_BLOCK; ++i) {
+
+        if (!heavy_input_pop(event)) {
+            break;
+        }
+
+        switch (event.type) {
+
+            case HEAVY_INPUT_MIDI:
+
+                handle_midi_message(
+                    event.status,
+                    event.data1,
+                    event.data2
+                );
+
+                break;
+
+            case HEAVY_INPUT_FLOAT:
+
+                pd_prog.sendFloatToReceiver(
+                    event.hash,
+                    event.value
+                );
+
+                break;
         }
     }
 }
@@ -488,11 +662,21 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
 
         /* --- Hardware MCP4725 CV Outputs --- */
 
-        {% for mcp in active_mcp4725 -%}
+       {% for mcp in active_mcp4725 -%}
         case {{ mcp.hash }}U:
             if (msg_isFloat(m, 0)) {
-                cv_out_{{ loop.index0 }}_val = val0;
-                cv_out_{{ loop.index0 }}_dirty = true;
+                uint32_t bits;
+                memcpy(&bits, &val0, sizeof(bits));
+
+                cv_out_{{ loop.index0 }}_bits.store(
+                    bits,
+                    std::memory_order_relaxed
+                );
+
+                cv_out_{{ loop.index0 }}_dirty.store(
+                    true,
+                    std::memory_order_release
+                );
             }
             break;
         {% endfor %}
@@ -524,7 +708,13 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
     }
 }
 
+
+// ============================================================
+// WEB INPUT ROUTER
+// Core 0 producer -> Heavy input queue
+
 // Global handler pointers defined in web.h
+// ============================================================
 
 typedef void (*web_float_handler_t)(const char *param, float value);
 typedef void (*osc_hv_float_handler_t)(const char *address, float value);
@@ -533,12 +723,14 @@ web_float_handler_t web_float_handler = nullptr;
 osc_hv_float_handler_t osc_hv_handler = nullptr;
 
 {% if board.web and board.web.enabled -%}
-static void web_router(const char *p, float v) {
+static void web_router(const char *p, float v)
+{
     if (!p) return;
+
     {% for r in hv_manifest.receives -%}
     {% if r.name.startswith('web') -%}
     if (!strcmp(p, "{{ r.name }}")) {
-        hv_send_float_lock(&pd_prog, {{ r.hash }}, v);
+        heavy_input_push_float({{ r.hash }}U, v);
         return;
     }
     {%- endif %}
@@ -546,109 +738,86 @@ static void web_router(const char *p, float v) {
 }
 {%- endif %}
 
+
+// ============================================================
+// OSC INPUT ROUTER
+// Core 0 producer -> Heavy input queue
+// ============================================================
+
 {% if board.web and board.web.osc_enabled -%}
-static void hv_osc_router(const char *a, float v) {
+static void hv_osc_router(const char *a, float v)
+{
     if (!a) return;
+
     {% for r in hv_manifest.receives -%}
     {% if r.name.startswith('osc') -%}
     if (!strcmp(a, "/{{ r.name }}")) {
-        hv_send_float_lock(&pd_prog, {{ r.hash }}, v);
+        heavy_input_push_float({{ r.hash }}U, v);
+        return;
     }
     {%- endif %}
     {% endfor %}
 }
 {%- endif %}
 
-/* ---  Print handler --- */
+
+// ============================================================
+// AUDIO CALLBACK
+// Core 1
+// ============================================================
+
+void __not_in_flash_func(audioFunc)(float* buffer, int frames)
+{
+    // Deliver queued MIDI and hardware input events.
+    heavy_input_dispatch();
+
+    // Process the audio block.
+    pd_prog.processInlineInterleaved(
+        buffer,
+        buffer,
+        frames
+    );
+}
+
+// ============================================================
+// PRINT HANDLER
+// Core 1 → Core 0 (SPSC queue)
+// Core 1 produces print messages; Core 0 dispatches them to Serial.
+// ============================================================
 
 {%- if board.console %}
-#define NUM_PRINT_NAMES {{ hv_manifest.prints|length }}
-PrintMsg print_pool[PRINT_POOL_SIZE];
 
-static const char* printNames[NUM_PRINT_NAMES] = {
-{% for p in hv_manifest.prints -%}
-    "{{ p.name }}"{% if not loop.last %}, {% endif %}
-{% endfor %}
-};
-
-
-static int16_t get_print_id(const char *name) {
-    if (!name || name[0] == '\0') return -1; 
-    for (uint16_t i = 0; i < NUM_PRINT_NAMES; i++) {
-        if (strcmp(name, printNames[i]) == 0) return (int16_t)i;
-    }
-    return -1;
-}
-
-
-void hv_print_handler(HeavyContextInterface* context,
-                      const char* printName,
-                      const char* str,
-                      const HvMessage* msg)
+void hv_print_handler(
+    HeavyContextInterface* context,
+    const char* printName,
+    const char* str,
+    const HvMessage* msg)
 {
-    static uint32_t last_print_ms = 0;
-    uint32_t now = to_ms_since_boot(get_absolute_time());
+    (void)context;
+    (void)str;
 
-    if (now - last_print_ms < 10) {
-        return;
-    }
-
-    int slot = -1;
-
-    for (int i = 0; i < PRINT_POOL_SIZE; i++) {
-        bool expected = false;
-
-        if (print_pool[i].busy.compare_exchange_strong(
-                expected, true,
-                std::memory_order_acq_rel))
-        {
-            slot = i;
-            break;
-        }
-    }
-
-    if (slot < 0) {
-        return;
-    }
-
-    PrintMsg &m = print_pool[slot];
-
-    int id = get_print_id(printName);
-
-    m.id       = id;
-    m.val      = msg ? msg_getFloat(msg, 0) : 0.0f;
-    m.is_float = (msg != nullptr);
-
-    std::atomic_thread_fence(std::memory_order_release);
-
-    if (!multicore_fifo_push_timeout_us(slot, 50)) {
-        m.busy.store(false, std::memory_order_release);
-        return;
-    }
-
-    last_print_ms = now;
+    print_push(printName, msg);
 }
+
 {% endif %}
 
-
-void audioFunc(float* buffer, int frames) {
-    pd_prog.processInlineInterleaved(buffer, buffer, frames);
-}
-
+// ============================================================
+// MAIN FUNCTION
+// Core 0 — System initialization and main control loop
+// Initializes hardware, launches Core 1 audio processing,
+// and handles MIDI, controls, sensors, display and serial output.
+// ============================================================
 
 int main() {
+
     set_sys_clock_khz({{ board.core_freq }}, true);
+
     stdio_init_all(); 
 
-    {%- if board.console %}
-    #if !defined(WEB_ENABLED) || (WEB_ENABLED == 0)
-        #ifndef MIDI_HOST
-        cdc_stdio_lib_init();
-        #endif
-    #endif
-    {%- endif %}
 
- // --- I2C Initialization ---
+// ====================================================
+// I2C init
+// ====================================================
 
     {% if board.inputs.sensors.mpr121 -%}
     i2c_init(i2c0, 400 * 1000);
@@ -657,7 +826,9 @@ int main() {
     {% endif %}
     {%- endif %}
 
- // --------------------------
+// ====================================================
+// Other init
+// ====================================================
 
     {%- if board.pico_board == 'zero' %}
     Pico::init_neopixel();
@@ -684,7 +855,9 @@ int main() {
     {% endif %}
     pd_prog.setSendHook(&sendHookHandler);
 
-// ---- AUDIO init ----
+// ====================================================
+// AUDIO init 
+// ====================================================
 
     {% if board.audio_mode == "I2S" %}
     Pico::setupAudio(I2S, audioFunc, 
@@ -702,56 +875,94 @@ int main() {
 
      masterFX.init();
 
-// ---- MCP4725 CV Out init ----
-{%- for mcp in active_mcp4725 %}
-Pico::MCP4725 cv_out_{{ loop.index0 }}
-({{ mcp.address | default("0x60") }});
-cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
-{%- endfor %}
+// ====================================================
+// MCP4725 CV Out init 
+// ====================================================
 
-// ---- HX710 init ----
+    {%- for mcp in active_mcp4725 %}
+    Pico::MCP4725 cv_out_{{ loop.index0 }}
+    ({{ mcp.address | default("0x60") }});
+    cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
+    {%- endfor %}
 
-{% for hx in active_hx710 %}
+// ====================================================
+// HX710 init 
+// ====================================================
+
+    {% for hx in active_hx710 %}
+
     Pico::HX710Config sensor_config_{{ loop.index0 }} = {
         {{ hx.sck_pin }},
         {{ hx.dout_pin }},
-        {{ hx.min_raw }},
-        {{ hx.max_raw }},
-        {{ hx.fall_factor }},
-        {{ hx.send_interval }},
-        {{ hx.rise_step }},
-        Pico::OutputMode::{{ hx.mode | upper }}
     };
 
-    Pico::HX710 sensor_{{ loop.index0 }}(sensor_config_{{ loop.index0 }});
+    sensor_config_{{ loop.index0 }}.release =
+    {{ hx.release | default(0.50, true) }}f;
+
+    sensor_config_{{ loop.index0 }}.mode =
+        Pico::OutputMode::{{ hx.mode | upper }};
+
+    Pico::HX710 sensor_{{ loop.index0 }}(
+        sensor_config_{{ loop.index0 }}
+    );
 
     if (!sensor_{{ loop.index0 }}.tryInit()) {
         printf("Failed to initialize sensor {{ hx.name }}\n");
     }
-{% endfor %}
 
-// ---- MPR121 init ----
+    {% endfor %}
 
-{% if active_mpr_pads and active_mpr_pads|length > 0 -%}
-    #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
+// ====================================================
+// HX711 LOAD CELL init
+// ====================================================
 
-    Pico::MPR121Config cfg[NUM_SENSORS] = {
-    {%- set unique_sensors = [] -%}
-    {%- for pad in active_mpr_pads -%}
-        {%- set s_idx = pad.sensor_idx -%}
-        {%- if s_idx not in unique_sensors -%}
-            {%- set _ = unique_sensors.append(s_idx) -%}
-            {%- set sensor = board.inputs.sensors.mpr121[s_idx] -%}
-        { 
-            {{ sensor.i2c_bus }}, 
-            {{ sensor.sda }}, 
-            {{ sensor.scl }}, 
-            {{ sensor.irq }}, 
-            {{ sensor.addr_index }} 
-        }{{ "," if not loop.last }}
-        {%- endif -%}
-    {%- endfor %}
+    {% for hx in active_hx711 %}
+
+    Pico::HX711Config hx711_config_{{ loop.index0 }} = {
+        {{ hx.sck_pin }},
+        {{ hx.dout_pin }}
     };
+
+    hx711_config_{{ loop.index0 }}.mode =
+        Pico::OutputMode::{{ hx.mode | upper }};
+
+    Pico::HX711 hx711_sensor_{{ loop.index0 }}(
+        hx711_config_{{ loop.index0 }}
+    );
+
+    if (!hx711_sensor_{{ loop.index0 }}.tryInit()) {
+        printf("Failed to initialize HX711: {{ hx.name }}\n");
+    } else {
+        printf("HX711 ready: {{ hx.name }} | Zero: %ld\n",
+            hx711_sensor_{{ loop.index0 }}.getZeroOffset());
+    }
+
+    {% endfor %}
+
+// ====================================================
+// MPR121 init 
+// ====================================================
+
+    {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
+        #define NUM_SENSORS {{ active_mpr_pads | map(attribute='sensor_idx') | unique | list | length }}
+
+        Pico::MPR121Config cfg[NUM_SENSORS] = {
+        {%- set unique_sensors = [] -%}
+        {%- for pad in active_mpr_pads -%}
+            {%- set s_idx = pad.sensor_idx -%}
+            {%- if s_idx not in unique_sensors -%}
+                {%- set _ = unique_sensors.append(s_idx) -%}
+                {%- set sensor = board.inputs.sensors.mpr121[s_idx] -%}
+            { 
+                {{ sensor.i2c_bus }}, 
+                {{ sensor.sda }}, 
+                {{ sensor.scl }}, 
+                {{ sensor.irq }}, 
+                {{ sensor.addr_index }} 
+            }{{ "," if not loop.last }}
+            {%- endif -%}
+        {%- endfor %}
+        };
 
     Pico::MPR121 sensor_array[NUM_SENSORS] = {
         {%- for i in range(unique_sensors | length) %}
@@ -766,23 +977,27 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
     }
 
     static uint16_t last_touched_state[NUM_SENSORS] = { 0 };
-{%- endif %}
-
-// ---- Display init ----
-
-{% if board.display is defined and board.display.enabled -%}
-    Pico::Screen::init(
-        &display_inst, 
-        {{ board.display.i2c_bus }}, 
-        {{ board.display.sda }}, 
-        {{ board.display.scl }}, 
-        {{ board.display.width }}, 
-        {{ board.display.height }},
-        Pico::SCREEN_MODE_{{ board.display.mode | upper }}
-    );
     {%- endif %}
 
-// ---- Peripherals init ----
+// ====================================================   
+// Display init 
+// ====================================================
+
+    {% if board.display is defined and board.display.enabled -%}
+        Pico::Screen::init(
+            &display_inst, 
+            {{ board.display.i2c_bus }}, 
+            {{ board.display.sda }}, 
+            {{ board.display.scl }}, 
+            {{ board.display.width }}, 
+            {{ board.display.height }},
+            Pico::SCREEN_MODE_{{ board.display.mode | upper }}
+        );
+        {%- endif %}
+
+// ====================================================
+// Peripherals init 
+// ====================================================
 
     {%- for btn in active_btns %}
     Pico::addPin({{ loop.index0 }}, {{ btn.pin }}, Pico::{{ btn.mode | upper }});
@@ -847,218 +1062,518 @@ cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMod
 
     while (true) {
 
-        {% if board.web and board.web.enabled -%}
-        web_poll(); 
-        {%- endif %}
+    // ========================================================
+    // WEB
+    // ========================================================
 
-        uint32_t now = to_ms_since_boot(get_absolute_time()); 
+    {% if board.web and board.web.enabled -%}
+    web_poll();
+    {%- endif %}
 
-        midi_task();
-        
-        #if !defined(MIDI_HOST) && ENABLE_DEBUG
-            print_queue(printNames, NUM_PRINT_NAMES, debug_enabled);
-        #else
-            best_effort_wfe_or_timeout(make_timeout_time_ms(1));
-        #endif
 
-        {% if board.display is defined and board.display.enabled -%}
-            for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
-                if (print_pool[i].busy.load(std::memory_order_acquire)) {
-                    
-                    uint32_t msg_id = print_pool[i].id; 
-                    float msg_val = print_pool[i].val;
-                    bool is_dashboard_item = false;
+    uint32_t now =
+        to_ms_since_boot(get_absolute_time());
 
-                    // Check if this message ID matches one of our 4 quadrant hashes
-                    for (int slot = 0; slot < 4; slot++) {
-                        if (msg_id == screen_slots[slot]) {
-                            Pico::Screen::update_focus(slot, msg_val);
-                            is_dashboard_item = true;
-                            break;
-                        }
-                    }
 
-                    // If it's NOT a quadrant item, treat it as a general console popup
-                    if (!is_dashboard_item) {
-                        Pico::Screen::update_focus(msg_id, msg_val); 
-                    }
+    // ========================================================
+    // MIDI
+    // ========================================================
 
-                    print_pool[i].busy.store(false, std::memory_order_release);
+    // Core 0:
+    // - Runs TinyUSB tasks.
+    // - Parses raw MIDI bytes.
+    // - Enqueues complete MIDI events for Core 1.
+    // - Transmits MIDI output from Core 1's output queue.
+
+    midi_task();
+
+
+    // ========================================================
+    // PRINT QUEUE
+    // ========================================================
+
+    #if !defined(MIDI_HOST) && ENABLE_DEBUG
+        print_queue(debug_enabled);
+    #endif
+
+
+    // ========================================================
+    // DISPLAY
+    // ========================================================
+
+    {% if board.display is defined and board.display.enabled -%}
+
+    for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
+
+        if (print_pool[i].busy.load(std::memory_order_acquire)) {
+
+            uint32_t msg_id = print_pool[i].id;
+            float msg_val = print_pool[i].val;
+
+            bool is_dashboard_item = false;
+
+            for (int slot = 0; slot < 4; slot++) {
+
+                if (msg_id == screen_slots[slot]) {
+
+                    Pico::Screen::update_focus(slot, msg_val);
+
+                    is_dashboard_item = true;
+                    break;
                 }
             }
-            Pico::Screen::process(now, printNames, NUM_PRINT_NAMES);
-            {%- endif %}
 
-        if (now - last_led_tick >= 20) {
-            last_led_tick = now;
+            if (!is_dashboard_item) {
+                Pico::Screen::update_focus(msg_id, msg_val);
+            }
 
-           Pico::update(now); 
+            print_pool[i].busy.store(
+                false,
+                std::memory_order_release
+            );
+        }
+    }
 
-            bool is_active = (now < midi_activity_timer);
-            float midi_val = is_active ? ((float)last_midi_velocity / 127.0f) : 0.0f;
-            float clock_val = (now < midi_clock_timer) ? 1.0f : 0.0f;
+    Pico::Screen::process(
+        now,
+        printNames,
+        NUM_PRINT_NAMES
+    );
 
-// ---- LED ----
+    {%- endif %}
 
-                {% for led in active_leds -%}
-                    {%- set idx = loop.index0 -%}
-                    
-                    {%- if led.is_rgb -%}
-                        #ifdef PICO_ZERO
-                        {
-                            float h = Pico::led_hue[{{ idx }}].load(std::memory_order_relaxed);
-                            float i = Pico::led_intensity[{{ idx }}].load(std::memory_order_relaxed);
 
-                            {% if led.mode == 'midi' %}
-                                i = midi_val;
-                                h = 0.66f; 
-                            {% elif led.mode == 'clock' %}
-                                i = clock_val;
-                                h = 0.66f; 
-                            {% elif led.mode == 'status' %}
-                                i = 1.0f;
-                            {% endif %}
+    // ========================================================
+    // HARDWARE UPDATE
+    // ========================================================
 
-                            Pico::updateRGB({{ idx }}, h, i);
-                        }
-                        #endif
-                    {%- else -%}
-                        val = Pico::led_vals[{{ idx }}].load(std::memory_order_relaxed);
-                        
-                        {%- if led.mode == 'status' %} val = 1.0f; {% endif %}
-                        {%- if led.mode == 'midi' %} val = midi_val; {% endif %}
-                        {%- if led.mode == 'clock' %} val = clock_val; {% endif %}
+    if (now - last_led_tick >= 20) {
 
-                        Pico::updateLed({{ idx }}, val);
+        last_led_tick = now;
 
-                        {%- if board.pico_board in ['pico_w', 'pico2_w'] and led.pin == 25 %}
-                        Pico::updateCyw43Led({{ idx }});
-                        {%- endif %}
+        Pico::update(now);
 
-                    {%- endif %}
-                {% endfor %}
+
+        // ----------------------------------------------------
+        // MIDI LED INDICATORS
+        // Core 1 writes these values.
+        // Core 0 reads them atomically.
+        // ----------------------------------------------------
+
+        const uint32_t activity_until =
+            midi_activity_timer.load(std::memory_order_relaxed);
+
+        const uint8_t velocity =
+            last_midi_velocity.load(std::memory_order_relaxed);
+
+        const uint32_t clock_until =
+            midi_clock_timer.load(std::memory_order_relaxed);
+
+
+        const bool is_active =
+            (now < activity_until);
+
+        float midi_val =
+            is_active
+                ? ((float)velocity / 127.0f)
+                : 0.0f;
+
+        float clock_val =
+            (now < clock_until)
+                ? 1.0f
+                : 0.0f;
+
+
+        // ====================================================
+        // LED OUTPUTS
+        // ====================================================
+
+        {% for led in active_leds -%}
+            {%- set idx = loop.index0 -%}
+
+            {%- if led.is_rgb -%}
 
                 #ifdef PICO_ZERO
-                Pico::showRGB(); 
+                {
+                    float h =
+                        Pico::led_hue[{{ idx }}].load(
+                            std::memory_order_relaxed
+                        );
+
+                    float i =
+                        Pico::led_intensity[{{ idx }}].load(
+                            std::memory_order_relaxed
+                        );
+
+                    {% if led.mode == 'midi' %}
+                        i = midi_val;
+                        h = 0.66f;
+                    {% elif led.mode == 'clock' %}
+                        i = clock_val;
+                        h = 0.66f;
+                    {% elif led.mode == 'status' %}
+                        i = 1.0f;
+                    {% endif %}
+
+                    Pico::updateRGB({{ idx }}, h, i);
+                }
                 #endif
-            
-            {% for btn in active_btns %}
 
-// ---- Buttons & Gates ----
+            {%- else -%}
 
-            Pico::processPin({{ loop.index0 }}, val, send); 
-            if (send) hv_send_float_lock(&pd_prog, {{ btn.hash }}, val);
-            {%- endfor %}
+                val =
+                    Pico::led_vals[{{ idx }}].load(
+                        std::memory_order_relaxed
+                    );
 
-            {%- for gate in active_gates %}
-            Pico::processPin({{ active_btns|length + loop.index0 }}, val, send);
-            if (send) hv_send_float_lock(&pd_prog, {{ gate.hash }}, val);
-            {%- endfor %}
-    
-            {%- for knob in active_knobs %}
+                {%- if led.mode == 'status' %}
+                    val = 1.0f;
+                {% endif %}
 
-// ---- Knobs  ----
+                {%- if led.mode == 'midi' %}
+                    val = midi_val;
+                {% endif %}
 
-            if (Pico::processKnob({{ loop.index0 }}, v)) hv_send_float_lock(&pd_prog, {{ knob.hash }}, v);
-            {%- endfor %}
-            {%- for enc in active_encoders %}
+                {%- if led.mode == 'clock' %}
+                    val = clock_val;
+                {% endif %}
 
-// ---- Encoder ----
+                Pico::updateLed({{ idx }}, val);
 
-            if (Pico::processEnc({{ loop.index0 }}, v)) hv_send_float_lock(&pd_prog, {{ enc.hash }}, v);
-            {%- endfor %}
-            {%- for joy in active_joystick %}
+                {%- if board.pico_board in ['pico_w', 'pico2_w'] and led.pin == 25 %}
+                    Pico::updateCyw43Led({{ idx }});
+                {%- endif %}
 
-// ---- Joysticks ----
+            {%- endif %}
 
-            {
-                float vx = 0.0f, vy = 0.0f;
-                bool cX = false, cY = false;
-                if (Pico::processJoystick({{ joy.id }}, vx, vy, cX, cY, {{ 'true' if joy.midi_range else 'false' }})) {
-                    if (cX) hv_send_float_lock(&pd_prog, {{ joy.hash_x }}, vx);
-                    if (cY) hv_send_float_lock(&pd_prog, {{ joy.hash_y }}, vy);
-                }
-            }
-            {%- endfor %}
-
-// ---- CNY70 ----
-
-            {%- for cny in active_cny70 %}
-            {
-                float sensor_out = 0.0f; 
-                float raw_val = 0.0f; 
-                if (Pico::processCNY70({{ loop.index0 }}, sensor_out, raw_val)) {
-                    hv_send_float_lock(&pd_prog, {{ cny.hash }}, sensor_out);
-                //  printf("Sensor %d | Raw: %.1f | Norm: %.3f\n", {{ loop.index0 }}, raw_val, sensor_out);
-                }
-            }
-            {%- endfor %}
-
-// ---- HC-SR04 ----
-
-           {%- for d in active_dist %}
-            if (Pico::dist_sensor.changed()) {
-                float dist_cm = Pico::dist_sensor.getDistance(); 
-                hv_send_float_lock(&pd_prog, {{ d.hash }}, dist_cm);
-             // printf("[Distance] %s | Val: %.2f cm\n", "distance", dist_cm);
-            }
-            {%- endfor %}
-
-
-// ---- HX710 ----
-
-            {% for hx in active_hx710 -%}
-            if (sensor_{{ loop.index0 }}.isReady()) {
-                sensor_{{ loop.index0 }}.read();
-                int32_t output_value = 0;
-                if (sensor_{{ loop.index0 }}.process(&output_value)) {
-                    hv_send_float_lock(&pd_prog, {{ hx.hash }}, (float)output_value);
-                }
-            }
-            {% endfor -%}
-
-// ---- CV Out ----
-
-        {% for mcp in active_mcp4725 %}
-            if (cv_out_{{ loop.index0 }}_dirty) {
-                cv_out_{{ loop.index0 }}_dirty = false;
-                cv_out_{{ loop.index0 }}.write(cv_out_{{ loop.index0 }}_val);
-                
-            }
         {% endfor %}
 
 
-// ---- MPR121 Processing ----
+        #ifdef PICO_ZERO
+        Pico::showRGB();
+        #endif
 
-        {% if active_mpr_pads and active_mpr_pads|length > 0 -%}
+
+        // ====================================================
+        // BUTTONS
+        // ====================================================
+
+        {% for btn in active_btns %}
+
+        Pico::processPin(
+            {{ loop.index0 }},
+            val,
+            send
+        );
+
+        if (send) {
+            hv_send_float(
+                &pd_prog,
+                {{ btn.hash }}U,
+                val
+            );
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // GATES
+        // ====================================================
+
+        {% for gate in active_gates %}
+
+        Pico::processPin(
+            {{ active_btns|length + loop.index0 }},
+            val,
+            send
+        );
+
+        if (send) {
+            hv_send_float(
+                &pd_prog,
+                {{ gate.hash }}U,
+                val
+            );
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // KNOBS
+        // ====================================================
+
+        {% for knob in active_knobs %}
+
+        if (Pico::processKnob({{ loop.index0 }}, v)) {
+
+            hv_send_float(
+                &pd_prog,
+                {{ knob.hash }}U,
+                v
+            );
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // ENCODERS
+        // ====================================================
+
+        {% for enc in active_encoders %}
+
+        if (Pico::processEnc({{ loop.index0 }}, v)) {
+
+            hv_send_float(
+                &pd_prog,
+                {{ enc.hash }}U,
+                v
+            );
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // JOYSTICKS
+        // ====================================================
+
+        {% for joy in active_joystick %}
+
+        {
+            float vx = 0.0f;
+            float vy = 0.0f;
+
+            bool cX = false;
+            bool cY = false;
+
+            if (Pico::processJoystick(
+                    {{ joy.id }},
+                    vx,
+                    vy,
+                    cX,
+                    cY,
+                    {{ 'true' if joy.midi_range else 'false' }}
+                )) {
+
+                if (cX) {
+                    hv_send_float(
+                        &pd_prog,
+                        {{ joy.hash_x }}U,
+                        vx
+                    );
+                }
+
+                if (cY) {
+                    hv_send_float(
+                        &pd_prog,
+                        {{ joy.hash_y }}U,
+                        vy
+                    );
+                }
+            }
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // CNY70 - optical
+        // ====================================================
+
+        {% for cny in active_cny70 %}
+
+        {
+            float sensor_out = 0.0f;
+            float raw_val = 0.0f;
+
+            if (Pico::processCNY70(
+                    {{ loop.index0 }},
+                    sensor_out,
+                    raw_val
+                )) {
+
+                hv_send_float(
+                    &pd_prog,
+                    {{ cny.hash }}U,
+                    sensor_out
+                );
+            }
+        }
+
+        {% endfor %}
+
+
+        // ====================================================
+        // HC-SR04 - distance 
+        // ====================================================
+
+        {% for d in active_dist %}
+
+        if (Pico::dist_sensor.changed()) {
+
+            float dist_cm =
+                Pico::dist_sensor.getDistance();
+
+            hv_send_float(
+                &pd_prog,
+                {{ d.hash }}U,
+                dist_cm
+            );
+        }
+
+        {% endfor %}
+
+
+        /// ====================================================
+        // HX710 - air pressure 
+        // ====================================================
+
+        {% for hx in active_hx710 %}
+
+        if (sensor_{{ loop.index0 }}.isReady()) sensor_{{ loop.index0 }}.read();
+
+        {% if hx.mode == 'RAW' %}
+        {
+            int32_t value = 0;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, static_cast<float>(value));
+        }
+        {% elif hx.mode == 'FLOAT' %}
+        {
+            float value = 0.0f;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, value);
+        }
+        {% elif hx.mode == 'MIDI' %}
+        {
+            int32_t value = 0;
+            if (sensor_{{ loop.index0 }}.process(&value))
+                hv_send_float(&pd_prog, {{ hx.hash }}U, static_cast<float>(value));
+        }
+        {% endif %}
+
+        {% endfor %}
+
+        // ====================================================
+        // HX711 load cell
+        // ====================================================
+
+        {% for hx in active_hx711 %}
+
+        if (hx711_sensor_{{ loop.index0 }}.isReady()) {
+            hx711_sensor_{{ loop.index0 }}.read();
+        }
+
+        {% if hx.mode == 'RAW' %}
+
+        {
+            int32_t output_value = 0;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    static_cast<float>(output_value)
+                );
+            }
+        }
+
+        {% elif hx.mode == 'FLOAT' %}
+
+        {
+            float output_value = 0.0f;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    output_value
+                );
+            }
+        }
+
+        {% elif hx.mode == 'MIDI' %}
+
+        {
+            uint8_t output_value = 0;
+
+            if (hx711_sensor_{{ loop.index0 }}.process(&output_value)) {
+                hv_send_float(
+                    &pd_prog,
+                    {{ hx.hash }}U,
+                    static_cast<float>(output_value)
+                );
+            }
+        }
+
+        {% endif %}
+
+        {% endfor %}
+
+        // ====================================================
+        // MPR121 - touch
+        // ====================================================
+
+        {% if active_mpr_pads and active_mpr_pads|length > 0 %}
+
         for (int i = 0; i < NUM_SENSORS; ++i) {
+
             if (!sensor_array[i].initialized()) {
                 continue;
             }
 
             sensor_array[i].processMPR121();
-            uint16_t touched = sensor_array[i].getTouched(); 
+
+            uint16_t touched =
+                sensor_array[i].getTouched();
 
             if (touched != last_touched_state[i]) {
+
                 for (int p = 0; p < NUM_ACTIVE_MPR_PADS; ++p) {
-                    MprPad& pad = active_mpr_pads[p]; 
+
+                    MprPad& pad = active_mpr_pads[p];
+
                     if (pad.sensor_idx == i) {
-                        bool isTouched = (touched >> pad.pad_idx) & 0x01;
-                        bool wasTouched = (last_touched_state[i] >> pad.pad_idx) & 0x01;
+
+                        bool isTouched =
+                            (touched >> pad.pad_idx) & 0x01;
+
+                        bool wasTouched =
+                            (last_touched_state[i] >> pad.pad_idx) & 0x01;
+
                         if (isTouched != wasTouched) {
-                            hv_send_float_lock(&pd_prog, pad.hash, isTouched ? 1.0f : 0.0f);
+
+                            hv_send_float(
+                                &pd_prog,
+                                pad.hash,
+                                isTouched ? 1.0f : 0.0f
+                            );
                         }
                     }
                 }
+
                 last_touched_state[i] = touched;
             }
         }
-        {%- endif %}
 
+        {% endif %}
 
-        } 
-        best_effort_wfe_or_timeout(make_timeout_time_ms(1));
-    } 
+    }
 
-    return 0;
+    // ========================================================
+    // CORE 0 IDLE
+    // ========================================================
+
+    best_effort_wfe_or_timeout(
+        make_timeout_time_ms(1)
+    );
 }
+
+return 0;
+
+}
+            
+        

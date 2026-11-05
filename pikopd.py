@@ -29,7 +29,7 @@ class PicoUF2Generator:
     | '_ \| || |/ / / _ \| |__) | |  | |
     | |_) | ||   < | (_) |  ___/| |  | |
     | .__/|_||_|\_\ \___/|_|    |_____/ 
-    |_|   [hvcc]  RP2040|RP2350  v0.0.3 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.4 
         """
         if not self.verbose:
             print(f"\033[36m{logo}\033[0m")
@@ -255,6 +255,7 @@ class PicoUF2Generator:
         cny_enabled = isinstance(sensors.get("cny70"), list) and len(sensors.get("cny70")) > 0
         mpr121_enabled = isinstance(sensors.get("mpr121"), list) and len(sensors.get("mpr121")) > 0
         air_enabled = isinstance(sensors.get("hx710"), list) and len(sensors.get("hx710")) > 0
+        loadcell_enabled = isinstance(sensors.get("hx711"), list) and len(sensors.get("hx711")) > 0
 
         # Build Ignore List for File Copying
         
@@ -277,6 +278,9 @@ class PicoUF2Generator:
         if not air_enabled:
             ignored_patterns.update(["hx710.h", "hx710.cpp"])
 
+        if not loadcell_enabled:
+            ignored_patterns.update(["hx711.h", "hx711.cpp"])
+
         # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
         
         os.makedirs(self.c_dir, exist_ok=True)
@@ -297,6 +301,7 @@ class PicoUF2Generator:
                     # Strictly check individual hardware file flags
                     
                     if "hx710" in file and not air_enabled: continue
+                    if "hx711" in file and not loadcell_enabled: continue
                     if "mpr121" in file and not mpr121_enabled: continue
                     if "cny70" in file and not cny_enabled: continue
                     if ("hc-sr04" in file or file.endswith(".pio")) and not distance_enabled: continue
@@ -354,18 +359,18 @@ class PicoUF2Generator:
         if web_enabled:
             mode = web_config.get("active_mode", 0)
             creds = web_config.get("ap" if mode == 0 else "sta", {})
-            osc = web_config.get("osc", {})
-            
+            osc_enabled = web_config.get("osc_enabled", False)
+
             cmake_cmd.extend([
                 "-DWEB=1",
                 f"-DACTIVE_MODE={mode}",
-                f'-DWIFI_SSID="{creds.get("ssid", "")}"',
-                f'-DWIFI_PASSWORD="{creds.get("password", "")}"',
-                f'-DMDNS_NAME="{web_config.get("mdns_name", "pikopd")}"',
-                f"-DOSC_ENABLED={1 if osc.get('enabled', True) else 0}",
-                f'-DOSC_PORT={web_config.get("osc_port", 8000)}',
-                "-DMIDI_HOST_ENABLED=0",  
-                "-DMIDI_UART_ENABLED=1"   
+                f"-DWIFI_SSID={creds.get('ssid', '')}",
+                f"-DWIFI_PASSWORD={creds.get('password', '')}",
+                f"-DMDNS_NAME={web_config.get('mdns_name', 'pikopd')}",
+                f"-DOSC_ENABLED={1 if osc_enabled else 0}",
+                f"-DOSC_PORT={web_config.get('osc_port', 8000)}",
+                "-DMIDI_HOST_ENABLED=0",
+                "-DMIDI_UART_ENABLED=1"
             ])
             print("\033[32m  -> Web Enabled: MIDI Host disabled, UART MIDI enabled\033[0m")
         else:
@@ -389,6 +394,7 @@ class PicoUF2Generator:
             f"-DCNY70_ENABLED={1 if cny_enabled else 0}",
             f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}",
             f"-DHX710_ENABLED={1 if air_enabled else 0}",
+            f"-DHX711_ENABLED={1 if loadcell_enabled else 0}",
             f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}",
             f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}",
             f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}",
@@ -419,10 +425,20 @@ class PicoUF2Generator:
             uf2 = uf2_files[0]
 
             try:
+                # Enter BOOTSEL mode
                 self.run_cmd(
-                    ["picotool", "load", "-f", "-x", uf2],
+                    ["picotool", "reboot", "-u"],
+                    step_name="Enter BOOTSEL"
+                )
+
+                time.sleep(2)
+
+                # Flash and reboot into application
+                self.run_cmd(
+                    ["picotool", "load",  "-f", "-x", uf2],
                     step_name="Flash"
                 )
+
                 flash_success = True
                 print("✔ Firmware flashed successfully.")
 
@@ -435,7 +451,7 @@ class PicoUF2Generator:
                     print("⚠ Pico is in BOOTSEL mode, but flashing failed.")
 
                 sys.exit(1)
-
+                
         duration = time.time() - start_time
         self.print_progress(1.0, f"Finished in {duration:.1f}s")
         sys.stdout.write("\n")

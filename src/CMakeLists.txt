@@ -29,14 +29,17 @@ add_definitions(-DMAX_VOICES=${MAX_VOICES})
 if(WEB)
     message(STATUS "Web Mode Active")
     set(USB_LIB "")
+
     add_compile_definitions(
         WEB=1
         WEB_ENABLED=1
-        OSC_ENABLED=1
+        OSC_ENABLED=${OSC_ENABLED}
+        OSC_PORT=${OSC_PORT}
         ACTIVE_MODE=${ACTIVE_MODE}
         CFG_TUH_ENABLED=0
         CFG_TUD_ENABLED=1
     )
+
 elseif(MIDI_HOST_ENABLED)
     set(USB_LIB "tinyusb_host")
     add_compile_definitions(
@@ -49,6 +52,7 @@ elseif(MIDI_HOST_ENABLED)
         CFG_TUH_MIDI=1
         CFG_TUSB_RHPORT0_MODE=OPT_MODE_HOST
     )
+
 else()
     set(USB_LIB "tinyusb_device")
     add_compile_definitions(
@@ -88,6 +92,7 @@ list(REMOVE_ITEM ALL_SOURCES "${CMAKE_CURRENT_LIST_DIR}/htmldata.c")
 # ==============================================================================
 add_executable(pikopd ${ALL_SOURCES})
 
+
 # Explicit suffix mapping prevents conflicts during pico_add_extra_outputs
 set_target_properties(pikopd PROPERTIES SUFFIX ".elf")
 
@@ -114,11 +119,24 @@ target_compile_definitions(pikopd PRIVATE
   MPR121_ENABLED=$<IF:$<BOOL:${MPR121_ENABLED}>,1,0>
     CNY70_ENABLED=$<IF:$<BOOL:${CNY70_ENABLED}>,1,0>
     HX710_ENABLED=$<IF:$<BOOL:${HX710_ENABLED}>,1,0>
+    HX711_ENABLED=$<IF:$<BOOL:${HX711_ENABLED}>,1,0>
     DISPLAY_ENABLED=$<IF:$<BOOL:${ENABLE_DISPLAY}>,1,0>
     $<$<BOOL:${USE_DELAY}>:USE_DELAY>
     $<$<BOOL:${USE_REVERB}>:USE_REVERB>
     $<$<BOOL:${USE_LIMITER}>:USE_LIMITER>
 )
+
+if(WIFI_SSID)
+    target_compile_definitions(pikopd PRIVATE WIFI_SSID=\"${WIFI_SSID}\")
+endif()
+
+if(WIFI_PASSWORD)
+    target_compile_definitions(pikopd PRIVATE WIFI_PASSWORD=\"${WIFI_PASSWORD}\")
+endif()
+
+if(MDNS_NAME)
+    target_compile_definitions(pikopd PRIVATE MDNS_NAME=\"${MDNS_NAME}\")
+endif()
 
 target_compile_options(pikopd PRIVATE -O3 -ffast-math)
 

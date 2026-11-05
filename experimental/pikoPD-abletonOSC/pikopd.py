@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+import os, json, shutil, subprocess, jinja2, argparse, time, glob, sys
+
+class PicoUF2Generator:
+    def __init__(self, pd_path, project_root, src_dir=None, verbose=False):
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.pd_path = os.path.abspath(pd_path)
+        self.project_root = os.path.abspath(project_root)
+        self.verbose = verbose
+        self.templates = os.path.join(self.script_dir, "templates")
+        
+        if src_dir is None:
+            self.src_dir = os.path.join(self.script_dir, "src")
+        else:
+            self.src_dir = os.path.abspath(src_dir)
+            
+        self.c_dir = self.project_root
+        self.patch_name = os.path.splitext(os.path.basename(self.pd_path))[0]
+        self.hvcc_dir = os.path.join(self.project_root, "hvcc")
+        self.build_dir = os.path.join(self.project_root, "build")
+        self.ir_json = os.path.join(self.hvcc_dir, f"{self.patch_name}.heavy.ir.json")
+        self.manifest_out = os.path.join(self.hvcc_dir, f"{self.patch_name}_manifest.json")
+        self.hv_lib_path = os.path.abspath(os.path.join(self.project_root, "../lib", "heavylib"))
+
+    def print_logo(self):
+        logo = r"""
+           _  _           _____  _____  
+     _ __ (_)| | __  ___ |  __ \|  __ \ 
+    | '_ \| || |/ / / _ \| |__) | |  | |
+    | |_) | ||   < | (_) |  ___/| |  | |
+    | .__/|_||_|\_\ \___/|_|    |_____/ 
+    |_|   [hvcc]  RP2040|RP2350  v0.0.4 
+        """
+        if not self.verbose:
+            print(f"\033[36m{logo}\033[0m")
+
+    def print_progress(self, percent, task, error=False):
+        if self.verbose:
+            return
+        bar_length = 20
+        filled = int(round(bar_length * percent))
+        color = "\033[91m" if error else "\033[34m"
+        reset = "\033[0m"
+        dim = "\033[2m"
+        bar = "█" * filled + dim + "░" * (bar_length - filled) + reset
+        sys.stdout.write(
+            f"\r{color}{bar}{reset} {int(percent * 100):>3}% | {task}\033[K"
+        )
+        sys.stdout.flush()
+
+    def run_cmd(self, cmd, cwd=None, step_name="Command"):
+        if self.verbose:
+            print(f"\n--- [ {step_name.upper()} ] ---")
+            res = subprocess.run(cmd, cwd=cwd)
+            if res.returncode != 0:
+                sys.exit(1)
+            return res
+        else:
+            res = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+            if res.returncode != 0:
+                self.handle_error(step_name, res)
+            return res
+
+    def handle_error(self, step_name, result):
+        print(f"\n\n\033[91m❌ ERROR during {step_name}:\033[0m")
+        print("-" * 50)
+        print(
+            result.stderr
+            if hasattr(result, "stderr") and result.stderr
+            else result.stdout
+        )
+        print("-" * 50)
+        sys.exit(1)
+
+    def check_pico_bootsel(self):
+        try:
+            res = subprocess.run(["picotool", "info"], capture_output=True, text=True)
+            return (
+                "No accessible RP-series devices" not in res.stdout
+                and res.returncode == 0
+            )
+        except Exception:
+            return False
+
+    def open_serial(self):
+        sys.stdout.write("\n[SERIAL] Connecting...")
+        sys.stdout.flush()
+        subprocess.run(
+            "pkill -f 'screen /dev/tty.usbmodem'", shell=True, capture_output=True
+        )
+        port = None
+        for _ in range(60):
+            ports = glob.glob("/dev/tty.usbmodem*")
+            if ports:
+                port = ports[0]
+                break
+            time.sleep(0.1)
+        if port:
+            script = f'tell application "Terminal" to do script "screen {port} 115200"'
+            subprocess.run(["osascript", "-e", script])
+            print(f" Connected to {port}")
+        else:
+            print(" Error: Device serial port not found.")
+
+    def collect_and_save_manifest(self):
+        if not os.path.exists(self.ir_json):
+            return {"receives": [], "sends": [], "tables": [], "prints": []}
+
+        with open(self.ir_json, "r") as f:
+            data = json.load(f)
+
+        manifest = {
+            "patch_name": self.patch_name,
+            "receives": [],
+            "sends": [],
+            "tables": [],
+            "prints": [],
+        }
+
+        control = data.get("control", {})
+        for r_name, r_body in control.get("receivers", {}).items():
+            if "__hv_" in r_name:
+                continue
+            manifest["receives"].append({
+                "name": r_name,
+                "hash": r_body.get("hash", "0")
+            })
+
+        for obj_id, obj_body in data.get("objects", {}).items():
+            t = obj_body.get("type", "")
+            args = obj_body.get("args", {})
+            
+            name = args.get("name") or args.get("label")
+            if not name or "__hv_" in name:
+                continue
+
+            obj_hash = args.get("hash", "0")
+            entry = {"name": name, "hash": obj_hash}
+
+            if t == "__send":
+                if not any(s['name'] == name for s in manifest["sends"]):
+                    manifest["sends"].append(entry)
+            elif t == "__print":
+                if not any(p['name'] == name for p in manifest["prints"]):
+                    manifest["prints"].append(entry)
+            elif t == "__table":
+                manifest["tables"].append(entry)
+
+        with open(self.manifest_out, "w") as f:
+            json.dump(manifest, f, indent=2)
+
+        return manifest
+
+    def flatten_hvcc_output(self):
+        """Move hvcc outputs into a single directory."""
+        for sub in ["c", "ir", "hv"]:
+            subdir = os.path.join(self.hvcc_dir, sub)
+            if not os.path.exists(subdir):
+                continue
+
+            for root, _, files in os.walk(subdir):
+                for f in files:
+                    src = os.path.join(root, f)
+                    dst = os.path.join(self.hvcc_dir, f)
+
+                    if not os.path.exists(dst) or (
+                        os.path.getmtime(src) > os.path.getmtime(dst)
+                    ):
+                        shutil.move(src, dst)
+
+            shutil.rmtree(subdir, ignore_errors=True)
+
+    def samples_inflash(self):
+        """Finds generated Heavy tables and adds 'static const' to move them to Flash."""
+        cpp_file = os.path.join(self.hvcc_dir, f"Heavy_{self.patch_name}.cpp")
+        
+        if not os.path.exists(cpp_file):
+            if self.verbose:
+                print(f"Warning: {cpp_file} not found for patching.")
+            return
+
+        with open(cpp_file, 'r') as f:
+            lines = f.readlines()
+
+        patched = False
+        with open(cpp_file, 'w') as f:
+            for line in lines:
+                if line.startswith("float hTable") and "[" in line:
+                    f.write("static const " + line)
+                    patched = True
+                else:
+                    f.write(line)
+        
+        if patched and self.verbose:
+            print(f"  -> Patched {cpp_file}: Tables moved to Flash memory.")
+
+    def run_all(self, flash=False, board_config=None, serial=False, skip_hvcc=False, midi_host=None):
+        self.print_logo()
+        start_time = time.time()
+        print(f"\033[1mBuilding: {self.patch_name}\033[0m")
+
+        if not os.path.exists(self.hv_lib_path):
+            print(f"❌ Heavy library path not found: {self.hv_lib_path}")
+            sys.exit(1)
+
+        # 1. Heavy Compiler Step
+        
+        if not skip_hvcc:
+            self.print_progress(0.1, "Heavy Compiler")
+            hvcc_cmd = [
+                "hvcc", self.pd_path,
+                "-o", self.hvcc_dir,
+                "-n", self.patch_name,
+                "-g", "c",
+                "-p", self.hv_lib_path,
+            ]
+            self.run_cmd(hvcc_cmd, step_name="HVCC")
+            self.flatten_hvcc_output()
+            self.samples_inflash()
+        else:
+            print("\033[33m⚠️  Skipping HVCC file regeneration (--skip-hvcc enabled)\033[0m")
+
+        # 2. Load Configuration
+        
+        self.print_progress(0.3, "Setup")
+        settings = {"pico_board": "pico2", "midi_mode": "usb"}
+
+        config_filename = board_config if board_config else "board.json"
+        config_path = os.path.join(self.script_dir, config_filename)
+        
+        if not os.path.exists(config_path):
+            print(f"\033[91m❌ Configuration file not found: {config_filename}\033[0m")
+            sys.exit(1)
+
+        with open(config_path) as f:
+            settings.update(json.load(f))
+            
+        print(f"\033[32m  -> Using config: {config_filename}\033[0m")
+
+        # 3. Parse Configurations and Feature Flags
+
+        masterfx = settings.get("masterfx") or {}
+        inputs = settings.get("inputs") or {}
+        sensors = inputs.get("sensors") or {}
+        web_config = settings.get("web") or {}
+        display_config = settings.get("display") or {}
+
+        midi_mode = midi_host if midi_host else settings.get("midi_mode")
+        web_enabled = web_config.get("enabled", False)
+        display_enabled = display_config.get("enabled", False)
+
+        # Strictly check that the sensor list exists AND has items inside it
+        
+        distance_enabled = isinstance(sensors.get("hc-sr04"), list) and len(sensors.get("hc-sr04")) > 0
+        cny_enabled = isinstance(sensors.get("cny70"), list) and len(sensors.get("cny70")) > 0
+        mpr121_enabled = isinstance(sensors.get("mpr121"), list) and len(sensors.get("mpr121")) > 0
+        air_enabled = isinstance(sensors.get("hx710"), list) and len(sensors.get("hx710")) > 0
+
+        # Build Ignore List for File Copying
+        
+        ignored_patterns = set()
+
+        if web_enabled:
+            ignored_patterns.add("usb")
+        else:
+            ignored_patterns.add("web")
+
+        if not display_enabled:
+            ignored_patterns.add("screen")
+
+        if not distance_enabled:
+            ignored_patterns.update(["hc-sr04.h", "hc-sr04.cpp", "hc-sr04.pio"])
+
+        if not mpr121_enabled:
+            ignored_patterns.update(["mpr121.h", "mpr121.cpp"])
+
+        if not air_enabled:
+            ignored_patterns.update(["hx710.h", "hx710.cpp"])
+
+        # 4. Sync and flatten ONLY enabled files/folders directly into the root src directory
+        
+        os.makedirs(self.c_dir, exist_ok=True)
+
+        if os.path.exists(self.src_dir):
+            for root, dirs, files in os.walk(self.src_dir):
+                for file in files:
+                    # Skip CMakeLists.txt at the root of src
+                    if file == "CMakeLists.txt" and root == self.src_dir:
+                        continue
+
+                    # Check parent directory rules to filter out disabled subfolders
+                    
+                    if not web_enabled and "web" in root: continue
+                    if web_enabled and "usb" in root: continue
+                    if not display_enabled and "screen" in root: continue
+                    
+                    # Strictly check individual hardware file flags
+                    
+                    if "hx710" in file and not air_enabled: continue
+                    if "mpr121" in file and not mpr121_enabled: continue
+                    if "cny70" in file and not cny_enabled: continue
+                    if ("hc-sr04" in file or file.endswith(".pio")) and not distance_enabled: continue
+                    if "delay" in file.lower() and not masterfx.get('delay', False): continue
+                    if ("reverb" in file.lower() or "freeverb" in file.lower()) and not masterfx.get('reverb', False): continue
+
+                    s = os.path.join(root, file)
+                    d = os.path.join(self.c_dir, file)  # Flattens directly into self.c_dir
+
+                    if not os.path.exists(d) or open(s, "rb").read() != open(d, "rb").read():
+                        shutil.copy2(s, d)
+
+        # Handle CMakeLists.txt separately for the project root
+        
+        cmake_src = os.path.join(self.src_dir, "CMakeLists.txt")
+        cmake_dest = os.path.join(self.project_root, "CMakeLists.txt")
+        if os.path.exists(cmake_src):
+            if not os.path.exists(cmake_dest) or open(cmake_src, "rb").read() != open(cmake_dest, "rb").read():
+                shutil.copy2(cmake_src, cmake_dest)
+
+        # 5. Generate main.cpp Template
+        
+        self.print_progress(0.5, "Updating C++ & Manifest")
+        manifest = self.collect_and_save_manifest()
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(self.templates))
+        new_main = env.get_template("main.cpp").render(name=self.patch_name, hv_manifest=manifest, board=settings)
+        
+        with open(os.path.join(self.c_dir, "main.cpp"), "w") as f:
+            f.write(new_main)
+
+        # 6. CMake Configuration
+        
+        sdk = os.environ.get("PICO_SDK_PATH")
+        board = settings.get("pico_board", "pico")
+        sdk_target = "pico_w" if board == "pico_w" else ("pico" if board == "zero" else board)
+
+        if board == "pico2" or board == "pico2_w":
+            toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m33_gcc.cmake")
+        else:
+            toolchain_file = os.path.join(sdk, "cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake")
+
+        os.makedirs(self.build_dir, exist_ok=True)
+        self.print_progress(0.7, "Configuring CMake")
+
+        cmake_cmd = [
+            "cmake", "-G", "Ninja",
+            f"-DPICO_SDK_PATH={sdk}",
+            f"-DPICO_BOARD={sdk_target}",
+            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+            self.project_root,
+        ]
+
+        # Web & MIDI Logic
+        
+        if web_enabled:
+            mode = web_config.get("active_mode", 0)
+            creds = web_config.get("ap" if mode == 0 else "sta", {})
+            osc_enabled = web_config.get("osc_enabled", False)
+
+            cmake_cmd.extend([
+                "-DWEB=1",
+                f"-DACTIVE_MODE={mode}",
+                f"-DWIFI_SSID={creds.get('ssid', '')}",
+                f"-DWIFI_PASSWORD={creds.get('password', '')}",
+                f"-DMDNS_NAME={web_config.get('mdns_name', 'pikopd')}",
+                f"-DOSC_ENABLED={1 if osc_enabled else 0}",
+                f"-DOSC_PORT={web_config.get('osc_port', 8000)}",
+                "-DMIDI_HOST_ENABLED=0",
+                "-DMIDI_UART_ENABLED=1"
+            ])
+            print("\033[32m  -> Web Enabled: MIDI Host disabled, UART MIDI enabled\033[0m")
+        else:
+            cmake_cmd.append("-DWEB=0")
+            if midi_mode == "host":
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=1", "-DMIDI_UART_ENABLED=0"])
+                print("\033[32m  -> MIDI Host Mode enabled\033[0m")
+            elif midi_mode == "uart":
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=0", "-DMIDI_UART_ENABLED=1"])
+                print("\033[32m  -> MIDI UART Mode enabled\033[0m")
+            else:
+                cmake_cmd.extend(["-DMIDI_HOST_ENABLED=0", "-DMIDI_UART_ENABLED=0"])
+                print("\033[32m  -> USB MIDI Device Mode enabled\033[0m")
+
+        # Console & Extra Flags
+        
+        cmake_cmd.extend([
+            f"-DENABLE_DEBUG={1 if settings.get('console') else 0}",
+            f"-DENABLE_DISPLAY={1 if display_enabled else 0}",
+            f"-DENABLE_DISTANCE_SENSOR={1 if distance_enabled else 0}",
+            f"-DCNY70_ENABLED={1 if cny_enabled else 0}",
+            f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}",
+            f"-DHX710_ENABLED={1 if air_enabled else 0}",
+            f"-DUSE_DELAY={1 if masterfx.get('delay', False) else 0}",
+            f"-DUSE_REVERB={1 if masterfx.get('reverb', False) else 0}",
+            f"-DUSE_LIMITER={1 if masterfx.get('limiter', False) else 0}",
+            f"-DMAX_VOICES={settings.get('voice_count', 1)}"
+        ])
+
+        if board == "zero":
+            cmake_cmd.append("-DPICO_ZERO_BOARD=1")
+
+        self.run_cmd(cmake_cmd, cwd=self.build_dir, step_name="CMake")
+
+        # 7. Compilation & Flash
+        
+        self.print_progress(0.85, "Compiling")
+        self.run_cmd(["ninja", "-j10"], cwd=self.build_dir, step_name="Ninja")
+
+        flash_success = False
+
+        if flash:
+            self.print_progress(0.95, "Flashing")
+
+            uf2_files = glob.glob(os.path.join(self.build_dir, "*.uf2"))
+
+            if not uf2_files:
+                print("❌ ERROR: No UF2 firmware found.")
+                sys.exit(1)
+
+            uf2 = uf2_files[0]
+
+            try:
+                # Enter BOOTSEL mode
+                self.run_cmd(
+                    ["picotool", "reboot", "-u"],
+                    step_name="Enter BOOTSEL"
+                )
+
+                time.sleep(2)
+
+                # Flash and reboot into application
+                self.run_cmd(
+                    ["picotool", "load",  "-f", "-x", uf2],
+                    step_name="Flash"
+                )
+
+                flash_success = True
+                print("✔ Firmware flashed successfully.")
+
+            except (Exception, SystemExit) as e:
+                print(f"❌ Flash failed: {e}")
+
+                if not self.check_pico_bootsel():
+                    print("⚠ Pico did not enter BOOTSEL mode or is not detected.")
+                else:
+                    print("⚠ Pico is in BOOTSEL mode, but flashing failed.")
+
+                sys.exit(1)
+                
+        duration = time.time() - start_time
+        self.print_progress(1.0, f"Finished in {duration:.1f}s")
+        sys.stdout.write("\n")
+        if serial and flash_success:
+            self.open_serial()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Upload Heavy Pd patch to Pico")
+    parser.add_argument("-b", "--board", help="Path to custom board configuration json file") 
+    parser.add_argument("pd_patch", help="Pure Data patch file (e.g., heavy.pd)")
+    parser.add_argument("project_root", help="Project folder")
+    parser.add_argument("-f", "--flash", action="store_true", help="Flash UF2 to Pico")
+    parser.add_argument(
+        "-s", "--serial", action="store_true", help="Open serial console after reboot"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable debug output"
+    )
+    parser.add_argument(
+        "-x", "--skip-hvcc",
+        action="store_true",
+        help="Skip running HVCC (useful for manual edits of C/C++ files)"
+    )
+    args = parser.parse_args()
+
+    cmake_path = os.path.join(args.project_root, "CMakeLists.txt")
+    if args.skip_hvcc and not os.path.exists(cmake_path):
+        print("\033[33m⚠️  --skip-hvcc (-x) ignored: CMakeLists.txt not found in project root\033[0m")
+        args.skip_hvcc = False
+
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+    gen = PicoUF2Generator(args.pd_patch, args.project_root, src, verbose=args.verbose)
+    gen.run_all(skip_hvcc=args.skip_hvcc, flash=args.flash, serial=args.serial, board_config=args.board)

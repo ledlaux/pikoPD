@@ -1,0 +1,81 @@
+
+{
+  "name": "heavy",
+  "pico_board": "pico_w",
+  "core_freq": 240000,
+  "audio_mode": "I2S",
+  "sample_rate": 48000,
+  "channel": 2,
+  "buffer_size": 64,
+  "i2s_data_pin": 9,
+  "i2s_bclk_pin": 10,
+  "pwm_pin": 10,
+  "voice_count": 1,
+  "midi_mode": "usb",
+  "console": true,
+
+  "inputs": {
+
+    "adc_pins": [
+
+    ],
+
+    "buttons": [
+      { "name": "btn1", "pin": 14, "mode": "switch" },
+      { "name": "btn2", "pin": 13, "mode": "bang" },
+      { "name": "btn3", "pin": 12, "mode": "bang" }
+    ],
+
+    "gate_in": [
+
+    ],
+
+    "encoders": [
+     
+    ],
+
+    "joystick": [
+      
+    ],
+
+  "sensors": {   
+   }
+},
+
+"outputs": {
+    "gate_out": [
+    ],
+    "mcp4725": [
+    ]
+  },
+
+  "leds": [
+        { "name": "led1", "pin": 25, "mode": "pd" }
+  ],  
+  
+  "masterfx": {
+  },
+
+  "display": {
+    },
+  
+   "web": {
+      "enabled": true,
+      "active_mode": 0,
+      "ap": {
+        "mode_id": 0,
+        "ssid": "pikoPD",
+        "password": "12345678"
+      },
+      "sta": {
+        "mode_id": 1,
+        "ssid": "",
+        "password": ""
+      },
+      "mdns_name": "pikopd",
+      "http_port": 80,
+      "osc_enabled": true,
+      "osc_port": 11001
+    }
+  }
+

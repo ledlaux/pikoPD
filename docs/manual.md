@@ -11,6 +11,8 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 ## Table of Contents
 - [Toolchain Setup](#toolchain-setup)
 - [Architecture](#architecture)
+- [Project Configuration](#project-configuration)
+  - [Build](#build)
 - [Hardware Configuration](#hardware-configuration)
   - [Audio Setup](#audio-setup)
   - [Buttons](#buttons)
@@ -20,13 +22,12 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
   - [Joystick](#joystick)
   - [Encoder](#encoder)
   - [Sensors](#sensors)
-    - [MPR121](#mpr121)
-    - [HC-SR04](#hc-sr04)
-    - [CNY70](#cny70)
-    - [HX710](#hx710)
+    - [MPR121 – Capacitive Touch](#mpr121--capacitive-touch)
+    - [HC-SR04 – Ultrasonic Distance](#hc-sr04--ultrasonic-distance)
+    - [CNY70 – Optical](#cny70--optical)
+    - [HX710 – Air Pressure](#hx710--air-pressure)
+    - [HX711 – Load Cell](#hx711--load-cell)
   - [Display](#display)
-- [Project Configuration](#project-configuration)
-  - [Build](#build)
 - [MIDI](#midi)
 - [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
@@ -142,6 +143,65 @@ sudo make install
 * Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
 * Provides stable audio performance with low jitter and fewer dropouts.
 
+
+# Project Configuration
+
+- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check PD patch examples in the folder.
+- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
+- The script automatically includes objects present in the patch and ignores unconnected.
+- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- Tested on macOS.
+
+```
+workspace/
+├── pico-sdk/
+│   └── pico-extras/
+├── picotool/
+├── pikoPD/
+│   ├── docs/
+│   ├── lib/
+│   │   └── heavylib/
+│   ├── patches/           # pd patches folder
+│   ├── src/               # hardware config source files
+│   ├── templates/
+│   │   └── main.cpp       # template 
+│   ├── project/
+│   │   ├── build/         # build folder (uf2 file here)   
+│   │   ├── hvcc/          # hvcc compiler generated files
+│   │   ├── src/             
+│   │   └── CMakeLists.txt  
+│   ├── board.json         # user config file
+│   └── pikopd.py          # pikopd script
+```
+
+## Build
+
+pikopd.py
+
+- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
+- Copies config files into project folder from `/src`
+- Configures hardware using `board.json`
+- Uses main.cpp as a project template
+- Builds firmware using **CMake** in a `build/` folder  
+- Checks for device in BOOTSEL mode
+- Flashes UF2 firmware to PICO board and restarts device
+
+Enter bootloader mode by holding device boot button
+
+```
+python3 pikopd.py patches/heavy.pd project_name 
+
+optional arguments:
+  -h, --help           Show help message and exit
+  -b, --board          Path to custom json configuration file
+  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -s, --serial         Open serial console after reboot
+  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
+  -v, --verbose        Enable verbose compiler console debug output
+```
+
 # Hardware Configuration
 
 Hardware configuration is done by adjusting the `board.json` file.  
@@ -169,6 +229,7 @@ Set in `board.json`:
       - mpr121
       - hc-sr04
       - hx710
+      - hx711
     - display
     - web & OSC 
     - masterfx (delay, reverb, limiter)
@@ -263,7 +324,7 @@ PikoPD boards support 4 LED modes.
 - **pd** – Maps a Pure Data `[send]` object directly to the LED.
 - **status** – LED turns on when the board is powered and working correctly.
 - **midi** – LED blinks in response to incoming MIDI messages.
-- **clock** – LED blinks in response to incoming MIDI clock.
+- **clock** – LED blinks in response to incoming MIDI clock (send START/STOP midi)
 
 ```json
 "leds": [
@@ -278,9 +339,11 @@ PikoPD boards support 4 LED modes.
 | Board     | Pin | Notes                             |
 | --------- | --- | --------------------------------- |
 | Pico      | 25  | Single-color LED                  |
-| Pico W    | 25  | Single-color LED                  |
-| Pico 2    | 25  | Single-color LED                  |
+| Pico W    | 25  | Single-color LED (Cyw43)          |
 | Pico Zero | 16  | RGB NeoPixel LED (`is_rgb: true`) |
+| Pico 2    | 25  | Single-color LED                  |
+| Pico 2w   | 25  | Single-color LED (Cyw43)          |
+
 
 Code supports up to 12 different led connection.
 
@@ -318,8 +381,7 @@ Use this construct in your patch from [encoder.pd](https://github.com/ledlaux/pi
 
 ## Sensors
 
-
-### MPR121 - Touch sensor
+### MPR121 – Capacitive Touch 
 
 ```json
 "sensors": {
@@ -341,7 +403,7 @@ IRQ pin is used by default to make processing more efficient.
 To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
-### HC-SR04 - Distance sensor
+### HC-SR04 – Ultrasonic Distance 
 
 ```json
   "sensors": {
@@ -354,7 +416,7 @@ To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each 
 PikoPD supports multiple HC-SR04 ultrasonic distance sensors. Use object `[r distance @hv_param]`.
 
 
-### CNY70 - Optical sensor
+### CNY70 – Optical 
 
 
 ```json
@@ -377,7 +439,7 @@ Because there are multiple manufacturers of these sensors, the pin layouts and w
 
 To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
-### HX710 - Air pressure sensor
+### HX710 – Air Pressure 
 
 ```json
 "sensors": {
@@ -386,20 +448,50 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
           "name": "air",
           "sck_pin": 2,
           "dout_pin": 3,
-          "min_raw": 800000,
-          "max_raw": 1200000,
-          "fall_factor": 0.95,
-          "send_interval": 50,
-          "rise_step": 1,
+          "release": "0.5",
           "mode": "midi"
         }
       ]
     }
 ```
 
-The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors (such as the UPC barometric pressure sensors) for touchless breath, wind, or pressure control. Calibration Parameters: min_raw and max_raw define the expected raw sensor boundaries to normalize output values. Filtering & Smoothing: Includes adjustable fall_factor, rise_step, and send_interval parameters to smooth erratic pressure fluctuations and manage data transmission rates.
+The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors.
 
-Mode Selection: Supports both raw ("RAW) and MIDI mapping options.
+Mode Selection: supports raw, float (0-1.0) and midi (0-127) mapping options.
+
+Manual calibration in raw mode: adjust values of min_raw and max_raw in /src/sensors/hx710.h. 
+
+Supports adjustable release setting in midi mode.
+
+### HX711 – Load Cell
+
+```json
+"sensors": {   
+    "hx711": [
+    {
+      "name": "loadcell",
+      "sck_pin": 2,
+      "dout_pin": 3,
+      "mode": "midi" 
+    }
+  ]
+}
+```
+
+Output modes:  raw, float (0-1.0), midi (0-127)
+            
+To make calibration set RAW mode and then adjust min_raw/max_raw values in /src/sensors/hx711.h.
+
+Connect the standard four-wire output of your load cell to the input terminals of the HX711 module as detailed in the table below:
+
+| Load Cell Wire Color | HX711 Terminal |
+| --- | --- |
+| Red | E+ |
+| Black | E- |
+| White | A- |
+| Green | A+ |
+
+Wire colours can vary between load cells. Always check your load cell's datasheet before connecting.
 
 
 ## Display
@@ -421,64 +513,6 @@ PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.js
 
 1. console - outputs adjusted parameter [print] object.
 2. pd - outputs first 4 [print] objects as dashboard.
-
-# Project Configuration
-
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- Check PD patch examples in the folder.
-- The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
-- Tested on macOS.
-
-```
-workspace/
-├── pico-sdk/
-│   └── pico-extras/
-├── picotool/
-├── pikoPD/
-│   ├── docs/
-│   ├── lib/
-│   │   └── heavylib/
-│   ├── patches/           # pd patches folder
-│   ├── src/               # hardware config source files
-│   ├── templates/
-│   │   └── main.cpp       # template 
-│   ├── project/
-│   │   ├── build/         # build folder (uf2 file here)   
-│   │   ├── hvcc/          # hvcc compiler generated files
-│   │   ├── src/             
-│   │   └── CMakeLists.txt  
-│   ├── board.json         # user config file
-│   └── pikopd.py          # pikopd script
-```
-
-## Build
-
-pikopd.py
-
-- Converts Pure Data (`.pd`) patch to C code via **hvcc** compiler
-- Copies config files into project folder from `/src`
-- Configures hardware using `board.json`
-- Uses main.cpp as a project template
-- Builds firmware using **CMake** in a `build/` folder  
-- Checks for device in BOOTSEL mode
-- Flashes UF2 firmware to PICO board and restarts device
-
-Enter bootloader mode by holding device boot button
-
-```
-python3 pikopd.py patches/heavy.pd project_name 
-
-optional arguments:
-  -h, --help           Show help message and exit
-  -b, --board          Path to custom json configuration file
-  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot
-  -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
-  -v, --verbose        Enable verbose compiler console debug output
-```
 
 # MIDI 
 
@@ -532,11 +566,12 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
 ```json
   "console": true
 ```
-
-Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can crash the device. 
+Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can (crash)[https://github.com/ledlaux/pikoPD/issues/25] app. 
 
 
 # WEB Control and OSC
+
+Works on pico_w and should work on pico_2w (not tested yet).
 
 ```json
  "web": {
@@ -558,8 +593,7 @@ Debug console will also output PD [print] objects, which are parsed automaticall
     "osc_port": 8000
   }
 ```
-
-This are very experimental feature, but after tests OSC is confirmed working without an issues. 
+These are very experimental features. Some examples: https://github.com/ledlaux/pikoPD/discussions/12.
 
 See `patches/web.pd`
 
