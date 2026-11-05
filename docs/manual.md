@@ -448,20 +448,20 @@ To use this sensor in a PD patch, connect its output to an ADC pin and add `[r c
           "name": "air",
           "sck_pin": 2,
           "dout_pin": 3,
-          "min_raw": 800000,
-          "max_raw": 1200000,
-          "fall_factor": 0.95,
-          "send_interval": 50,
-          "rise_step": 1,
+          "release": "0.5",
           "mode": "midi"
         }
       ]
     }
 ```
 
-The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors (such as the UPC barometric pressure sensors) for touchless breath, wind, or pressure control. Calibration Parameters: min_raw and max_raw define the expected raw sensor boundaries to normalize output values. Filtering & Smoothing: Includes adjustable fall_factor, rise_step, and send_interval parameters to smooth erratic pressure fluctuations and manage data transmission rates.
+The HX710 is a 24-bit analog-to-digital converter commonly used with air pressure sensors.
 
-Mode Selection: Supports both raw RAW and MIDI mapping options.
+Mode Selection: supports raw, float (0-1.0) and midi (0-127) mapping options.
+
+Manual calibration in raw mode: adjust values of min_raw and max_raw in /src/sensors/hx710.h. 
+
+Supports adjustable release setting in midi mode.
 
 ### HX711 – Load Cell
 
