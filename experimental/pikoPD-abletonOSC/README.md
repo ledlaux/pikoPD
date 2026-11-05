@@ -47,30 +47,34 @@ Asign buttons inside board.json
       { "name": "btn3", "pin": 12, "mode": "bang" }
     ],
 
+      "leds": [
+        { "name": "led1", "pin": 25, "mode": "pd" }
+  ],  
+
 Set "switch" if want to also use led for visual representation of the action. 
 
 # Wifi configuration
 
 AbletonOSC works on 11000 port (is hardcoded in web.h). This implementation works on both AP and STA modes. Check serial console for WiFi connection debugging. 
 
-   "web": {
-      "enabled": true,
-      "active_mode": 0,
-      "ap": {
-        "mode_id": 0,
-        "ssid": "pikoPD",
+   "web": {. 
+      "enabled": true,  
+      "active_mode": 0,  
+      "ap": { 
+        "mode_id": 0,  
+        "ssid": "pikoPD",  
         "password": "12345678"
       },
       "sta": {
-        "mode_id": 1,
-        "ssid": "",
-        "password": ""
-      },
-      "mdns_name": "pikopd",
-      "http_port": 80,
-      "osc_enabled": true,
-      "osc_port": 11001
-    }
+        "mode_id": 1, 
+        "ssid": "",  
+        "password": ""  
+      },  
+      "mdns_name": "pikopd",  
+      "http_port": 80,  
+      "osc_enabled": true,  
+      "osc_port": 11001. 
+    }  
   
 
 # Compilation and flashing
