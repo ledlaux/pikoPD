@@ -111,11 +111,16 @@ https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
 Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware.   
 
-Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
+Some successful audio input test example using **PCM1802** (**PCM1808** also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
 
 This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
-But don't expect that this devices can run big reverbs. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate that and improve this features. For now I have added Delay and Reverb processing as Master FX which can be enabled in the config. 
+Don't expect these devices to run large reverbs, though. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate it and improve these features.
+
+For now, I've added **Delay** and **Reverb** processing as Master FX, which can be enabled in the configuration. Control them with Midi CC.
+
+Keep the **Master Limiter** enabled, and don't forget to use `[clip~ -1 1]` in your Pure Data patch before `[dac~]` to keep audio levels safe. This clipping is already handled in the code, but we're here to learn Pure Data, so use this in your patches too!
+
 
 ## Default Patch
 
