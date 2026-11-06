@@ -25,7 +25,7 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - [x] usb midi
 - [x] usb midi host
 - [x] midi clock
-- [x] web & osc
+- [x] web & OSC
 - [x] display
 - [ ] audio input
 - [ ] sd card
