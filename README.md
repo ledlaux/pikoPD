@@ -64,9 +64,9 @@ Toolchain setup instructions can be found in the [manual](https://github.com/led
 
 - Hardware configuration is done using `board.json` file or interactive [web config tool](https://ledlaux.github.io/pikoPD).
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
-- The script automatically includes objects present in the patch and ignores unconnected.
+- The script includes objects present in the patch and ignores unconnected. But it is recommended to remove unused items from config.
 - Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
-- If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
+- If you change board and MIDI mode or encounter compile-time errors project folder needs to be cleaned first. Use -c flag.
 - Use HVCC compatible vanilla PD and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Check PD patch examples in the folder.
  
@@ -81,7 +81,6 @@ pikopd.py
 - Builds firmware using **CMake** in a `build/` folder  
 - Switches device to BOOTSEL mode automatically
 - Flashes UF2 firmware to the PICO board and restarts device
-
 
 ### Usage
 
@@ -108,9 +107,15 @@ Video of using MPR121 with samples loaded in PD on RP2040:
 
 https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
-## Audio Input
+## Audio Input and FX
 
-Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
+Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware.   
+
+Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
+
+This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
+
+But don't expect that this devices can run big reverbs. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate that and improve this features. For now I have added Delay and Reverb processing as Master FX which can be enabled in the config. 
 
 ## Default Patch
 
