@@ -14,6 +14,11 @@ set(PICO_EXTRAS_PATH "$ENV{PICO_SDK_PATH}/pico-extras")
 include("${CMAKE_CURRENT_LIST_DIR}/pico_sdk_import.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/pico_extras_import.cmake")
 
+set(PICO_FLASH_SIZE_BYTES
+    "${PICO_FLASH_SIZE_BYTES}"
+    CACHE STRING "QSPI flash size in bytes"
+)
+
 pico_sdk_init()
 
 # ==============================================================================
