@@ -10,7 +10,7 @@ PikoPD is in active development, with the core system implemented and future wor
 
 Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) for detailed instructions.
 
-## Features
+## Hardware features
 
 - [x] led
 - [x] knob
@@ -27,8 +27,9 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - [x] midi clock
 - [x] web & osc
 - [x] display
-- [ ] sd card
 - [ ] audio input
+- [ ] sd card
+- [ ] usb audio
 - [ ] bluetooth midi
 
 # Architecture
