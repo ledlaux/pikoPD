@@ -6,7 +6,9 @@ Hardware is configured through a simple JSON file, where you define pins, periph
 
 This started as a personal hobby project to learn Pure Data and the Pico SDK. I use AI to help with coding, but spend a lot of time testing and refining everything on actual hardware.
 
-Project is evolving. With the core system in place, future development is focused on optimisation, expanding features, and supporting additional hardware.
+The project is evolving. With the core system in place, future development will focus on optimisation, expanding features, and supporting additional hardware.
+
+I’ve received some positive feedback from educators around the world who have tested pikoPD in the classroom. I hope the project will continue to grow and become a useful and accessible tool for learning Pure Data and embedded programming.
 
 Contributions, ideas, and feedback are welcome! Feel free to open an issue or start a discussion.
 
