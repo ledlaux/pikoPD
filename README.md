@@ -2,9 +2,9 @@
 
 pikoPD brings **Pure Data (Pd)** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using Pd patches.
 
-Hardware is configured through a simple JSON file, where you define pins, peripherals, and board features. The Python-based build system combines **CMake**, **hvcc**, and **picotool** to automate the entire workflow — from patch conversion and code generation to firmware compilation and flashing the board.
+Hardware is configured through a simple JSON file, where you define pins, peripherals, and board features. The Python-based build system combines **CMake**, **hvcc** compiler, and **picotool** to automate the entire workflow — from patch conversion and code generation to firmware compilation and flashing the board.
 
-This started as a personal hobby project to learn Pure Data and the Raspberry Pi Pico C/C++ SDK. I use AI to help with coding, but spend a lot of time testing and refining everything on actual hardware.
+This started as a hobby project to learn Pure Data and the Raspberry Pi Pico C/C++ SDK. I use AI to help with coding, but spend a lot of time testing and refining everything on actual hardware.
 
 I’ve received some positive feedback from educators around the world who have tested pikoPD in the classroom. I hope the project will continue to grow and become a useful and accessible tool for learning Pure Data and embedded programming.
 
