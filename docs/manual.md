@@ -632,10 +632,17 @@ To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
 
 # WEB Config Tool
 
+I started to develop a small interactive hardware config tool for the pikoPD project which is available online:
+https://ledlaux.github.io/pikoPD/
+
+You can:
 Select your board model (Raspberry Pico, Pico W, Zero or Pico 2).    
 Upload your .pd patch to see available parameters or load board.json configuration file.    
 Click a pin on the board and add a component, or drag a parameter tag directly onto a pin.    
 Export the board.json and place it in the pikoPD folder.    
+
+This needs a big revork and improvement which I dont have capacity for now. In future it can become a hub for sharing custom user firmwares 
+and be a playful educational tool for interacting with pikoPD projects.  
 
 # Useful Links
 
