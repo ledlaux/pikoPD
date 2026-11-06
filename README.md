@@ -1,6 +1,6 @@
 # pikoPD — Pure Data in Your Pocket
 
-pikoPD brings **Pure Data** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using PD patches.
+pikoPD brings **Pure Data** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using Pd patches.
 
 Hardware is configured through a simple JSON file, where you define pins, peripherals, and board features. The Python-based build system combines **CMake**, **hvcc**, and **picotool** to automate the entire workflow — from patch conversion and code generation to firmware compilation and flashing the board.
 
@@ -75,10 +75,10 @@ Toolchain setup instructions can be found in the [manual](https://github.com/led
 - Hardware configuration is done using `board.json` file or interactive [web config tool](https://ledlaux.github.io/pikoPD).
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script includes objects present in the patch and ignores unconnected. But it is recommended to remove unused items from config.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- Debug console, when enabled, will also output Pd `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors project folder needs to be cleaned first. Use -c flag.
-- Use HVCC compatible vanilla PD and heavylib objects, such as hv.osc~ and hv.lfo~.
-- Check PD patch examples in the folder.
+- Use HVCC compatible vanilla Pd and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check Pd patch examples in the folder.
  
 ## Build
 
@@ -93,8 +93,6 @@ pikopd.py
 - Flashes UF2 firmware to the PICO board and restarts device
 
 ### Usage
-
-Enter bootloader mode by holding device boot button.
 
 ```
 python3 pikopd.py patches/heavy.pd project_name -f
@@ -111,17 +109,17 @@ optional arguments:
   
 ## Sample loading
 
-Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata. Also check example [patch](https://github.com/ledlaux/pikoPD/blob/develop/patches/sample_drums_MPR121.pd).
+Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata app. Also check example [patch](https://github.com/ledlaux/pikoPD/blob/develop/patches/sample_drums_MPR121.pd).
 
-Video of using MPR121 with samples loaded in PD on RP2040:  
+Video of using MPR121 with samples loaded in Pd on RP2040:  
 
 https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
 ## Audio Input and FX
 
-Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware.   
+Raspberry Pico can't sample audio with builtin analog to digital converters, so Pd `[adc]` object will not work without an external hardware.   
 
-Some successful audio input test example using **PCM1802** (**PCM1808** also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
+Some successful audio input test example using **PCM1802** (**PCM1808** also should work) and Pd can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
 
 This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
@@ -129,18 +127,18 @@ Don't expect these devices to run large reverbs, though. RAM is very limited. Bu
 
 For now, I've added **Delay** and **Reverb** processing as Master FX, which can be enabled in the configuration. Control them with Midi CC.
 
-Keep the **Master Limiter** enabled, and don't forget to use `[clip~ -1 1]` in your Pure Data patch before `[dac~]` to keep audio levels safe. This clipping is already handled in the code, but we're here to learn Pure Data, so use this in your patches too!
+Keep the **Master Limiter** enabled, and don't forget to use `[clip~ -1 1]` in your Pd patch before `[dac~]` to keep audio levels safe. This leveling is already handled in the code, but we're here to learn Pure Data, so use this in your patches too!
 
 
 ## Default Patch
 
-PD patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
+Pd patch **heavy.pd** is a simple synthesizer that uses the `[notein]` object and USB MIDI input. 
 
 ### LED Control
 - Sending MIDI CC1 on channel 1 controls LED brightness.  
 
 ### Serial Output
-The patch includes three `[print]` objects that send normalized values (`0.0–1.0`) from PD to the serial console:
+The patch includes three `[print]` objects that send normalized values (`0.0–1.0`) from Pd to the serial console:
 
 1. MIDI CC Input – Receives MIDI CC1 and prints the value.  
 2. ADC Knob Input (GPIO26) – Reads the analog knob and prints its normalized value.  
@@ -160,9 +158,9 @@ I started to develop interactive hardware config tool for the pikoPD projects wh
 https://ledlaux.github.io/pikoPD/
 
 You can upload your .pd patch and map controls to the corresponding patch receivers and senders. 
-Click a pin on the board to add a component, or drag a PD object tag directly onto a pin to asign.
-Some of the hardware objects like enc (encoder) are automatically recognized and placed in the coresponding category.     
-Finaly export the board.json.    
+Click a pin on the board to add a component, or drag a Pd object tag directly onto a pin to assign.
+Some of the hardware objects like enc (encoder) are automatically recognized and placed in the corresponding category.     
+Finally export the board.json.    
 
 This tool still needs further development, and unfortunately I don't have the time or capacity to work on it right now. 
 
