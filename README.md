@@ -75,7 +75,7 @@ Toolchain setup instructions can be found in the [manual](https://github.com/led
 - Hardware configuration is done using `board.json` file or interactive [web config tool](https://ledlaux.github.io/pikoPD).
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script includes objects present in the patch and ignores unconnected. But it is recommended to remove unused items from config.
-- Debug console, when enabled, will also output Pd `[print]` objects. Use it moderately, because it can crash the device.
+- Debug console, when enabled, will also output Pd `[print]` objects. Use it moderately, because it can freeze device.
 - If you change board and MIDI mode or encounter compile-time errors project folder needs to be cleaned first. Use -c flag.
 - Use HVCC compatible vanilla Pd and heavylib objects, such as hv.osc~ and hv.lfo~.
 - Check Pd patch examples in the folder.
