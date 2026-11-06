@@ -48,6 +48,7 @@ PikoPD takes advantage of the Pico and Pico 2 multicore processing:
 
 - Python 3.10+
   - Jinja2
+  - pyserial
 - arm-none-eabi toolchain
 - CMake
 - Ninja
@@ -91,8 +92,9 @@ python3 pikopd.py patches/heavy.pd project_name -f
 optional arguments:
   -h, --help           Show help message and exit
   -b, --board          Path to custom json configuration file
-  -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
-  -s, --serial         Open serial console after reboot (works only on macOS)
+  -f, --flash          Flash UF2 to Pico 
+  -c, --clean          Clean the project folder and recompile
+  -s, --serial         Open serial console after reboot
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
 ```
