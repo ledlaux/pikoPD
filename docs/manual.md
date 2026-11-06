@@ -31,7 +31,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 - [MIDI](#midi)
 - [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
-- [Audio Input](#audio-input)
+- [Audio Input and FX](#audio-input-and-fx)
 - [Serial Monitor](#serial-monitor) 
 - [Web Control and OSC](#web-control-and-osc)
 - [Web Config Tool](#web-config-tool)
@@ -567,13 +567,16 @@ Sample loading works despite the limitations. Here is a [tutorial](https://www.y
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
 
-# Audio Input
+# Audio Input and FX
 
-Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. 
+Raspberry Pico can't sample audio with builtin analog to digital converters, so PD [adc] object will not work without an external hardware.
 
-Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder.
+Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/main/experimental/audio_input/pcm1802) folder.
 
 This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
+
+But don't expect that this devices can run big reverbs. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate that and improve this features. For now I have added Delay and Reverb processing as Master FX which can be enabled in the config.
+
 
 # Serial Monitor 
 
