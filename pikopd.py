@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import json
 import shutil
 import subprocess
@@ -187,6 +188,57 @@ class PicoUF2Generator:
         )
 
         return result.returncode == 0
+
+    def validate_flash_size(self, set_mb):
+
+        result = subprocess.run(
+            ["picotool", "info", "-a"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Could not read flash information:\n{result.stderr}"
+            )
+
+        output = result.stdout.replace("\u00a0", " ")
+
+        matches = re.findall(
+            r"flash\s+size\s*:\s*(\d+)\s*([KMG])?",
+            output,
+            re.IGNORECASE
+        )
+
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"Expected exactly one flash-size result, found {len(matches)}."
+            )
+
+        value, unit = matches[0]
+
+        multiplier = {
+            "": 1,
+            "K": 1024,
+            "M": 1024 * 1024,
+            "G": 1024 * 1024 * 1024
+        }[unit.upper()]
+
+        detected_bytes = int(value) * multiplier
+        detected_mb = detected_bytes / (1024 * 1024)
+        expected_bytes = set_mb * 1024 * 1024
+
+        if detected_bytes < expected_bytes:
+            raise RuntimeError(
+                f"FLASH TOO SMALL! Required: {set_mb} MB, "
+                f"detected: {detected_mb:g} MB. Flashing aborted."
+            )
+
+        self.progress_status(
+            f"Device flash detected: {detected_mb:g} MB"
+        )
+
+        return True
 
     def enter_bootsel(self):
 
@@ -631,6 +683,11 @@ class PicoUF2Generator:
 
         os.makedirs(self.build_dir, exist_ok=True)
 
+        flash_size = settings.get("flash_size", 2)
+
+        if type(flash_size) is not int or flash_size not in (2, 4, 8, 16, 32):
+            raise ValueError("flash_size must be 2, 4, 8, 16 or 32 MB")
+
         cmake_cmd = [
             "cmake", "-G", "Ninja",
             f"-DPICO_SDK_PATH={sdk}",
@@ -638,6 +695,10 @@ class PicoUF2Generator:
             f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
             self.project_root
         ]
+
+        cmake_cmd.append(
+            f"-DPICO_FLASH_SIZE_BYTES={flash_size * 1024 * 1024}"
+        )
 
         # Web & MIDI logic.
         if web_enabled:
@@ -717,7 +778,7 @@ class PicoUF2Generator:
             step_name="Compilation"
         )
 
-        self.progress_status(percent=85, stage="Preparing firmware upload")
+       # self.progress_status(percent=85, stage="Preparing firmware upload")
 
         # 8. FLASHING
         flash_success = False
@@ -736,6 +797,9 @@ class PicoUF2Generator:
                 # Enter BOOTSEL using automatic detection/fallback.
                 if not self.enter_bootsel():
                     raise RuntimeError("Could not enter BOOTSEL mode")
+
+                # Verify physical flash capacity before writing firmware.
+                self.validate_flash_size(flash_size)
 
                 self.progress_status(percent=93, stage="Flashing firmware")
 
