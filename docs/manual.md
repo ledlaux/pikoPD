@@ -31,6 +31,7 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 - [MIDI](#midi)
 - [Polyphonic Input](#polyphonic-input)
 - [Sample Loading](#sample-loading)
+- [Audio Input](#audio-input)
 - [Serial Monitor](#serial-monitor) 
 - [Web Control and OSC](#web-control-and-osc)
 - [Web Config Tool](#web-config-tool)
@@ -565,6 +566,14 @@ Check example in the patch folder.
 Sample loading works despite the limitations. Here is a [tutorial](https://www.youtube.com/watch?v=0qgkYWsYdTo) for a sample loading using Plugdata.
 
 By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD applies a patch to store them in flash memory, making it possible to load more.
+
+# Audio Input
+
+Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. 
+
+Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder.
+
+This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
 # Serial Monitor 
 
