@@ -1,16 +1,22 @@
-# pikoPD
+# pikoPD — Pure Data in Your Pocket
 
-This project provides a hardware abstraction layer for developing embedded audio, MIDI, and interactive hardware applications with the **Pure Data (Pd)** environment on **Raspberry Pi Pico** boards. Turn `.pd` patches into **UF2 firmware** using the **HVCC compiler** and **Pico C/C++ SDK**.
+pikoPD brings **Pure Data** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using PD patches.
 
-Hardware configuration is managed through a simple configuration file defining hardware, pins, and peripherals. While the build system, combining Python automation and CMake, handles code generation, patch conversion, firmware compilation, and uploading to the target board.
+Hardware is configured through a simple JSON file, where you define pins, peripherals, and board features. The Python-based build system combines **CMake**, **hvcc**, and **picotool** to automate the entire workflow — from patch conversion and code generation to firmware compilation and flashing the board.
 
-This started as solo hobby project which would not be possible without AI assistance, while the design, feature concepts, hardware integration, and testing are carried out by me.
+This started as a personal hobby project to learn Pure Data and the Pico SDK. I use AI to help with coding, but spend a lot of time testing and refining everything on actual hardware.
 
-PikoPD is in active development, with the core system implemented and future work focused on optimisation, expanding features, and supporting additional hardware. Feel free to open issues, start discussions, or join the development!
+Project is evolving. With the core system in place, future development is focused on optimisation, expanding features, and supporting additional hardware.
 
-Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) for detailed instructions.
+Contributions, ideas, and feedback are welcome! Feel free to open an issue or start a discussion.
 
-## Hardware features
+For detailed instructions, see the [pikoPD manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md).
+
+## Features
+
+Supports Raspberry Pi Pico boards based on the RP2040 and RP2350, including Wi-Fi-enabled models and boards with different flash memory capacities.
+
+**Hardware:**
 
 - [x] led
 - [x] knob
@@ -21,15 +27,17 @@ Read the [manual](https://github.com/ledlaux/pikoPD/blob/main/docs/manual.md) fo
 - [x] joystick
 - [x] sensors
 - [x] i2s & pwm audio
+- [x] display
+- [ ] audio input
+- [ ] sd card
+- [ ] usb audio
+
+**Interfaces:**
 - [x] uart midi
 - [x] usb midi
 - [x] usb midi host
 - [x] midi clock
 - [x] web & OSC
-- [x] display
-- [ ] audio input
-- [ ] sd card
-- [ ] usb audio
 - [ ] bluetooth midi
 
 # Architecture
