@@ -580,8 +580,9 @@ This is not yet fully integrated in the main project and needs separate project 
 ```json
   "console": true
 ```
-Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can (crash)[https://github.com/ledlaux/pikoPD/issues/25] app. 
+Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can (crash)[https://github.com/ledlaux/pikoPD/issues/25] app with rapid messages from midi knob CC. It happens on RP2350 but not on RP2040.   
 
+If the WEB mode is ON PD [print] are disabled to see regular Pico serial console prints for debugging WiFi connection (need to find a better solution). 
 
 # WEB Control and OSC
 
