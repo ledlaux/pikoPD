@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.4)
+/* pikoPD (v0.0.5)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
