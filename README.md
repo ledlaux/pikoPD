@@ -1,6 +1,6 @@
 # pikoPD — Pure Data in Your Pocket
 
-pikoPD brings **Pure Data (Pd)** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using Pd patches.
+This project brings **Pure Data (Pd)** to Raspberry Pi Pico boards, providing an easily configurable hardware abstraction layer for building embedded audio and MIDI applications using Pd patches.
 
 Hardware is configured through a simple JSON file, where you define pins, peripherals, and board features. The Python-based build system combines **CMake**, **hvcc** compiler, and **picotool** to automate the entire workflow — from patch conversion and code generation to firmware compilation and flashing the board.
 
