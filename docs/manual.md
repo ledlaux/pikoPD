@@ -43,7 +43,9 @@ PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as
 ## Python 3.10+ 
 
   - jinja2
+  - pyserial
 
+python3 -m pip install -r requirements.txt
 
 ## CMake, Ninja and arm-none-eabi-gcc
 
@@ -174,6 +176,7 @@ workspace/
 │   │   └── CMakeLists.txt  
 │   ├── board.json         # user config file
 │   └── pikopd.py          # pikopd script
+
 ```
 
 ## Build
@@ -197,6 +200,7 @@ optional arguments:
   -h, --help           Show help message and exit
   -b, --board          Path to custom json configuration file
   -f, --flash          Flash UF2 to Pico (BOOTSEL mode required)
+  -c, --clean          Clean the project folder and recompile
   -s, --serial         Open serial console after reboot
   -x, --skip-hvcc      Disable hvcc file regeneration for manual editing
   -v, --verbose        Enable verbose compiler console debug output
@@ -210,7 +214,8 @@ This file defines how the board hardware (LEDs, inputs, joystick, etc.) is mappe
 Set in `board.json`:
   
     - board (pico, pico_w, zero, pico2, pico2_w)
-    - core frequency
+    - core frequency 
+    - flash size (2, 4, 8, 16, 32)
     - sample rate
     - audio mode (I2S, PWM) and pins
     - voice count
