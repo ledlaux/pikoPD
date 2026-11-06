@@ -134,6 +134,20 @@ The patch includes three `[print]` objects that send normalized values (`0.0–1
 **Monosynth.pd** is a monophonic synthesizer with simple envelope and delay effect. Send CC1 and CC2 to control delay.
 
 
+# WEB Config Tool
+
+I started to develop interactive hardware config tool for the pikoPD projects which is available online:
+https://ledlaux.github.io/pikoPD/
+
+You can upload your .pd patch and configuration tool helps map controls to the corresponding patch receivers and senders. 
+Click a pin on the board and add a component, or drag a PD object tag directly onto a pin to asign.
+Some of the hardware objects like enc (encoder) are automatically recognized and placed in the inputs category.     
+Finaly export the board.json and place it in the pikoPD folder.      
+
+This tool still needs further development, and unfortunately I don't have the time or capacity to work on it right now. 
+In the 
+
+
 ## Useful links
 
 - About HVCC compiler  
