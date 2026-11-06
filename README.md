@@ -110,8 +110,7 @@ https://github.com/user-attachments/assets/2db6b777-098d-49f5-b9c8-0d9d2602aadc
 
 ## Audio Input
 
-Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. Some audio input tests can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder of the Develop branch.  
-
+Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware. Some successful audio input test example using PCM1802 (PCM1808 also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
 ## Default Patch
 
