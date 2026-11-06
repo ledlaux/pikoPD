@@ -575,7 +575,7 @@ Some successful audio input test example using PCM1802 (PCM1808 also should work
 
 This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
-But don't expect that this devices can run big reverbs. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate that and improve this features. For now I have added Delay and Reverb processing as Master FX which can be enabled in the config.
+But don't expect that this devices can run big reverbs. RAM is very limited. But if I get my hands on a Pico 2 board equipped with PSRAM, I'll definitely look into how to integrate that and improve this features. For now I have added Delay and Reverb processing as Master FX which can be enabled in the config. Keep Master limiter on and also don't forget to use [clip~ -1 1] in the patch before [dac~] for a safe audio levels. 
 
 
 # Serial Monitor 
