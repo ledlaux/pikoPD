@@ -32,7 +32,6 @@ Supports Raspberry Pi Pico boards based on the RP2040 and RP2350, including Wi-F
 - [x] display
 - [ ] audio input
 - [ ] sd card
-- [ ] usb audio
 
 **Interfaces:**
 - [x] uart midi
@@ -40,6 +39,7 @@ Supports Raspberry Pi Pico boards based on the RP2040 and RP2350, including Wi-F
 - [x] usb midi host
 - [x] midi clock
 - [x] web & OSC
+- [ ] usb audio
 - [ ] bluetooth midi
 
 # Architecture
