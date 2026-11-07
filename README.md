@@ -164,7 +164,7 @@ Finally export the board.json.
 
 This tool still needs further development, and unfortunately I don't have the time or capacity to work on it right now. 
 
-In the future, it could evolve into a hub for sharing custom user firmwares and a playful educational tool for exploring and interacting with pikoPD projects.
+In the future, it could evolve into a community for sharing custom user firmwares and a playful educational tool for exploring and interacting with pikoPD projects.
 
 
 
