@@ -1,11 +1,11 @@
 # PikoPD Manual 
 
 
-PikoPD project automates building **PD patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
+PikoPD project automates building **Pd patches** (`.pd`) into a **UF2** firmware using **hvcc** compiler and **Raspberry Pi Pico C/C++ SDK**. 
 
 The goal of this project is to develop an interface between the Raspberry Pi Pico, its peripherals (such as knobs, buttons, sensors), and Pure Data, providing an interactive workflow for creating embedded audio and MIDI tools.
 
-PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+PikoPD supports hvcc-compatible vanilla Pd objects and heavylib objects, such as hv.osc~ and hv.lfo~.
 
 
 ## Table of Contents
@@ -149,11 +149,11 @@ sudo make install
 
 # Project Configuration
 
-- PikoPD supports hvcc-compatible vanilla PD objects and heavylib objects, such as hv.osc~ and hv.lfo~.
-- Check PD patch examples in the folder.
+- PikoPD supports hvcc-compatible vanilla Pd objects and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Check Pd patch examples in the folder.
 - The `[s @hv_param]` and `[r @hv_param]` object names must exactly match (case-sensitive) names defined in the config file.
 - The script automatically includes objects present in the patch and ignores unconnected.
-- Debug console, when enabled, will also output PD `[print]` objects. Use it moderately, because it can crash the device.
+- Debug console, when enabled, will also output Pd `[print]` objects. Use it moderately, because it can crash the device.
 - If you change board and MIDI mode or encounter compile-time errors remove the project folder or rename it to rebuild files.
 - Tested on macOS.
 
@@ -166,7 +166,7 @@ workspace/
 │   ├── docs/
 │   ├── lib/
 │   │   └── heavylib/
-│   ├── patches/           # pd patches folder
+│   ├── patches/           # Pd patches folder
 │   ├── src/               # hardware config source files
 │   ├── templates/
 │   │   └── main.cpp       # template 
@@ -176,7 +176,7 @@ workspace/
 │   │   ├── src/             
 │   │   └── CMakeLists.txt  
 │   ├── board.json         # user config file
-│   └── pikopd.py          # pikopd script
+│   └── pikopd.py          # pikoPD script
 
 ```
 
@@ -292,7 +292,7 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `knob`  | Analog control such as a potentiometer (smoothed) |
 | `cv_in` | Control voltage input for external analog signals (0–3.3V)       |
 
-! Raspberry Pico can't sample audio so PD `[adc]` object will not work without an external adc (will be added in near future).
+! Raspberry Pico can't sample audio so Pd `[adc]` object will not work without an external adc (will be added in near future).
 
 
 ## DAC
@@ -321,7 +321,7 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 | `cv`  | Directly outputs a 0.0 to 3.3V control voltage based on floating-point input values (0.0 to 1.0).  |
 | `note_out` | Converts MIDI note numbers (36.0 to 96.0) into standard Volt-per-Octave pitch control voltages.    |
 
-Create objects `s cv_out @hv_param` or `s note_out @hv_param` inside the PD patch for coresponding mode. 
+Create objects `s cv_out @hv_param` or `s note_out @hv_param` inside the Pd patch for coresponding mode. 
 
 ## LED 
 
@@ -353,7 +353,7 @@ PikoPD boards support 4 LED modes.
 
 Code supports up to 12 different led connection.
 
-**RGB led** in PD accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
+**RGB led** in Pd patch accepts 1 value (intensity) or 2 values (hue and intensity) in range f0.0-1.0.  
 Use `[pack f f]` object before `[s ledRGB]` to send 2 values. 
 
 
@@ -406,7 +406,7 @@ PikoPD supports up to 4 MPR121 capacitive touch sensor devices on each of the i2
 
 IRQ pin is used by default to make processing more efficient. 
 
-To use this sensor in the PD  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
+To use this sensor in the Pd  patch create `[r pad1 @hv_param]` object for each pad in numerical order. Script will automatically asign pad objects to each of the devices (0-12, 13-24...) set in *board.json*. 
 
 
 ### HC-SR04 – Ultrasonic Distance 
@@ -443,7 +443,7 @@ When you place a finger or an object in front of the sensor (within a few millim
 
 Because there are multiple manufacturers of these sensors, the pin layouts and wiring can differ. Refer to this 3.3V common wiring [scheme](https://app.cirkitdesigner.com/project/fa619fa3-0145-456f-aaa3-b2f01b14e3e7) for Raspberry Pi Pico boards. Note that because infrared light is invisible to the human eye, you will need to look at the LED through a smartphone camera lens to verify that it is turned on and glowing.
 
-To use this sensor in a PD patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
+To use this sensor in a Pd patch, connect its output to an ADC pin and add `[r cny @hv_param]` object.
 
 ### HX710 – Air Pressure 
 
@@ -527,7 +527,7 @@ PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.js
 "midi_mode": "uart"    // Default pins tx 0, rx 1 
 "midi_mode": "host"    // Use otg cable to power pico and usb midi device
 ```
-Midi clock and start/stop messages work with PD `[midirealtimein]` object.
+Midi clock and start/stop messages work with Pd `[midirealtimein]` object.
 
 | CC Number | Parameter               |
 |----------:|-------------------------|
@@ -557,7 +557,7 @@ To make MIDI note processing lightweight, a custom voice allocation system with 
 To use the custom system:  
 1. Set **voice count** to 2 or more in `board.json`.  
 2. Add `[NOTE1, [NOTE2]...` objects for each voice.
-4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the PD patch.  
+4. Use `[unpack]` to extract **note**, **velocity**, and **channel** in the Pd patch.  
 
 Check example in the patch folder. 
 
@@ -569,9 +569,9 @@ By design, hvcc-generated code stores samples in float arrays in RAM. PikoPD app
 
 ## Audio Input and FX
 
-Raspberry Pico can't sample audio with builtin analog to digital converters, so PD `[adc]` object will not work without an external hardware.   
+Raspberry Pico can't sample audio with builtin analog to digital converters, so Pd `[adc]` object will not work without an external hardware.   
 
-Some successful audio input test example using **PCM1802** (**PCM1808** also should work) and PD can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
+Some successful audio input test example using **PCM1802** (**PCM1808** also should work) and Pd can be found in the [experimental](https://github.com/ledlaux/pikoPD/tree/develop/experimental/audio_input/pcm1802) folder. 
 
 This is not yet fully integrated in the main project and needs separate project build because of the tricky pio and dma settings. Hope to integrate it fully in the future updates, because it is the most requested feature.
 
@@ -586,9 +586,9 @@ Keep the **Master Limiter** enabled, and don't forget to use `[clip~ -1 1]` in y
 ```json
   "console": true
 ```
-Debug console will also output PD [print] objects, which are parsed automatically. Use it moderately, because it can [crash](https://github.com/ledlaux/pikoPD/issues/25) app with rapid messages from midi knob CC. It happens on RP2350 but not on RP2040.   
+Debug console will also output Pd [print] objects, which are parsed automatically. Use it moderately, because it can [crash](https://github.com/ledlaux/pikoPD/issues/25) app with rapid messages from midi knob CC. It happens on RP2350 but not on RP2040.   
 
-If the WEB mode is ON PD [print] are disabled to see regular Pico serial console prints for debugging WiFi connection (need to find a better solution). 
+If the WEB mode is ON [print] objects are disabled to see regular Pico serial console prints for debugging WiFi connection (need to find a better solution). 
 
 # WEB Control and OSC
 
@@ -619,9 +619,9 @@ These are very experimental features. Some examples: https://github.com/ledlaux/
 See `patches/web.pd`
 
 ## Web
-- To receive values from WEB ui /cgi_handler use PD objects with keyword WEB - [r web @hv_param]  
+- To receive values from WEB ui /cgi_handler use Pd objects with keyword WEB - [r web @hv_param]  
 
-At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside PD.   
+At this test stage only one slider is enabled in WEB UI which sends values to web1 object inside Pd.   
 
 After device connects to wifi open pikopd.local in the browser. 
 
@@ -629,12 +629,12 @@ For creating custom WEB UI use the library `/lib/pico-w-webserver`. Edit `index.
 After that put generated `htmldata.c` inside `/src/web` and rebuild. 
 
 ## OSC
-- To receive OSC messages on port 8000 use PD objects with keyword OSC - [r osc @hv_param]  
+- To receive OSC messages on port 8000 use Pd objects with keyword OSC - [r osc @hv_param]  
 - To send messages from the pikoPD device on port 8001 use [s osc @hv_param]
 
 Parameter and Event names may only contain alphanumeric characters or underscore (r osc1 @hv_param not /ch/osc1).
 
-To test OSC use the PD patch `oscNetsendReceive.pd` in /tools.
+To test OSC use the Pd patch `oscNetsendReceive.pd` in /tools.
 
 # WEB Config Tool
 
@@ -642,7 +642,7 @@ I started to develop interactive hardware config tool for the pikoPD projects wh
 https://ledlaux.github.io/pikoPD/
 
 You can upload your .pd patch and configuration tool helps map controls to the corresponding patch receivers and senders. 
-Click a pin on the board and add a component, or drag a PD object tag directly onto a pin to asign.
+Click a pin on the board and add a component, or drag a Pd object tag directly onto a pin to asign.
 Some of the hardware objects like enc (encoder) are automatically recognized and placed in the inputs category.     
 Finaly export the board.json and place it in the pikoPD folder.      
 
@@ -653,5 +653,5 @@ In the future, it could evolve into a hub for sharing custom user firmwares and 
 
 - About hvcc compiler  
   https://wasted-audio.github.io/hvcc/
-- Hvcc supported PD objects  
+- Hvcc supported Pd objects  
   https://github.com/Wasted-Audio/hvcc/blob/develop/docs/reference/objects/supported.md
