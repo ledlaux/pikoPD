@@ -34,7 +34,13 @@
 #include "hx711.h"
 #endif
 
+#if MCP4725_ENABLED
 #include "mcp4725.h" 
+#endif
+
+#if MCP4822_ENABLED
+#include "MCP4822.h" 
+#endif
 
 
 namespace Pico {
