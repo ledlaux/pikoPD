@@ -1378,6 +1378,18 @@ int main() {
 
         {% endfor %}
 
+        // ====================================================
+        // MCP4725 - DAC output
+        // ====================================================
+
+        {% for mcp in active_mcp4725 %}
+            if (cv_out_{{ loop.index0 }}_dirty) {
+                cv_out_{{ loop.index0 }}_dirty = false;
+                cv_out_{{ loop.index0 }}.write(cv_out_{{ loop.index0 }}_val);
+                
+            }
+        {% endfor %}
+
 
         // ====================================================
         // CNY70 - optical
