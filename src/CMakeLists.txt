@@ -181,7 +181,12 @@ target_link_libraries(pikopd PRIVATE
     hardware_pwm
     pico_multicore
     hardware_i2c
+  hardware_spi
 )
+
+if(MCP4822_ENABLED)
+    target_link_libraries(pikopd PRIVATE hardware_spi)
+endif()
 
 if(NOT WEB)
     target_link_libraries(pikopd PRIVATE
