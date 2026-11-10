@@ -222,7 +222,7 @@ Set in `board.json`:
     - voice count
     - led (pwm, rgb and mode)
     - adc pins (knob, cv_in)
-    - dac pins (cv out, v/oct)
+    - dac (cv out, pitch)
     - rotary encoder 
     - gate in/out (gate or trigger)
     - button (bang, toggle, switch)
@@ -295,33 +295,94 @@ BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
 ! Raspberry Pico can't sample audio so Pd `[adc]` object will not work without an external adc. Check [Audio Input and FX](#audio-input-and-fx) section.
 
 
-## DAC
+## DAC 
+
+pikoPD supports two external 12-bit DACs:
+
+- **MCP4725** – Single-channel I2C DAC.
+- **MCP4822** – Dual-channel SPI DAC.
+
+### MCP4725 (I2C)
+
+Configure MCP4725 devices in `board.json`:
 
 ```json
-"outputs": {
+{
+  "outputs": {
     "mcp4725": [
-      {
-        "name": "note_out",
-        "sda_pin": 6,
-        "scl_pin": 7,
-        "mode": "note"
-      },
       {
         "name": "cv_out",
         "sda_pin": 6,
         "scl_pin": 7,
         "mode": "cv"
+      },
+      {
+        "name": "note_out",
+        "sda_pin": 6,
+        "scl_pin": 7,
+        "mode": "note"
       }
     ]
   }
+}
 ```
 
-| Type    | Description                                             |
-| ------- | ------------------------------------------------------- |
-| `cv`  | Directly outputs a 0.0 to 3.3V control voltage based on floating-point input values (0.0 to 1.0).  |
-| `note_out` | Converts MIDI note numbers (36.0 to 96.0) into standard Volt-per-Octave pitch control voltages.    |
+**Output modes:**
 
-Create objects `s cv_out @hv_param` or `s note_out @hv_param` inside the Pd patch for coresponding mode. 
+| Mode | Description |
+|---|---|
+| `cv` | Normalized input from `0.0` to `1.0`, mapped to the full DAC range. |
+| `note` | MIDI notes `36–96` (C2–C7), mapped linearly to the full DAC range. |
+
+### MCP4822 (SPI)
+
+The MCP4822 provides two independently configurable channels. Multiple devices can share SCK and MOSI, each requiring a separate CS pin.
+
+```json
+{
+  "outputs": {
+    "mcp4822": [
+      {
+        "name": "dac1",
+        "sck_pin": 18,
+        "mosi_pin": 19,
+        "cs_pin": 17,
+        "channel_a": {
+          "name": "pitch_out",
+          "mode": "note"
+        },
+        "channel_b": {
+          "name": "cv_out",
+          "mode": "cv"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Output modes (configurable per channel):**
+
+| Mode | Description |
+|---|---|
+| `cv` | Normalized input from `0.0` to `1.0`, mapped to the full DAC range. |
+| `note` | MIDI notes `36–96` (C2–C7), mapped linearly to the full DAC range. |
+| `raw` | Direct 12-bit DAC value from `0` to `4095`. |
+
+**NOTE mode:** Both DACs use the same linear mapping: C2 = minimum, C7 = maximum. Each octave represents 20% of the output range. This is not yet calibrated for precise 1 V/octave output.
+
+**Voltage range:** The MCP4725 output depends on its supply voltage. The MCP4822 uses its internal 2.048 V reference with 1× gain, giving approximately 2.048 V maximum output.
+
+### Pure Data Usage
+
+Use `[s name @hv_param]` with the names defined in `board.json`, for example:
+
+```text
+[s cv_out @hv_param]
+[s note_out @hv_param]
+[s pitch_out @hv_param]
+```
+
 
 ## LED 
 
