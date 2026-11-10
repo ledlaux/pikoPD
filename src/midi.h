@@ -1347,7 +1347,7 @@ extern "C" {
 // and do not depend on these stubs.
 // ============================================================
 
-#if defined(PICO_PLATFORM) || defined(PICO_RP2040)
+#if defined(PICO_RP2040)
 
 extern "C" {
 
