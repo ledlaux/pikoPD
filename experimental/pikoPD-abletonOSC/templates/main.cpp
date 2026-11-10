@@ -22,7 +22,7 @@ MIT Licence
 
 #include "audio.h"
 #include "control.h"
-#include "midi.h"
+#include "message.h"
 
 #include "osc_address.h"
 
