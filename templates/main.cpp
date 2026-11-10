@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.5)
+/* pikoPD (v0.0.6)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -190,6 +190,25 @@ MasterFX masterFX;
         'scl_pin': cv_out.scl_pin,
         'mode': cv_out.mode | default('CV') | upper
     }) -%}
+{%- endfor -%}
+
+{%- set active_mcp4822 = [] -%}
+{%- for mcp in board.get('outputs', {}).get('mcp4822', []) -%}
+    {%- for channel_name in ['channel_a', 'channel_b'] -%}
+        {%- set channel_cfg = mcp.get(channel_name, {}) -%}
+        {%- if channel_cfg.get('name') in sends -%}
+            {%- set _ = active_mcp4822.append({
+                'device': mcp.name,
+                'name': channel_cfg.name,
+                'hash': sends[channel_cfg.name],
+                'channel': 'A' if channel_name == 'channel_a' else 'B',
+                'sck_pin': mcp.sck_pin,
+                'mosi_pin': mcp.mosi_pin,
+                'cs_pin': mcp.cs_pin,
+                'mode': channel_cfg.get('mode', 'cv') | upper
+            }) -%}
+        {%- endif -%}
+    {%- endfor -%}
 {%- endfor -%}
 
 {# --- MPR121 Touch Sensor Block --- #}
@@ -882,7 +901,45 @@ int main() {
     {%- for mcp in active_mcp4725 %}
     Pico::MCP4725 cv_out_{{ loop.index0 }}
     ({{ mcp.address | default("0x60") }});
-    cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
+    cv_out_{{ loop.index0 }}.init(
+        {{ mcp.sda_pin }}, 
+        {{ mcp.scl_pin }}, 
+        Pico::MCPMode::{{ mcp.mode }});
+    {%- endfor %}
+
+// ====================================================
+// MCP4822 CV Out init
+// ====================================================
+
+    {%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+
+        {%- set ns = namespace(active=false) %}
+        {%- for ch in ['channel_a', 'channel_b'] %}
+            {%- if mcp.get(ch, {}).get('name') in sends %}
+                {%- set ns.active = true %}
+            {%- endif %}
+        {%- endfor %}
+
+        {%- if ns.active %}
+
+        Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
+
+        cv_out_{{ loop.index0 }}.init(
+            {{ mcp.sck_pin }},
+            {{ mcp.mosi_pin }}
+        );
+
+        cv_out_{{ loop.index0 }}.setMode(
+            Pico::MCPChannel::A,
+            Pico::MCPMode::{{ mcp.get('channel_a', {}).get('mode', 'cv') | upper }}
+        );
+
+        cv_out_{{ loop.index0 }}.setMode(
+            Pico::MCPChannel::B,
+            Pico::MCPMode::{{ mcp.get('channel_b', {}).get('mode', 'cv') | upper }}
+        );
+
+        {%- endif %}
     {%- endfor %}
 
 // ====================================================
@@ -1378,7 +1435,8 @@ int main() {
 
         {% endfor %}
 
-        // ====================================================
+        
+         // ====================================================
         // MCP4725 - DAC output
         // ====================================================
         
@@ -1400,6 +1458,54 @@ int main() {
         }
         
         {% endfor %}
+
+
+        // ====================================================
+        // MCP4822 - DAC output
+        // ====================================================
+
+        {% for mcp in active_mcp4822 %}
+
+        // Channel A
+        if (cv_out_{{ loop.index0 }}_A_dirty.exchange(
+                false,
+                std::memory_order_acquire
+            )) {
+
+            uint32_t bits = cv_out_{{ loop.index0 }}_A_bits.load(
+                std::memory_order_relaxed
+            );
+
+            float value;
+            memcpy(&value, &bits, sizeof(value));
+
+            cv_out_{{ loop.index0 }}.writeChannel(
+                Pico::MCPChannel::A,
+                value
+            );
+        }
+
+        // Channel B
+        if (cv_out_{{ loop.index0 }}_B_dirty.exchange(
+                false,
+                std::memory_order_acquire
+            )) {
+
+            uint32_t bits = cv_out_{{ loop.index0 }}_B_bits.load(
+                std::memory_order_relaxed
+            );
+
+            float value;
+            memcpy(&value, &bits, sizeof(value));
+
+            cv_out_{{ loop.index0 }}.writeChannel(
+                Pico::MCPChannel::B,
+                value
+            );
+        }
+
+        {% endfor %}
+
 
         // ====================================================
         // CNY70 - optical
@@ -1532,7 +1638,6 @@ int main() {
         }
 
         {% endif %}
-
         {% endfor %}
 
         // ====================================================
