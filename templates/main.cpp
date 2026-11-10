@@ -1381,15 +1381,25 @@ int main() {
         // ====================================================
         // MCP4725 - DAC output
         // ====================================================
-
+        
         {% for mcp in active_mcp4725 %}
-            if (cv_out_{{ loop.index0 }}_dirty) {
-                cv_out_{{ loop.index0 }}_dirty = false;
-                cv_out_{{ loop.index0 }}.write(cv_out_{{ loop.index0 }}_val);
-                
-            }
+        
+        if (cv_out_{{ loop.index0 }}_dirty.exchange(
+                false,
+                std::memory_order_acquire
+            )) {
+        
+            uint32_t bits = cv_out_{{ loop.index0 }}_bits.load(
+                std::memory_order_relaxed
+            );
+        
+            float value;
+            memcpy(&value, &bits, sizeof(value));
+        
+            cv_out_{{ loop.index0 }}.write(value);
+        }
+        
         {% endfor %}
-
 
         // ====================================================
         // CNY70 - optical
