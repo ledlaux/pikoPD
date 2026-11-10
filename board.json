@@ -60,7 +60,7 @@
       ],
 
       "hx711": [ 
-        { "name": "loadcell", "sck_pin": 2, "dout_pin": 3, "mode": "MIDI"}
+        { "name": "loadcell", "sck_pin": 2, "dout_pin": 3, "mode": "midi"}
       ]
    }
 },
