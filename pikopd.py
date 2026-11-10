@@ -544,6 +544,7 @@ class PicoUF2Generator:
         # 3. CONFIGURATION FLAGS
         masterfx = settings.get("masterfx") or {}
         inputs = settings.get("inputs") or {}
+        outputs = settings.get("outputs") or {}
         sensors = inputs.get("sensors") or {}
         web_config = settings.get("web") or {}
         display_config = settings.get("display") or {}
