@@ -194,11 +194,15 @@ MasterFX masterFX;
 
 {%- set active_mcp4822 = [] -%}
 {%- for mcp in board.get('outputs', {}).get('mcp4822', []) -%}
+    {%- set device_index = loop.index0 -%}
+
     {%- for channel_name in ['channel_a', 'channel_b'] -%}
         {%- set channel_cfg = mcp.get(channel_name, {}) -%}
+
         {%- if channel_cfg.get('name') in sends -%}
             {%- set _ = active_mcp4822.append({
-                'device': mcp.name,
+                'device': 'cv_out_' ~ device_index,
+                'device_index': device_index,
                 'name': channel_cfg.name,
                 'hash': sends[channel_cfg.name],
                 'channel': 'A' if channel_name == 'channel_a' else 'B',
@@ -208,6 +212,7 @@ MasterFX masterFX;
                 'mode': channel_cfg.get('mode', 'cv') | upper
             }) -%}
         {%- endif -%}
+
     {%- endfor -%}
 {%- endfor -%}
 
@@ -236,8 +241,10 @@ MasterFX masterFX;
     {%- endfor -%}
 {%- endif -%}
 
-// Only render the C++ struct and array if at least one pad is found in receives 
 {% if active_mpr_pads|length > 0 -%}
+
+// Only render the C++ struct and array if at least one pad is found in receives 
+
 struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
 
 MprPad active_mpr_pads[] = {
@@ -278,14 +285,41 @@ static const uint32_t screen_slots[4] = {
 
 static std::atomic<uint32_t> midi_activity_timer{0};
 static std::atomic<uint8_t> last_midi_velocity{0};
+static std::atomic<uint32_t> midi_clock_timer{0};
 static uint8_t current_midi_note = 60;
 static uint32_t last_led_tick = 0;
-static std::atomic<uint32_t> midi_clock_timer{0};
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
+// ====================================================
+// MCP4725 DAC mailboxes
+// ====================================================
+{% for mcp in active_mcp4725 %}
+static std::atomic<uint32_t> cv_out_{{ loop.index0 }}_bits{0};
+static std::atomic<bool> cv_out_{{ loop.index0 }}_dirty{false};
+{% endfor %}
+
+
+// ====================================================
+// MCP4822 DAC mailboxes
+// ====================================================
+
+{% for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+{% set idx = loop.index0 %}
+
+{% if mcp.channel_a.name in sends %}
+static std::atomic<uint32_t> cv_out_{{ idx }}_A_bits{0};
+static std::atomic<bool> cv_out_{{ idx }}_A_dirty{false};
+{% endif %}
+
+{% if mcp.channel_b.name in sends %}
+static std::atomic<uint32_t> cv_out_{{ idx }}_B_bits{0};
+static std::atomic<bool> cv_out_{{ idx }}_B_dirty{false};
+{% endif %}
+
+{% endfor %}
 
 // ---- NOTE receives ----
 
@@ -698,6 +732,30 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
                 );
             }
             break;
+        {% endfor %}
+
+        /* --- MCP4822 Outputs --- */
+
+        {% for mcp in active_mcp4822 -%}
+        case {{ mcp.hash }}U: {
+            if (msg_isFloat(m, 0)) {
+                uint32_t bits;
+                memcpy(&bits, &val0, sizeof(bits));
+
+                {% if mcp.channel == 'A' %}
+                {{ mcp.device }}_A_bits.store(
+                    bits, std::memory_order_relaxed);
+                {{ mcp.device }}_A_dirty.store(
+                    true, std::memory_order_release);
+                {% else %}
+                {{ mcp.device }}_B_bits.store(
+                    bits, std::memory_order_relaxed);
+                {{ mcp.device }}_B_dirty.store(
+                    true, std::memory_order_release);
+                {% endif %}
+            }
+            break;
+        }
         {% endfor %}
 
         /* --- Web (SSI Sync) & OSC Routing --- */
@@ -1464,45 +1522,44 @@ int main() {
         // MCP4822 - DAC output
         // ====================================================
 
-        {% for mcp in active_mcp4822 %}
+        {% for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+        {% set idx = loop.index0 %}
 
-        // Channel A
-        if (cv_out_{{ loop.index0 }}_A_dirty.exchange(
-                false,
-                std::memory_order_acquire
-            )) {
+            // Channel A
+            {% if mcp.channel_a.name in sends %}
+            if (cv_out_{{ idx }}_A_dirty.exchange(
+                    false,
+                    std::memory_order_acquire
+                )) {
 
-            uint32_t bits = cv_out_{{ loop.index0 }}_A_bits.load(
-                std::memory_order_relaxed
-            );
+                uint32_t bits = cv_out_{{ idx }}_A_bits.load(
+                    std::memory_order_relaxed
+                );
 
-            float value;
-            memcpy(&value, &bits, sizeof(value));
+                float value;
+                memcpy(&value, &bits, sizeof(value));
 
-            cv_out_{{ loop.index0 }}.writeChannel(
-                Pico::MCPChannel::A,
-                value
-            );
-        }
+                cv_out_{{ idx }}.writeChannel(Pico::MCPChannel::A, value);
+            }
+            {% endif %}
 
-        // Channel B
-        if (cv_out_{{ loop.index0 }}_B_dirty.exchange(
-                false,
-                std::memory_order_acquire
-            )) {
+            // Channel B
+            {% if mcp.channel_b.name in sends %}
+            if (cv_out_{{ idx }}_B_dirty.exchange(
+                    false,
+                    std::memory_order_acquire
+                )) {
 
-            uint32_t bits = cv_out_{{ loop.index0 }}_B_bits.load(
-                std::memory_order_relaxed
-            );
+                uint32_t bits = cv_out_{{ idx }}_B_bits.load(
+                    std::memory_order_relaxed
+                );
 
-            float value;
-            memcpy(&value, &bits, sizeof(value));
+                float value;
+                memcpy(&value, &bits, sizeof(value));
 
-            cv_out_{{ loop.index0 }}.writeChannel(
-                Pico::MCPChannel::B,
-                value
-            );
-        }
+                cv_out_{{ idx }}.writeChannel(Pico::MCPChannel::B, value);
+            }
+            {% endif %}
 
         {% endfor %}
 
