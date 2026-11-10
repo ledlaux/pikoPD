@@ -14,9 +14,9 @@ namespace Pico {
 // ==================================================
 
 enum class MCPMode {
-    CV,     // Normalized input: 0.0 - 1.0
-    NOTE,   // MIDI note: 36 - 96
-    RAW     // DAC value: 0 - 4095
+    CV,
+    NOTE,
+    RAW
 };
 
 enum class MCPChannel {
@@ -46,7 +46,35 @@ private:
 
     MCPChannel channel;
 
+    // ==================================================
+    // Shared SPI bus management
+    // ==================================================
+
+    struct SPIBusState {
+        bool initialized;
+        uint sck_pin;
+        uint mosi_pin;
+        uint32_t requested_baudrate;
+        uint32_t actual_baudrate;
+    };
+
+    static SPIBusState& getBusState(spi_inst_t* port) {
+
+        static SPIBusState buses[2] = {
+            {false, 0, 0, 0, 0},
+            {false, 0, 0, 0, 0}
+        };
+
+        return (port == spi0) ? buses[0] : buses[1];
+    }
+
+    static bool isValidPort(spi_inst_t* port) {
+        return port == spi0 || port == spi1;
+    }
+
+    // ==================================================
     // MCP4822 command bits
+    // ==================================================
 
     static constexpr uint16_t DAC_CHANNEL_A = (0 << 15);
     static constexpr uint16_t DAC_CHANNEL_B = (1 << 15);
@@ -54,25 +82,17 @@ private:
     static constexpr uint16_t DAC_GAIN_1X = (1 << 13);
     static constexpr uint16_t DAC_ACTIVE  = (1 << 12);
 
-    // --------------------------------------------------
+    // ==================================================
     // Channel index
-    // --------------------------------------------------
+    // ==================================================
 
     static uint8_t channelIndex(MCPChannel ch) {
         return (ch == MCPChannel::A) ? 0 : 1;
     }
 
-    // --------------------------------------------------
-    // Validate common SPI SCK/MOSI pin pairs
-    //
-    // SPI0:
-    // SCK  2, 6, 18, 22
-    // MOSI 3, 7, 19, 23
-    //
-    // SPI1:
-    // SCK  10, 14, 26
-    // MOSI 11, 15, 27
-    // --------------------------------------------------
+    // ==================================================
+    // Validate SPI pin pairs
+    // ==================================================
 
     static bool isValidPinPair(
         spi_inst_t* port,
@@ -102,9 +122,9 @@ private:
         return false;
     }
 
-    // --------------------------------------------------
-    // Automatically resolve SPI controller
-    // --------------------------------------------------
+    // ==================================================
+    // Resolve SPI controller automatically
+    // ==================================================
 
     static spi_inst_t* resolveSPI(
         uint sck_pin,
@@ -122,9 +142,92 @@ private:
         return nullptr;
     }
 
-    // --------------------------------------------------
+    // ==================================================
+    // Initialize shared SPI bus
+    // Called only once per SPI peripheral.
+    // ==================================================
+
+    bool initializeBus(
+        uint sck_pin,
+        uint mosi_pin,
+        uint32_t spi_baudrate
+    ) {
+
+        if (!isValidPort(spi_port)) {
+            printf("[MCP4822] ERROR: Invalid SPI controller\n");
+            return false;
+        }
+
+        if (!isValidPinPair(spi_port, sck_pin, mosi_pin)) {
+
+            printf(
+                "[MCP4822] ERROR: Invalid SPI pin pair: SCK=%u, MOSI=%u\n",
+                sck_pin,
+                mosi_pin
+            );
+
+            return false;
+        }
+
+        SPIBusState& bus = getBusState(spi_port);
+
+        // Bus already initialized by another DAC.
+
+        if (bus.initialized) {
+
+            if (bus.sck_pin != sck_pin ||
+                bus.mosi_pin != mosi_pin ||
+                bus.requested_baudrate != spi_baudrate) {
+
+                printf(
+                    "[MCP4822] ERROR: SPI bus configuration mismatch\n"
+                );
+
+                return false;
+            }
+
+            baudrate = bus.actual_baudrate;
+
+            return true;
+        }
+
+        // First device using this SPI peripheral.
+
+        baudrate = spi_init(spi_port, spi_baudrate);
+
+        spi_set_format(
+            spi_port,
+            8,
+            SPI_CPOL_0,
+            SPI_CPHA_0,
+            SPI_MSB_FIRST
+        );
+
+        gpio_set_function(sck_pin, GPIO_FUNC_SPI);
+        gpio_set_function(mosi_pin, GPIO_FUNC_SPI);
+
+        // Save shared bus configuration.
+
+        bus.initialized = true;
+        bus.sck_pin = sck_pin;
+        bus.mosi_pin = mosi_pin;
+        bus.requested_baudrate = spi_baudrate;
+        bus.actual_baudrate = baudrate;
+
+        printf(
+            "[MCP4822] SPI%u initialized: SCK=%u, MOSI=%u, baud=%lu\n",
+            spi_port == spi0 ? 0u : 1u,
+            sck_pin,
+            mosi_pin,
+            static_cast<unsigned long>(baudrate)
+        );
+
+        return true;
+    }
+
+    // ==================================================
     // Raw SPI write
-    // --------------------------------------------------
+    // ==================================================
 
     void __not_in_flash_func(writeRaw)(
         MCPChannel ch,
@@ -167,7 +270,7 @@ public:
     // Constructors
     // ==================================================
 
-    // Automatically select SPI controller from pin pair.
+    // Automatically resolve SPI controller from pins.
 
     explicit MCP4822(uint8_t cs)
         : spi_port(nullptr),
@@ -207,7 +310,7 @@ public:
             return true;
         }
 
-        // Select SPI controller automatically if necessary.
+        // Resolve SPI controller if necessary.
 
         if (spi_port == nullptr) {
 
@@ -216,26 +319,13 @@ public:
             if (spi_port == nullptr) {
 
                 printf(
-                    "[MCP4822] ERROR: Invalid SPI pin pair: SCK=%u, MOSI=%u\n",
+                    "[MCP4822] ERROR: Invalid SPI pins: SCK=%u, MOSI=%u\n",
                     sck_pin,
                     mosi_pin
                 );
 
                 return false;
             }
-        }
-
-        // Validate SPI controller and pin combination.
-
-        if (!isValidPinPair(spi_port, sck_pin, mosi_pin)) {
-
-            printf(
-                "[MCP4822] ERROR: Pins SCK=%u, MOSI=%u do not match selected SPI controller\n",
-                sck_pin,
-                mosi_pin
-            );
-
-            return false;
         }
 
         // Validate CS pin.
@@ -250,41 +340,29 @@ public:
             return false;
         }
 
-        // Set initial mode for both channels.
+        // Initialize or reuse shared SPI bus.
+
+        if (!initializeBus(sck_pin, mosi_pin, spi_baudrate)) {
+            return false;
+        }
+
+        // Configure independent channel modes.
 
         channel_mode[0] = output_mode;
         channel_mode[1] = output_mode;
 
-        // Initialize SPI.
-
-        baudrate = spi_init(spi_port, spi_baudrate);
-
-        spi_set_format(
-            spi_port,
-            8,
-            SPI_CPOL_0,
-            SPI_CPHA_0,
-            SPI_MSB_FIRST
-        );
-
-        gpio_set_function(sck_pin, GPIO_FUNC_SPI);
-        gpio_set_function(mosi_pin, GPIO_FUNC_SPI);
-
-        // Manual chip select.
+        // Initialize this DAC's CS pin only.
 
         gpio_init(cs_pin);
-        gpio_set_dir(cs_pin, GPIO_OUT);
         gpio_put(cs_pin, 1);
+        gpio_set_dir(cs_pin, GPIO_OUT);
 
         initialized = true;
 
         printf(
-            "[MCP4822] Initialized: SPI%u, SCK=%u, MOSI=%u, CS=%u, baud=%lu\n",
+            "[MCP4822] Device initialized: SPI%u, CS=%u\n",
             spi_port == spi0 ? 0u : 1u,
-            sck_pin,
-            mosi_pin,
-            cs_pin,
-            static_cast<unsigned long>(baudrate)
+            cs_pin
         );
 
         return true;
@@ -295,7 +373,6 @@ public:
     // ==================================================
 
     bool isConnected() const {
-        // MCP4822 has no SPI readback.
         return initialized && spi_port != nullptr;
     }
 
@@ -350,15 +427,11 @@ public:
     // RAW DAC output
     // ==================================================
 
-    // Selected channel.
-
     void __not_in_flash_func(setVoltage)(
         uint16_t value
     ) {
         writeRaw(channel, value);
     }
-
-    // Explicit channel.
 
     void __not_in_flash_func(writeChannelRaw)(
         MCPChannel ch,
@@ -371,19 +444,12 @@ public:
     // CV output
     // ==================================================
 
-    // Normalized input: 0.0 - 1.0
-
     void __not_in_flash_func(setNormalized)(
         float normalized_val
     ) {
 
-        if (normalized_val < 0.0f) {
-            normalized_val = 0.0f;
-        }
-
-        if (normalized_val > 1.0f) {
-            normalized_val = 1.0f;
-        }
+        if (normalized_val < 0.0f) normalized_val = 0.0f;
+        if (normalized_val > 1.0f) normalized_val = 1.0f;
 
         uint16_t value = static_cast<uint16_t>(
             normalized_val * 4095.0f
@@ -392,20 +458,13 @@ public:
         writeRaw(channel, value);
     }
 
-    // Explicit channel CV output.
-
     void __not_in_flash_func(writeChannelNormalized)(
         MCPChannel ch,
         float normalized_val
     ) {
 
-        if (normalized_val < 0.0f) {
-            normalized_val = 0.0f;
-        }
-
-        if (normalized_val > 1.0f) {
-            normalized_val = 1.0f;
-        }
+        if (normalized_val < 0.0f) normalized_val = 0.0f;
+        if (normalized_val > 1.0f) normalized_val = 1.0f;
 
         uint16_t value = static_cast<uint16_t>(
             normalized_val * 4095.0f
@@ -416,41 +475,28 @@ public:
 
     // ==================================================
     // NOTE output
-    // ==================================================
-
     // MIDI note mapping: 36 - 96
+    // ==================================================
 
     void __not_in_flash_func(noteOut)(
         float midi_note
     ) {
 
-        if (midi_note < 36.0f) {
-            midi_note = 36.0f;
-        }
-
-        if (midi_note > 96.0f) {
-            midi_note = 96.0f;
-        }
+        if (midi_note < 36.0f) midi_note = 36.0f;
+        if (midi_note > 96.0f) midi_note = 96.0f;
 
         float normalized = (midi_note - 36.0f) / 60.0f;
 
         setNormalized(normalized);
     }
 
-    // Explicit channel NOTE output.
-
     void __not_in_flash_func(writeChannelNote)(
         MCPChannel ch,
         float midi_note
     ) {
 
-        if (midi_note < 36.0f) {
-            midi_note = 36.0f;
-        }
-
-        if (midi_note > 96.0f) {
-            midi_note = 96.0f;
-        }
+        if (midi_note < 36.0f) midi_note = 36.0f;
+        if (midi_note > 96.0f) midi_note = 96.0f;
 
         float normalized = (midi_note - 36.0f) / 60.0f;
 
@@ -461,15 +507,11 @@ public:
     // Automatic channel output
     // ==================================================
 
-    // Uses the configured mode of the selected channel.
-
     void __not_in_flash_func(write)(
         float input_value
     ) {
         writeChannel(channel, input_value);
     }
-
-    // Uses the configured mode of the specified channel.
 
     void __not_in_flash_func(writeChannel)(
         MCPChannel ch,
@@ -483,30 +525,22 @@ public:
         switch (channel_mode[channelIndex(ch)]) {
 
             case MCPMode::CV:
-
                 writeChannelNormalized(ch, input_value);
                 break;
 
             case MCPMode::NOTE:
-
                 writeChannelNote(ch, input_value);
                 break;
 
             case MCPMode::RAW:
 
-                if (input_value < 0.0f) {
-                    input_value = 0.0f;
-                }
-
-                if (input_value > 4095.0f) {
-                    input_value = 4095.0f;
-                }
+                if (input_value < 0.0f) input_value = 0.0f;
+                if (input_value > 4095.0f) input_value = 4095.0f;
 
                 writeRaw(ch, static_cast<uint16_t>(input_value));
                 break;
 
             default:
-
                 writeChannelNormalized(ch, input_value);
                 break;
         }
@@ -516,13 +550,9 @@ public:
     // Last output values
     // ==================================================
 
-    // Selected channel.
-
     uint16_t getLastValue() const {
         return last_raw_value[channelIndex(channel)];
     }
-
-    // Explicit channel.
 
     uint16_t getLastValue(MCPChannel ch) const {
         return last_raw_value[channelIndex(ch)];
