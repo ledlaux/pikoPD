@@ -39,7 +39,7 @@
 #endif
 
 #if MCP4822_ENABLED
-#include "MCP4822.h" 
+#include "mcp4822.h" 
 #endif
 
 
