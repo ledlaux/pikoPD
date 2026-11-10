@@ -885,42 +885,6 @@ int main() {
     cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
     {%- endfor %}
 
-// ====================================================
-// MCP4822 CV Out init
-// ====================================================
-
-{%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
-
-    {%- set ns = namespace(active=false) %}
-    {%- for ch in ['channel_a', 'channel_b'] %}
-        {%- if mcp.get(ch, {}).get('name') in sends %}
-            {%- set ns.active = true %}
-        {%- endif %}
-    {%- endfor %}
-
-    {%- if ns.active %}
-
-    Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
-
-    cv_out_{{ loop.index0 }}.init(
-        {{ mcp.sck_pin }},
-        {{ mcp.mosi_pin }}
-    );
-
-    {%- for ch in ['channel_a', 'channel_b'] %}
-        {%- set channel_cfg = mcp.get(ch, {}) %}
-        {%- if channel_cfg.get('name') in sends %}
-
-    cv_out_{{ loop.index0 }}.setMode(
-        Pico::MCPChannel::{{ 'A' if ch == 'channel_a' else 'B' }},
-        Pico::MCPMode::{{ channel_cfg.get('mode', 'cv') | upper }}
-    );
-
-        {%- endif %}
-    {%- endfor %}
-
-    {%- endif %}
-{%- endfor %}
 
 // ====================================================
 // HX711 LOAD CELL init
