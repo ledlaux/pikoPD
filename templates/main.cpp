@@ -22,7 +22,7 @@ MIT Licence
 
 #include "audio.h"
 #include "control.h"
-#include "midi.h"
+#include "message.h"
 
 {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' -%}
 #include "pico/cyw43_arch.h"
