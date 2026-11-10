@@ -886,31 +886,41 @@ int main() {
     {%- endfor %}
 
 // ====================================================
-// HX710 init 
+// MCP4822 CV Out init
 // ====================================================
 
-    {% for hx in active_hx710 %}
+{%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
 
-    Pico::HX710Config sensor_config_{{ loop.index0 }} = {
-        {{ hx.sck_pin }},
-        {{ hx.dout_pin }},
-    };
+    {%- set ns = namespace(active=false) %}
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- if mcp.get(ch, {}).get('name') in sends %}
+            {%- set ns.active = true %}
+        {%- endif %}
+    {%- endfor %}
 
-    sensor_config_{{ loop.index0 }}.release =
-    {{ hx.release | default(0.50, true) }}f;
+    {%- if ns.active %}
 
-    sensor_config_{{ loop.index0 }}.mode =
-        Pico::OutputMode::{{ hx.mode | upper }};
+    Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
 
-    Pico::HX710 sensor_{{ loop.index0 }}(
-        sensor_config_{{ loop.index0 }}
+    cv_out_{{ loop.index0 }}.init(
+        {{ mcp.sck_pin }},
+        {{ mcp.mosi_pin }}
     );
 
-    if (!sensor_{{ loop.index0 }}.tryInit()) {
-        printf("Failed to initialize sensor {{ hx.name }}\n");
-    }
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- set channel_cfg = mcp.get(ch, {}) %}
+        {%- if channel_cfg.get('name') in sends %}
 
-    {% endfor %}
+    cv_out_{{ loop.index0 }}.setMode(
+        Pico::MCPChannel::{{ 'A' if ch == 'channel_a' else 'B' }},
+        Pico::MCPMode::{{ channel_cfg.get('mode', 'cv') | upper }}
+    );
+
+        {%- endif %}
+    {%- endfor %}
+
+    {%- endif %}
+{%- endfor %}
 
 // ====================================================
 // HX711 LOAD CELL init
