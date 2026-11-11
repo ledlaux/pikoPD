@@ -41,7 +41,7 @@ I2S library author suggests to set system clock to stabile, tested 192Mhz and al
 
 | Setting | Value |
 |---|---:|
-| System clock | 190 or 250 MHz |
+| System clock | 192 or 250 MHz |
 | Sample rate | 22,050 Hz |
 | Heavy block size | 64  |
 | Audio buffer | 2,048 |
