@@ -278,7 +278,7 @@ LRCK pin is asigned automatically as next after the BCLK.
 TOGGLE:	Latch (On/Off)   
 SWITCH:	Press & Release (Momentary)  
 BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)  
-TOUCH: Sends a Pd bang when touched and a float 0 when released. Special case which requires 1 MΩ resistor: 
+TOUCH: capacitive gpio pin sends a Pd bang when touched and a 0 when released. Special case which requires 1 MΩ resistor: 
 
 
               GP15
