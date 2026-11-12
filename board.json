@@ -26,7 +26,9 @@
     "buttons": [
       { "name": "btn1", "pin": 23, "mode": "bang" },
       { "name": "btn2", "pin": 11, "mode": "toggle" },
-      { "name": "btn3", "pin": 14, "mode": "switch" }
+      { "name": "btn3", "pin": 14, "mode": "switch" },
+      { "name": "btn4", "pin": 15, "mode": "touch" }
+
     ],
 
     "gate_in": [
