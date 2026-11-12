@@ -23,10 +23,11 @@ Supports Raspberry Pi Pico boards based on the RP2040 and RP2350, including Wi-F
 - [x] led
 - [x] knob
 - [x] button
-- [x] encoder
+- [x] touch pin
 - [x] cv in/out 
 - [x] gate in/out
 - [x] joystick
+- [x] encoder
 - [x] sensors
 - [x] i2s & pwm audio
 - [x] display
