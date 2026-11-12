@@ -1387,36 +1387,24 @@ int main() {
 
         {% for btn in active_btns %}
 
-        {% if btn.mode == "touch" %}
-
-        if (Pico::buttonPressed({{ loop.index0 }})) {
-            hv_send_bang(
-                &pd_prog,
-                {{ btn.hash }}U
-            );
-        }
-
-        {% else %}
+        bool bang = false;
 
         Pico::processPin(
             {{ loop.index0 }},
             val,
-            send
+            send,
+            bang
         );
 
-        if (send) {
-            hv_send_float(
-                &pd_prog,
-                {{ btn.hash }}U,
-                val
-            );
+        if (bang) {
+            hv_send_bang(&pd_prog, {{ btn.hash }}U);
         }
 
-        {% endif %}
+        if (send) {
+            hv_send_float(&pd_prog, {{ btn.hash }}U, val);
+        }
 
         {% endfor %}
-
-
 
         // ====================================================
         // GATES
