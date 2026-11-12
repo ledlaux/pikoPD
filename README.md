@@ -78,7 +78,7 @@ Toolchain setup instructions can be found in the [manual](https://github.com/led
 - The script includes objects present in the patch and ignores unconnected. But it is recommended to remove unused items from config.
 - Debug console, when enabled, will also output Pd `[print]` objects. Use it moderately, because it can freeze device.
 - If you change board and MIDI mode or encounter compile-time errors project folder needs to be cleaned first. Use -c flag.
-- Use HVCC compatible vanilla Pd and heavylib objects, such as hv.osc~ and hv.lfo~.
+- Only hvcc compatible vanilla Pd and heavylib objects, such as hv.osc~ and hv.lfo~ (use Plugdata app for patching).
 - Check Pd patch examples in the folder.
  
 ## Build
