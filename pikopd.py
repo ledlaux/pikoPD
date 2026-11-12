@@ -212,16 +212,6 @@ class PicoUF2Generator:
         
         # picotool infers flash size from the programmed contents, so it
         # reports none for blank flash (e.g. a new board).
-        
-        if not matches:
-            self.progress_status(
-                "Device flash size unknown (blank flash?), skipping size check.",
-                color="33"
-            )
-            return True
-
-        # picotool infers flash size from the programmed contents, so it
-        # reports none for blank flash (e.g. a new board).
         if not matches:
             self.progress_status(
                 "Device flash size unknown (blank flash?), skipping size check.",
