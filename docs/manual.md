@@ -225,7 +225,7 @@ Set in `board.json`:
     - dac (cv out, pitch)
     - rotary encoder 
     - gate in/out (gate or trigger)
-    - button (bang, toggle, switch)
+    - button (bang, toggle, switch, touch)
     - joystick and range (regular or midi 1-127)
     - midi mode (uart, usb, host)
       - uart (pins tx 0, rx 1 )
@@ -271,12 +271,25 @@ LRCK pin is asigned automatically as next after the BCLK.
   { "name": "btn1", "pin": 23, "mode": "toggle" },
   { "name": "btn2", "pin": 11, "mode": "switch" },
   { "name": "btn3", "pin": 14, "mode": "bang" }
+  { "name": "btn4", "pin": 15, "mode": "touch" }
 ]
 ```
 
 TOGGLE:	Latch (On/Off)   
 SWITCH:	Press & Release (Momentary)  
-BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)
+BANG:	Trigger, Sends 1.0, then 0.0 after 50ms (can be adjusted)  
+TOUCH: Sends a Pd bang when touched and a float 0 when released. Special case which requires 1 MΩ resistor: 
+
+
+              GP15
+                |
+                +---------------- Electrode
+                |
+                |
+              [ 1 MΩ ]
+                |
+                |
+               GND
 
 ## ADC 
 
