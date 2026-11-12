@@ -121,6 +121,8 @@ target_compile_definitions(pikopd PRIVATE
     CFG_TUSB_MCU=OPT_MCU_RP2040
     HV_UNIX=1
     PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS=2000
+    MCP4725_ENABLED=$<IF:$<BOOL:${MCP4725_ENABLED}>,1,0>
+    MCP4822_ENABLED=$<IF:$<BOOL:${MCP4822_ENABLED}>,1,0>
     MPR121_ENABLED=$<IF:$<BOOL:${MPR121_ENABLED}>,1,0>
     CNY70_ENABLED=$<IF:$<BOOL:${CNY70_ENABLED}>,1,0>
     HX710_ENABLED=$<IF:$<BOOL:${HX710_ENABLED}>,1,0>
@@ -179,7 +181,12 @@ target_link_libraries(pikopd PRIVATE
     hardware_pwm
     pico_multicore
     hardware_i2c
+  hardware_spi
 )
+
+if(MCP4822_ENABLED)
+    target_link_libraries(pikopd PRIVATE hardware_spi)
+endif()
 
 if(NOT WEB)
     target_link_libraries(pikopd PRIVATE

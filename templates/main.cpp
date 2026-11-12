@@ -1,4 +1,4 @@
-/* pikoPD (v0.0.5)
+/* pikoPD (v0.0.6)
 
 Project automates building Pure Data patches ( .pd ) 
 into a UF2 firmware using HVCC compiler and Raspberry Pi Pico C/C++ SDK
@@ -22,7 +22,8 @@ MIT Licence
 
 #include "audio.h"
 #include "control.h"
-#include "midi.h"
+#include "message.h"
+
 
 {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' -%}
 #include "pico/cyw43_arch.h"
@@ -192,6 +193,30 @@ MasterFX masterFX;
     }) -%}
 {%- endfor -%}
 
+{%- set active_mcp4822 = [] -%}
+{%- for mcp in board.get('outputs', {}).get('mcp4822', []) -%}
+    {%- set device_index = loop.index0 -%}
+
+    {%- for channel_name in ['channel_a', 'channel_b'] -%}
+        {%- set channel_cfg = mcp.get(channel_name, {}) -%}
+
+        {%- if channel_cfg.get('name') in sends -%}
+            {%- set _ = active_mcp4822.append({
+                'device': 'cv_out_' ~ device_index,
+                'device_index': device_index,
+                'name': channel_cfg.name,
+                'hash': sends[channel_cfg.name],
+                'channel': 'A' if channel_name == 'channel_a' else 'B',
+                'sck_pin': mcp.sck_pin,
+                'mosi_pin': mcp.mosi_pin,
+                'cs_pin': mcp.cs_pin,
+                'mode': channel_cfg.get('mode', 'cv') | upper
+            }) -%}
+        {%- endif -%}
+
+    {%- endfor -%}
+{%- endfor -%}
+
 {# --- MPR121 Touch Sensor Block --- #}
 {%- set mpr_config = sensors.get('mpr121', []) -%}
 {%- set active_mpr_pads = [] -%}
@@ -217,8 +242,10 @@ MasterFX masterFX;
     {%- endfor -%}
 {%- endif -%}
 
-// Only render the C++ struct and array if at least one pad is found in receives 
 {% if active_mpr_pads|length > 0 -%}
+
+// Only render the C++ struct and array if at least one pad is found in receives 
+
 struct MprPad { const char* sensor_name; int sensor_idx; int pad_idx; const char* pad_name; uint32_t hash; };
 
 MprPad active_mpr_pads[] = {
@@ -259,14 +286,41 @@ static const uint32_t screen_slots[4] = {
 
 static std::atomic<uint32_t> midi_activity_timer{0};
 static std::atomic<uint8_t> last_midi_velocity{0};
+static std::atomic<uint32_t> midi_clock_timer{0};
 static uint8_t current_midi_note = 60;
 static uint32_t last_led_tick = 0;
-static std::atomic<uint32_t> midi_clock_timer{0};
 static uint8_t clock_count = 0;
 static bool clock_running = false; 
 static bool debug_enabled = true;
 static uint32_t last_print_tick = 0;
 
+// ====================================================
+// MCP4725 DAC mailboxes
+// ====================================================
+{% for mcp in active_mcp4725 %}
+static std::atomic<uint32_t> cv_out_{{ loop.index0 }}_bits{0};
+static std::atomic<bool> cv_out_{{ loop.index0 }}_dirty{false};
+{% endfor %}
+
+
+// ====================================================
+// MCP4822 DAC mailboxes
+// ====================================================
+
+{% for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+{% set idx = loop.index0 %}
+
+{% if mcp.channel_a.name in sends %}
+static std::atomic<uint32_t> cv_out_{{ idx }}_A_bits{0};
+static std::atomic<bool> cv_out_{{ idx }}_A_dirty{false};
+{% endif %}
+
+{% if mcp.channel_b.name in sends %}
+static std::atomic<uint32_t> cv_out_{{ idx }}_B_bits{0};
+static std::atomic<bool> cv_out_{{ idx }}_B_dirty{false};
+{% endif %}
+
+{% endfor %}
 
 // ---- NOTE receives ----
 
@@ -293,6 +347,11 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 // ============================================================
 
 // These functions are called only from Core 1.
+
+inline void hv_send_bang(Heavy_test* pd, uint32_t hash)
+{
+    pd->sendMessageToReceiverV(hash, 0.0, "b");
+}
 
 inline void hv_send_msg1(uint32_t hash, float a)
 {
@@ -681,6 +740,30 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
             break;
         {% endfor %}
 
+        /* --- MCP4822 Outputs --- */
+
+        {% for mcp in active_mcp4822 -%}
+        case {{ mcp.hash }}U: {
+            if (msg_isFloat(m, 0)) {
+                uint32_t bits;
+                memcpy(&bits, &val0, sizeof(bits));
+
+                {% if mcp.channel == 'A' %}
+                {{ mcp.device }}_A_bits.store(
+                    bits, std::memory_order_relaxed);
+                {{ mcp.device }}_A_dirty.store(
+                    true, std::memory_order_release);
+                {% else %}
+                {{ mcp.device }}_B_bits.store(
+                    bits, std::memory_order_relaxed);
+                {{ mcp.device }}_B_dirty.store(
+                    true, std::memory_order_release);
+                {% endif %}
+            }
+            break;
+        }
+        {% endfor %}
+
         /* --- Web (SSI Sync) & OSC Routing --- */
 
         {% if board.web and board.web.enabled -%}
@@ -882,9 +965,78 @@ int main() {
     {%- for mcp in active_mcp4725 %}
     Pico::MCP4725 cv_out_{{ loop.index0 }}
     ({{ mcp.address | default("0x60") }});
-    cv_out_{{ loop.index0 }}.init({{ mcp.sda_pin }}, {{ mcp.scl_pin }}, Pico::MCPMode::{{ mcp.mode }});
+    cv_out_{{ loop.index0 }}.init(
+        {{ mcp.sda_pin }}, 
+        {{ mcp.scl_pin }}, 
+        Pico::MCPMode::{{ mcp.mode }});
     {%- endfor %}
 
+// ====================================================
+// MCP4822 CV Out init
+// ====================================================
+// ====================================================
+// MCP4822 CV Out init
+// ====================================================
+
+{%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+
+    {%- set ns = namespace(active=false) %}
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- if mcp.get(ch, {}).get('name') in sends %}
+            {%- set ns.active = true %}
+        {%- endif %}
+    {%- endfor %}
+
+    {%- if ns.active %}
+
+    Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
+
+    cv_out_{{ loop.index0 }}.init(
+        {{ mcp.sck_pin }},
+        {{ mcp.mosi_pin }}
+    );
+
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- set channel_cfg = mcp.get(ch, {}) %}
+        {%- if channel_cfg.get('name') in sends %}
+
+    cv_out_{{ loop.index0 }}.setMode(
+        Pico::MCPChannel::{{ 'A' if ch == 'channel_a' else 'B' }},
+        Pico::MCPMode::{{ channel_cfg.get('mode', 'cv') | upper }}
+    );
+
+        {%- endif %}
+    {%- endfor %}
+
+    {%- endif %}
+{%- endfor %}
+
+// ====================================================
+// HX710 init 
+// ====================================================
+
+    {% for hx in active_hx710 %}
+
+    Pico::HX710Config sensor_config_{{ loop.index0 }} = {
+        {{ hx.sck_pin }},
+        {{ hx.dout_pin }},
+    };
+
+    sensor_config_{{ loop.index0 }}.release =
+    {{ hx.release | default(0.50, true) }}f;
+
+    sensor_config_{{ loop.index0 }}.mode =
+        Pico::OutputMode::{{ hx.mode | upper }};
+
+    Pico::HX710 sensor_{{ loop.index0 }}(
+        sensor_config_{{ loop.index0 }}
+    );
+
+    if (!sensor_{{ loop.index0 }}.tryInit()) {
+        printf("Failed to initialize sensor {{ hx.name }}\n");
+    }
+
+    {% endfor %}
 
 // ====================================================
 // HX711 LOAD CELL init
@@ -1228,28 +1380,31 @@ int main() {
         #endif
 
 
+       
         // ====================================================
         // BUTTONS
         // ====================================================
 
         {% for btn in active_btns %}
 
+        bool bang = false;
+
         Pico::processPin(
             {{ loop.index0 }},
             val,
-            send
+            send,
+            bang
         );
 
+        if (bang) {
+            hv_send_bang(&pd_prog, {{ btn.hash }}U);
+        }
+
         if (send) {
-            hv_send_float(
-                &pd_prog,
-                {{ btn.hash }}U,
-                val
-            );
+            hv_send_float(&pd_prog, {{ btn.hash }}U, val);
         }
 
         {% endfor %}
-
 
         // ====================================================
         // GATES
@@ -1349,6 +1504,76 @@ int main() {
                 }
             }
         }
+
+        {% endfor %}
+
+        
+         // ====================================================
+        // MCP4725 - DAC output
+        // ====================================================
+        
+        {% for mcp in active_mcp4725 %}
+        
+        if (cv_out_{{ loop.index0 }}_dirty.exchange(
+                false,
+                std::memory_order_acquire
+            )) {
+        
+            uint32_t bits = cv_out_{{ loop.index0 }}_bits.load(
+                std::memory_order_relaxed
+            );
+        
+            float value;
+            memcpy(&value, &bits, sizeof(value));
+        
+            cv_out_{{ loop.index0 }}.write(value);
+        }
+        
+        {% endfor %}
+
+
+        // ====================================================
+        // MCP4822 - DAC output
+        // ====================================================
+
+        {% for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+        {% set idx = loop.index0 %}
+
+            // Channel A
+            {% if mcp.channel_a.name in sends %}
+            if (cv_out_{{ idx }}_A_dirty.exchange(
+                    false,
+                    std::memory_order_acquire
+                )) {
+
+                uint32_t bits = cv_out_{{ idx }}_A_bits.load(
+                    std::memory_order_relaxed
+                );
+
+                float value;
+                memcpy(&value, &bits, sizeof(value));
+
+                cv_out_{{ idx }}.writeChannel(Pico::MCPChannel::A, value);
+            }
+            {% endif %}
+
+            // Channel B
+            {% if mcp.channel_b.name in sends %}
+            if (cv_out_{{ idx }}_B_dirty.exchange(
+                    false,
+                    std::memory_order_acquire
+                )) {
+
+                uint32_t bits = cv_out_{{ idx }}_B_bits.load(
+                    std::memory_order_relaxed
+                );
+
+                float value;
+                memcpy(&value, &bits, sizeof(value));
+
+                cv_out_{{ idx }}.writeChannel(Pico::MCPChannel::B, value);
+            }
+            {% endif %}
 
         {% endfor %}
 
@@ -1484,7 +1709,6 @@ int main() {
         }
 
         {% endif %}
-
         {% endfor %}
 
         // ====================================================

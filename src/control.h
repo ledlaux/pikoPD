@@ -34,7 +34,13 @@
 #include "hx711.h"
 #endif
 
+#if MCP4725_ENABLED
 #include "mcp4725.h" 
+#endif
+
+#if MCP4822_ENABLED
+#include "mcp4822.h" 
+#endif
 
 
 namespace Pico {
@@ -46,7 +52,8 @@ namespace Pico {
         SWITCH = 1,  
         TOGGLE = 2,
         GATE_IN = 3, 
-        GATE_OUT = 4   
+        GATE_OUT = 4, 
+        TOUCH = 5  
     };
 
     struct Button {
@@ -112,31 +119,83 @@ namespace Pico {
         }
     }
 
+    constexpr uint32_t CAP_TOUCH_THRESHOLD_US = 6;
+    constexpr uint32_t CAP_TOUCH_MAX_US = 1000;
+
+    inline uint32_t readCapTouch(uint32_t pin) {
+
+        // Charge electrode
+        gpio_set_pulls(pin, false, false);
+        gpio_put(pin, 1);
+        gpio_set_dir(pin, GPIO_OUT);
+
+        busy_wait_us_32(10);
+
+        // Measure discharge
+        gpio_set_dir(pin, GPIO_IN);
+
+        uint32_t start = time_us_32();
+
+        while (gpio_get(pin)) {
+            if ((time_us_32() - start) >= CAP_TOUCH_MAX_US)
+                break;
+        }
+
+        return time_us_32() - start;
+    }
+
+  
     inline void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0) {
+
         gpio_init(pin);
+
         btns[index].pin = pin;
         btns[index].mode = mode;
         btns[index].mask = (1u << pin);
         btns[index].pulse_duration = duration;
 
         if (mode == GATE_OUT) {
+
             gpio_set_dir(pin, GPIO_OUT);
             gpio_put(pin, 0);
+
             btns[index].state.store(false, std::memory_order_relaxed);
             btns[index].last = false;
-        } else {
+            btns[index].raw_prev = false;
+
+        }
+        else if (mode == TOUCH) {
+
+            // Capacitive touch: no pull-up or pull-down
+            gpio_set_pulls(pin, false, false);
+            gpio_set_dir(pin, GPIO_IN);
+
+            btns[index].state.store(false, std::memory_order_relaxed);
+            btns[index].last = false;
+            btns[index].raw_prev = false;
+
+        }
+        else {
+
+            // Standard active-low button
             gpio_set_dir(pin, GPIO_IN);
             gpio_pull_up(pin);
+
             bool is_pressed = !gpio_get(pin);
+
             btns[index].state.store(is_pressed, std::memory_order_relaxed);
             btns[index].last = is_pressed;
             btns[index].raw_prev = is_pressed;
         }
+
         btns[index].last_time = 0;
         btns[index].toggle_state = false;
         btns[index].reset_at = 0;
-        if (index >= n_btn) n_btn = index + 1;
+
+        if (index >= n_btn)
+            n_btn = index + 1;
     }
+
 
     inline void addKnob(int index, uint32_t pin) {
         start_adc();
@@ -148,10 +207,12 @@ namespace Pico {
         if (index >= n_knob) n_knob = index + 1;
     }
 
+
     inline void addCV(int index, uint32_t pin) {
         addKnob(index, pin); 
         knobs[index].coeff = 1.0f; 
     }
+
 
     inline void addEncoder(int index, uint32_t pinA, uint32_t pinB) {
         gpio_init(pinA);
@@ -170,6 +231,7 @@ namespace Pico {
         if (index >= n_encoder) n_encoder = index + 1;
     }
 
+
     inline void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
         start_adc();
         adc_gpio_init(pinX);
@@ -187,62 +249,101 @@ namespace Pico {
         if (index >= n_joystick) n_joystick = index + 1;
     }
 
-    inline void update(uint32_t now) {
-        uint32_t all_pins = gpio_get_all(); 
-        for (int i = 0; i < n_btn; i++) {
-            if (btns[i].mode == GATE_OUT) {
-                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                    gpio_put(btns[i].pin, 0);
-                    btns[i].state.store(false, std::memory_order_relaxed);
-                    btns[i].reset_at = 0; 
-                }
-                continue; 
+
+   inline void update(uint32_t now) {
+    uint32_t all_pins = gpio_get_all();
+
+    for (int i = 0; i < n_btn; i++) {
+
+        if (btns[i].mode == GATE_OUT) {
+            if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                gpio_put(btns[i].pin, 0);
+                btns[i].state.store(false, std::memory_order_relaxed);
+                btns[i].reset_at = 0;
             }
-            bool r = (all_pins & btns[i].mask) == 0;
-            if (btns[i].mode == GATE_IN) {
+            continue;
+        }
+
+        // Capacitive touch input
+        if (btns[i].mode == TOUCH) {
+            uint32_t touch_value = readCapTouch(btns[i].pin);
+            bool r = (touch_value >= CAP_TOUCH_THRESHOLD_US);
+
+            if (r != btns[i].raw_prev) {
+                btns[i].last_time = now;
+                btns[i].raw_prev = r;
+            } else if ((now - btns[i].last_time) > 20) {
                 btns[i].state.store(r, std::memory_order_relaxed);
-            } else {
-                if (r != btns[i].raw_prev) {
-                    btns[i].last_time = now;
-                    btns[i].raw_prev = r;
-                } else if ((now - btns[i].last_time) > 20) {
-                    btns[i].state.store(r, std::memory_order_relaxed);
-                }
+            }
+
+            continue;
+        }
+
+        // Ordinary active-low inputs
+        bool r = (all_pins & btns[i].mask) == 0;
+
+        if (btns[i].mode == GATE_IN) {
+            btns[i].state.store(r, std::memory_order_relaxed);
+        } else {
+            if (r != btns[i].raw_prev) {
+                btns[i].last_time = now;
+                btns[i].raw_prev = r;
+            } else if ((now - btns[i].last_time) > 20) {
+                btns[i].state.store(r, std::memory_order_relaxed);
             }
         }
-        for (int i = 0; i < n_encoder; i++) {
-            bool clk = (all_pins & (1u << encoder[i].pinA)) != 0;
-            bool dt  = (all_pins & (1u << encoder[i].pinB)) != 0;
-            if (clk != encoder[i].last_clk) {
-                if (clk) { 
-                    if (clk != dt) encoder[i].value.fetch_sub(1, std::memory_order_relaxed);
-                    else encoder[i].value.fetch_add(1, std::memory_order_relaxed);
-                }
-                encoder[i].last_clk = clk;
+    }
+
+    // Encoders
+    for (int i = 0; i < n_encoder; i++) {
+        bool clk = (all_pins & (1u << encoder[i].pinA)) != 0;
+        bool dt  = (all_pins & (1u << encoder[i].pinB)) != 0;
+
+        if (clk != encoder[i].last_clk) {
+            if (clk) {
+                if (clk != dt)
+                    encoder[i].value.fetch_sub(1, std::memory_order_relaxed);
+                else
+                    encoder[i].value.fetch_add(1, std::memory_order_relaxed);
             }
+            encoder[i].last_clk = clk;
         }
-        for (int i = 0; i < n_knob; i++) {
-            adc_select_input(knobs[i].adc_ch);
-            float raw = (float)adc_read() / 4095.0f;
-            float prev = knobs[i].value.load(std::memory_order_relaxed);
-            if (fabsf(raw - prev) > 0.001f) {
-                float next_val = prev + (raw - prev) * knobs[i].coeff;
-                knobs[i].value.store(next_val, std::memory_order_relaxed);
-            }
+    }
+
+    // Knobs
+    for (int i = 0; i < n_knob; i++) {
+        adc_select_input(knobs[i].adc_ch);
+        float raw = (float)adc_read() / 4095.0f;
+        float prev = knobs[i].value.load(std::memory_order_relaxed);
+
+        if (fabsf(raw - prev) > 0.001f) {
+            float next_val = prev + (raw - prev) * knobs[i].coeff;
+            knobs[i].value.store(next_val, std::memory_order_relaxed);
         }
-        for (int i = 0; i < n_joystick; i++) {
-            adc_select_input(joystick[i].adcX);
-            float rawX = (float)adc_read();
-            adc_select_input(joystick[i].adcY);
-            float rawY = (float)adc_read();
-            if (fabsf(rawX - joystick[i].smoothX) > 1.0f) joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f; 
-            if (fabsf(rawY - joystick[i].smoothY) > 1.0f) joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
-            int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
-            int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
-            joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
-            joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
-        }
-    }   
+    }
+
+    // Joysticks
+    for (int i = 0; i < n_joystick; i++) {
+        adc_select_input(joystick[i].adcX);
+        float rawX = (float)adc_read();
+
+        adc_select_input(joystick[i].adcY);
+        float rawY = (float)adc_read();
+
+        if (fabsf(rawX - joystick[i].smoothX) > 1.0f)
+            joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f;
+
+        if (fabsf(rawY - joystick[i].smoothY) > 1.0f)
+            joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
+
+        int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
+        int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
+
+        joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
+        joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
+    }
+}
+
 
     inline void updateGate(int index, float val) {
         if (index < 12 && btns[index].mode == GATE_OUT) {
@@ -258,13 +359,15 @@ namespace Pico {
             }
         }
     }
-   
+
+
     inline bool buttonPressed(int i) {
         bool s = btns[i].state.load(std::memory_order_relaxed);
         if (s && !btns[i].last) { btns[i].last = true; return true; }
         if (!s) btns[i].last = false;
         return false;
     }
+
 
     inline bool buttonToggled(int i, bool& outState) {
         bool s = btns[i].state.load(std::memory_order_relaxed);
@@ -284,6 +387,17 @@ namespace Pico {
         return false;
     }
 
+    inline int touchGPIO(int i) {
+        bool s = btns[i].state.load(std::memory_order_relaxed);
+
+        if (s != btns[i].last) {
+            btns[i].last = s;
+            return s ? 1 : -1;
+        }
+
+        return 0;
+    }
+
     inline bool processEnc(int index, float &val) {
         int current_count = encoder[index].value.load(std::memory_order_relaxed);
         int diff = current_count - encoder[index].last_sent_count;
@@ -295,26 +409,80 @@ namespace Pico {
         return false;
     }
 
-    inline void processPin(int i, float &outVal, bool &shouldSend) {
+  
+    inline void processPin(
+        int i,
+        float &outVal,
+        bool &shouldSend,
+        bool &shouldBang
+    ) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        bool s; shouldSend = false;
+        bool s;
+
+        shouldSend = false;
+        shouldBang = false;
+
         switch (btns[i].mode) {
+
             case BANG:
-                if (buttonPressed(i)) { outVal = 1.0f; shouldSend = true; btns[i].reset_at = now + 10; } 
-                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) { btns[i].reset_at = 0; outVal = 0.0f; shouldSend = true; }
+                if (buttonPressed(i)) {
+                    outVal = 1.0f;
+                    shouldSend = true;
+                    btns[i].reset_at = now + 10;
+                }
+
+                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
+                    btns[i].reset_at = 0;
+                    outVal = 0.0f;
+                    shouldSend = true;
+                }
                 break;
-            case TOGGLE: if (buttonToggled(i, s)) { outVal = s ? 1.0f : 0.0f; shouldSend = true; } break;
+
+            case TOUCH: {
+                int edge = touchGPIO(i);
+
+                if (edge == 1) {
+                    shouldBang = true;
+                }
+                else if (edge == -1) {
+                    outVal = 0.0f;
+                    shouldSend = true;
+                }
+                break;
+            }
+
+            case TOGGLE:
+                if (buttonToggled(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                }
+                break;
+
             case SWITCH:
-            case GATE_IN: if (buttonChanged(i, s)) { outVal = s ? 1.0f : 0.0f; shouldSend = true; } break;
-            case GATE_OUT: if (buttonChanged(i, s)) { outVal = s ? 1.0f : 0.0f; shouldSend = true; gpio_put(btns[i].pin, s); } break;
+            case GATE_IN:
+                if (buttonChanged(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                }
+                break;
+
+            case GATE_OUT:
+                if (buttonChanged(i, s)) {
+                    outVal = s ? 1.0f : 0.0f;
+                    shouldSend = true;
+                    gpio_put(btns[i].pin, s);
+                }
+                break;
         }
     }
+
 
     inline bool processKnob(int i, float& outVal) {
         float v = knobs[i].value.load(std::memory_order_relaxed);
         if (std::abs(v - knobs[i].last_val) > 0.005f) { knobs[i].last_val = v; outVal = v; return true; }
         return false;
     }
+
 
     inline bool processJoystick(int id, float &outX, float &outY, bool &cX, bool &cY, bool midi_range = false) {
         if (id >= n_joystick) return false;

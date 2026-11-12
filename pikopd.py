@@ -209,6 +209,16 @@ class PicoUF2Generator:
             output,
             re.IGNORECASE
         )
+        
+        # picotool infers flash size from the programmed contents, so it
+        # reports none for blank flash (e.g. a new board).
+        
+        if not matches:
+            self.progress_status(
+                "Device flash size unknown (blank flash?), skipping size check.",
+                color="33"
+            )
+            return True
 
         # picotool infers flash size from the programmed contents, so it
         # reports none for blank flash (e.g. a new board).
@@ -553,6 +563,7 @@ class PicoUF2Generator:
         # 3. CONFIGURATION FLAGS
         masterfx = settings.get("masterfx") or {}
         inputs = settings.get("inputs") or {}
+        outputs = settings.get("outputs") or {}
         sensors = inputs.get("sensors") or {}
         web_config = settings.get("web") or {}
         display_config = settings.get("display") or {}
@@ -561,6 +572,14 @@ class PicoUF2Generator:
         web_enabled = web_config.get("enabled", False)
         display_enabled = display_config.get("enabled", False)
 
+        mcp4725_enabled = (
+            isinstance(outputs.get("mcp4725"), list)
+            and bool(outputs.get("mcp4725"))
+        )
+        mcp4822_enabled = (
+            isinstance(outputs.get("mcp4822"), list)
+            and bool(outputs.get("mcp4822"))
+        )
         distance_enabled = (
             isinstance(sensors.get("hc-sr04"), list)
             and bool(sensors.get("hc-sr04"))
@@ -599,6 +618,12 @@ class PicoUF2Generator:
                         continue
 
                     if not display_enabled and "screen" in root:
+                        continue
+
+                    if not mcp4725_enabled and "mcp4725" in filename:
+                        continue
+
+                    if not mcp4822_enabled and "mcp4822" in filename:
                         continue
 
                     if not air_enabled and "hx710" in filename:
@@ -760,6 +785,8 @@ class PicoUF2Generator:
         cmake_cmd.extend([
             f"-DENABLE_DEBUG={1 if settings.get('console') else 0}",
             f"-DENABLE_DISPLAY={1 if display_enabled else 0}",
+            f"-DMCP4725_ENABLED={1 if mcp4725_enabled else 0}",
+            f"-DMCP4822_ENABLED={1 if mcp4822_enabled else 0}",
             f"-DENABLE_DISTANCE_SENSOR={1 if distance_enabled else 0}",
             f"-DCNY70_ENABLED={1 if cny_enabled else 0}",
             f"-DMPR121_ENABLED={1 if mpr121_enabled else 0}",
