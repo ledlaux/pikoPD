@@ -24,6 +24,7 @@ MIT Licence
 #include "control.h"
 #include "message.h"
 
+
 {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' -%}
 #include "pico/cyw43_arch.h"
 {% if board.web and board.web.enabled -%}
@@ -346,6 +347,11 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 // ============================================================
 
 // These functions are called only from Core 1.
+
+inline void hv_send_bang(Heavy_test* pd, uint32_t hash)
+{
+    pd->sendMessageToReceiverV(hash, 0.0, "b");
+}
 
 inline void hv_send_msg1(uint32_t hash, float a)
 {
@@ -968,39 +974,42 @@ int main() {
 // ====================================================
 // MCP4822 CV Out init
 // ====================================================
+// ====================================================
+// MCP4822 CV Out init
+// ====================================================
 
-    {%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
-    
-        {%- set ns = namespace(active=false) %}
-        {%- for ch in ['channel_a', 'channel_b'] %}
-            {%- if mcp.get(ch, {}).get('name') in sends %}
-                {%- set ns.active = true %}
-            {%- endif %}
-        {%- endfor %}
-    
-        {%- if ns.active %}
-    
-        Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
-    
-        cv_out_{{ loop.index0 }}.init(
-            {{ mcp.sck_pin }},
-            {{ mcp.mosi_pin }}
-        );
-    
-        {%- for ch in ['channel_a', 'channel_b'] %}
-            {%- set channel_cfg = mcp.get(ch, {}) %}
-            {%- if channel_cfg.get('name') in sends %}
-    
-        cv_out_{{ loop.index0 }}.setMode(
-            Pico::MCPChannel::{{ 'A' if ch == 'channel_a' else 'B' }},
-            Pico::MCPMode::{{ channel_cfg.get('mode', 'cv') | upper }}
-        );
-    
-            {%- endif %}
-        {%- endfor %}
-    
+{%- for mcp in board.get('outputs', {}).get('mcp4822', []) %}
+
+    {%- set ns = namespace(active=false) %}
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- if mcp.get(ch, {}).get('name') in sends %}
+            {%- set ns.active = true %}
         {%- endif %}
     {%- endfor %}
+
+    {%- if ns.active %}
+
+    Pico::MCP4822 cv_out_{{ loop.index0 }}({{ mcp.cs_pin }});
+
+    cv_out_{{ loop.index0 }}.init(
+        {{ mcp.sck_pin }},
+        {{ mcp.mosi_pin }}
+    );
+
+    {%- for ch in ['channel_a', 'channel_b'] %}
+        {%- set channel_cfg = mcp.get(ch, {}) %}
+        {%- if channel_cfg.get('name') in sends %}
+
+    cv_out_{{ loop.index0 }}.setMode(
+        Pico::MCPChannel::{{ 'A' if ch == 'channel_a' else 'B' }},
+        Pico::MCPMode::{{ channel_cfg.get('mode', 'cv') | upper }}
+    );
+
+        {%- endif %}
+    {%- endfor %}
+
+    {%- endif %}
+{%- endfor %}
 
 // ====================================================
 // HX710 init 
@@ -1371,11 +1380,23 @@ int main() {
         #endif
 
 
+       
         // ====================================================
         // BUTTONS
         // ====================================================
 
         {% for btn in active_btns %}
+
+        {% if btn.mode == "touch" %}
+
+        if (Pico::buttonPressed({{ loop.index0 }})) {
+            hv_send_bang(
+                &pd_prog,
+                {{ btn.hash }}U
+            );
+        }
+
+        {% else %}
 
         Pico::processPin(
             {{ loop.index0 }},
@@ -1391,7 +1412,10 @@ int main() {
             );
         }
 
+        {% endif %}
+
         {% endfor %}
+
 
 
         // ====================================================
