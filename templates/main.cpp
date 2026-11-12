@@ -348,9 +348,9 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 
 // These functions are called only from Core 1.
 
-inline void hv_send_bang(Heavy_test* pd, uint32_t hash)
+inline void hv_send_bang(uint32_t hash)
 {
-    pd->sendMessageToReceiverV(hash, 0.0, "b");
+    pd_prog.sendMessageToReceiverV(hash, 0.0, "b");
 }
 
 inline void hv_send_msg1(uint32_t hash, float a)
@@ -1397,7 +1397,7 @@ int main() {
         );
 
         if (bang) {
-            hv_send_bang(&pd_prog, {{ btn.hash }}U);
+            hv_send_bang({{ btn.hash }}U);
         }
 
         if (send) {
@@ -1405,6 +1405,7 @@ int main() {
         }
 
         {% endfor %}
+
 
         // ====================================================
         // GATES
