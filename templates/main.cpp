@@ -348,11 +348,6 @@ constexpr uint32_t VOICE_HASHES[MAX_VOICES] = {
 
 // These functions are called only from Core 1.
 
-inline void hv_send_bang(uint32_t hash)
-{
-    pd_prog.sendMessageToReceiverV(hash, 0.0, "b");
-}
-
 inline void hv_send_msg1(uint32_t hash, float a)
 {
     pd_prog.sendMessageToReceiverV(hash, 0.0, "f", a);
@@ -370,13 +365,19 @@ inline void hv_send_msg3(uint32_t hash, float a, float b, float c)
 
 // Core 0 producer: enqueue float input for Core 1.
 
-inline void hv_send_float(
-    HeavyContextInterface* ctx,
+inline void hv_send_float(HeavyContextInterface* ctx,
     uint32_t hash,
     float value)
 {
     (void)ctx;
     heavy_input_push_float(hash, value);
+}
+
+// Core 0 producer: enqueue bang input for Core 1.
+
+inline void hv_send_bang(uint32_t hash)
+{
+    heavy_input_push_bang(hash);
 }
 
 
@@ -628,27 +629,30 @@ inline void heavy_input_dispatch()
         switch (event.type) {
 
             case HEAVY_INPUT_MIDI:
-
                 handle_midi_message(
                     event.status,
                     event.data1,
                     event.data2
                 );
-
                 break;
 
             case HEAVY_INPUT_FLOAT:
-
                 pd_prog.sendFloatToReceiver(
                     event.hash,
                     event.value
                 );
+                break;
 
+            case HEAVY_INPUT_BANG:
+                pd_prog.sendMessageToReceiverV(
+                    event.hash,
+                    0.0,
+                    "b"
+                );
                 break;
         }
     }
 }
-
 
 void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uint32_t receiverHash, const HvMessage *m) {
     uint8_t midiMsg[3] = {0, 0, 0};
@@ -1385,7 +1389,7 @@ int main() {
         // BUTTONS
         // ====================================================
 
-        {% for btn in active_btns %}
+       {% for btn in active_btns %}
 
         bool bang = false;
 
@@ -1397,11 +1401,11 @@ int main() {
         );
 
         if (bang) {
-            hv_send_bang({{ btn.hash }}U);
+            heavy_input_push_bang({{ btn.hash }}U);
         }
 
         if (send) {
-            hv_send_float(&pd_prog, {{ btn.hash }}U, val);
+            heavy_input_push_float({{ btn.hash }}U, val);
         }
 
         {% endfor %}
