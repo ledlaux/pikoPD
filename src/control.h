@@ -1,503 +1,1413 @@
 #pragma once
 
 #include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "hardware/adc.h"
-#include "hardware/i2c.h"
-#include "led.h"
-#include "pico/time.h"
+
+#include <cstdio>
+#include <cstdint>
+#include <cstddef>
 #include <atomic>
 #include <cmath>
-#include <cstdio>
+#include <cstring>
 
-#if PICO_ZERO
-#include "ws2812.pio.h" 
+#include "hardware/uart.h"
+#include "hardware/gpio.h"
+#include "hardware/irq.h"
+
+#include "hvcc/HvMessage.h"
+
+// ============================================================
+// TINYUSB CONFIGURATION
+// ============================================================
+
+#if !defined(WEB) || (WEB == 0)
+
+    #ifdef MIDI_HOST
+
+        #ifndef CFG_TUH_ENABLED
+            #define CFG_TUH_ENABLED 1
+        #endif
+
+        #ifndef CFG_TUH_MIDI
+            #define CFG_TUH_MIDI 1
+        #endif
+
+        #ifndef BOARD_TUH_RHPORT
+            #define BOARD_TUH_RHPORT 0
+        #endif
+
+        #include "tusb_config.h"
+        #include "tusb.h"
+        #include "host/usbh.h"
+        #include "class/midi/midi_host.h"
+
+    #else
+
+        #include "tusb_config.h"
+        #include "tusb.h"
+
+    #endif
+
 #endif
 
-#if MPR121_ENABLED
-#include "mpr121.h"
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+#ifndef ENABLE_DEBUG
+    #define ENABLE_DEBUG 0
 #endif
 
-#if DISTANCE_SENSOR_ENABLED
-#include "hc-sr04.h"
+#ifndef MAX_VOICES
+    #define MAX_VOICES 1
 #endif
 
-#if HX710_ENABLED
-#include "hx710.h"
-#endif
+#define MIDI_IN_BUF  256
+#define MIDI_OUT_BUF 256
 
-#if CNY70_ENABLED
-#include "cny70.h"
-#endif
+// Print queue must have a power-of-two capacity.
+#define PRINT_QUEUE_SIZE 64
+#define PRINT_QUEUE_MASK (PRINT_QUEUE_SIZE - 1)
+#define PRINT_TEXT_SIZE  128
+#define PRINT_NAME_SIZE   64
+#define PRINT_SYMBOL_SIZE 24
+#define PRINT_MAX_ATOMS   8
+#define PRINT_INTERVAL_MS 40
 
-#if HX711_ENABLED
-#include "hx711.h"
-#endif
+// ============================================================
+// HEAVY INPUT SPSC QUEUE
+// ============================================================
+//
+// Producer: Core 0 only.
+// Consumer: Core 1 only.
+//
+// Core 0:
+//   - Parses raw MIDI input.
+//   - Enqueues MIDI events.
+//   - Enqueues hardware/web/OSC float inputs.
+//
+// Core 1:
+//   - Dequeues events.
+//   - Calls handle_midi_message().
+//   - Calls pd_prog.sendFloatToReceiver().
+//
+// Do not push into this queue from an IRQ or Core 1.
+// ============================================================
 
-#if MCP4725_ENABLED
-#include "mcp4725.h" 
-#endif
+#define HEAVY_INPUT_QUEUE_SIZE 256
+#define HEAVY_INPUT_QUEUE_MASK (HEAVY_INPUT_QUEUE_SIZE - 1)
 
-#if MCP4822_ENABLED
-#include "mcp4822.h" 
-#endif
+enum HeavyInputType : uint8_t {
+    HEAVY_INPUT_MIDI,
+    HEAVY_INPUT_FLOAT,
+    HEAVY_INPUT_BANG
+};
+
+struct HeavyInputEvent {
+    HeavyInputType type;
+    uint8_t status;
+    uint8_t data1;
+    uint8_t data2;
+    uint32_t hash;
+    float value;
+};
+
+struct HeavyInputQueue {
+    HeavyInputEvent data[HEAVY_INPUT_QUEUE_SIZE];
+
+    // Written only by Core 0.
+    std::atomic<uint32_t> head{0};
+
+    // Written only by Core 1.
+    std::atomic<uint32_t> tail{0};
+
+    std::atomic<uint32_t> dropped{0};
+};
+
+inline HeavyInputQueue heavy_input_rb;
 
 
-namespace Pico {
+// ------------------------------------------------------------
+// Core 0: enqueue MIDI event
+// ------------------------------------------------------------
 
-    // --- Enums and Structs ---
+inline bool heavy_input_push_midi(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
 
-    enum PinMode {
-        BANG   = 0,
-        SWITCH = 1,  
-        TOGGLE = 2,
-        GATE_IN = 3, 
-        GATE_OUT = 4, 
-        TOUCH = 5  
-    };
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
 
-    struct Button {
-        uint32_t pin;
-        uint32_t mask;      
-        std::atomic<bool> state;
-        bool last;   
-        bool raw_prev;   
-        uint32_t last_time;
-        PinMode mode;
-        bool toggle_state;
-        uint32_t reset_at = 0;
-        uint32_t pulse_duration;
-    };
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
 
-    struct Knob {
-        uint32_t adc_ch;
-        std::atomic<float> value;
-        float last_val;  
-        float coeff; 
-    };
+        return false;
+    }
 
-    struct Encoder {
-        uint32_t pinA;
-        uint32_t pinB;
-        bool last_clk;      
-        bool last_dt;      
-        int last_sent_count;      
-        std::atomic<int> value;
-    };
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
 
-    struct Joystick {
-        uint8_t adcX;
-        uint8_t adcY;
-        uint16_t centerX = 2048;
-        uint16_t centerY = 2048;
-        float smoothX = 2048.0f;
-        float smoothY = 2048.0f;
-        std::atomic<int16_t> x;
-        std::atomic<int16_t> y;
-        float lastSentX = -1.0f;
-        float lastSentY = -1.0f;
-    };
+    event.type = HEAVY_INPUT_MIDI;
 
-    // --- State Storage ---
+    event.status = status;
+    event.data1 = data1;
+    event.data2 = data2;
 
-    inline Button btns[12];
-    inline Knob knobs[4];
-    inline Encoder encoder[4];
-    inline Joystick joystick[2];
- 
-    inline int n_btn = 0;
-    inline int n_knob = 0;
-    inline int n_encoder = 0;
-    inline int n_joystick = 0;
+    event.hash = 0;
+    event.value = 0.0f;
 
-    inline bool adc_initialized = false;
+    // Publish the completed event.
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
 
-    inline void start_adc() {
-        if (!adc_initialized) {
-            adc_init();
-            adc_initialized = true;
+    return true;
+}
+
+
+// ------------------------------------------------------------
+// Core 0: enqueue float receiver event
+// ------------------------------------------------------------
+
+inline bool heavy_input_push_float(
+    uint32_t hash,
+    float value)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
+
+    event.type = HEAVY_INPUT_FLOAT;
+
+    event.status = 0;
+    event.data1 = 0;
+    event.data2 = 0;
+
+    event.hash = hash;
+    event.value = value;
+
+    // Publish the completed event.
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+
+// ------------------------------------------------------------
+// Core 0: enqueue bang receiver event
+// ------------------------------------------------------------
+
+inline bool heavy_input_push_bang(uint32_t hash)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
+
+    event.type = HEAVY_INPUT_BANG;
+
+    event.status = 0;
+    event.data1 = 0;
+    event.data2 = 0;
+
+    event.hash = hash;
+    event.value = 0.0f;
+
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+// ------------------------------------------------------------
+// Core 1: dequeue Heavy input event
+// ------------------------------------------------------------
+
+inline bool heavy_input_pop(HeavyInputEvent& event)
+{
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_relaxed);
+
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_acquire);
+
+    if (tail == head) {
+        return false;
+    }
+
+    event = heavy_input_rb.data[
+        tail & HEAVY_INPUT_QUEUE_MASK
+    ];
+
+    // Release the consumed slot.
+    heavy_input_rb.tail.store(
+        tail + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+
+// ============================================================
+// VOICE MANAGEMENT
+// ============================================================
+
+struct Voice {
+    uint8_t note = 0;
+    uint8_t velocity = 0;
+    bool active = false;
+    uint32_t age = 0;
+};
+
+inline Voice voices[MAX_VOICES];
+inline uint32_t voiceCounter = 0;
+
+
+inline int findVoiceByNote(uint8_t note)
+{
+    for (int i = 0; i < MAX_VOICES; i++) {
+        if (voices[i].active && voices[i].note == note) {
+            return i;
         }
     }
 
-    constexpr uint32_t CAP_TOUCH_THRESHOLD_US = 6;
-    constexpr uint32_t CAP_TOUCH_MAX_US = 1000;
+    return -1;
+}
 
-    inline uint32_t readCapTouch(uint32_t pin) {
 
-        // Charge electrode
-        gpio_set_pulls(pin, false, false);
-        gpio_put(pin, 1);
-        gpio_set_dir(pin, GPIO_OUT);
+inline void sendVoiceNoteOff(int voiceIndex, uint8_t note)
+{
+    (void)note;
 
-        busy_wait_us_32(10);
-
-        // Measure discharge
-        gpio_set_dir(pin, GPIO_IN);
-
-        uint32_t start = time_us_32();
-
-        while (gpio_get(pin)) {
-            if ((time_us_32() - start) >= CAP_TOUCH_MAX_US)
-                break;
-        }
-
-        return time_us_32() - start;
+    if (voiceIndex < 0 || voiceIndex >= MAX_VOICES) {
+        return;
     }
 
-  
-    inline void addPin(int index, uint32_t pin, PinMode mode, uint32_t duration = 0) {
+    voices[voiceIndex].active = false;
+}
 
-        gpio_init(pin);
 
-        btns[index].pin = pin;
-        btns[index].mode = mode;
-        btns[index].mask = (1u << pin);
-        btns[index].pulse_duration = duration;
+inline void sendVoiceNoteOn(
+    int voiceIndex,
+    uint8_t note,
+    uint8_t velocity)
+{
+    if (voiceIndex < 0 || voiceIndex >= MAX_VOICES) {
+        return;
+    }
 
-        if (mode == GATE_OUT) {
+    voices[voiceIndex].note = note;
+    voices[voiceIndex].velocity = velocity;
+    voices[voiceIndex].active = true;
+    voices[voiceIndex].age = voiceCounter++;
+}
 
-            gpio_set_dir(pin, GPIO_OUT);
-            gpio_put(pin, 0);
 
-            btns[index].state.store(false, std::memory_order_relaxed);
-            btns[index].last = false;
-            btns[index].raw_prev = false;
+inline int allocateVoice(uint8_t note)
+{
+    int existing = findVoiceByNote(note);
 
+    if (existing >= 0) {
+        voices[existing].age = voiceCounter++;
+        return existing;
+    }
+
+    int oldestIndex = 0;
+    uint32_t oldestAge = UINT32_MAX;
+
+    for (int i = 0; i < MAX_VOICES; i++) {
+
+        if (!voices[i].active) {
+            voices[i].note = note;
+            voices[i].active = true;
+            voices[i].age = voiceCounter++;
+            return i;
         }
-        else if (mode == TOUCH) {
 
-            // Capacitive touch: no pull-up or pull-down
-            gpio_set_pulls(pin, false, false);
-            gpio_set_dir(pin, GPIO_IN);
+        if (voices[i].age < oldestAge) {
+            oldestAge = voices[i].age;
+            oldestIndex = i;
+        }
+    }
 
-            btns[index].state.store(false, std::memory_order_relaxed);
-            btns[index].last = false;
-            btns[index].raw_prev = false;
+    sendVoiceNoteOff(oldestIndex, voices[oldestIndex].note);
 
+    voices[oldestIndex].note = note;
+    voices[oldestIndex].active = true;
+    voices[oldestIndex].age = voiceCounter++;
+
+    return oldestIndex;
+}
+
+
+// ============================================================
+// MIDI INPUT / OUTPUT BUFFERS
+// ============================================================
+
+struct MidiInputBuffer {
+    uint8_t data[MIDI_IN_BUF];
+
+    // Producer: one active MIDI input source.
+    // Consumer: Core 0 MIDI parser.
+    std::atomic<uint32_t> head{0};
+    std::atomic<uint32_t> tail{0};
+
+    uint32_t available() const
+    {
+        return head.load(std::memory_order_acquire) -
+               tail.load(std::memory_order_acquire);
+    }
+
+    bool is_full() const
+    {
+        return available() >= MIDI_IN_BUF;
+    }
+};
+
+
+struct MidiOutputBuffer {
+    uint32_t data[MIDI_OUT_BUF];
+
+    // Producer: Core 1 Heavy MIDI output hook.
+    // Consumer: Core 0 USB MIDI output task.
+    std::atomic<uint32_t> head{0};
+    std::atomic<uint32_t> tail{0};
+
+    uint32_t occupied() const
+    {
+        return head.load(std::memory_order_acquire) -
+               tail.load(std::memory_order_relaxed);
+    }
+
+    bool is_full() const
+    {
+        return occupied() >= MIDI_OUT_BUF;
+    }
+};
+
+
+inline MidiOutputBuffer midi_out_rb;
+inline MidiInputBuffer midi_in_rb;
+
+
+// ============================================================
+// MIDI INPUT RING BUFFER
+// ============================================================
+//
+// Producer: UART IRQ OR USB MIDI callback.
+// Consumer: Core 0 MIDI parser.
+//
+// Important:
+// Only one input source should produce into this queue at a
+// time. If UART and USB can produce concurrently, serialize
+// their calls to midi_push().
+// ============================================================
+
+inline void midi_push(uint8_t byte)
+{
+    uint32_t head =
+        midi_in_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        midi_in_rb.tail.load(std::memory_order_acquire);
+
+    if ((head - tail) < MIDI_IN_BUF) {
+
+        midi_in_rb.data[head & (MIDI_IN_BUF - 1)] = byte;
+
+        midi_in_rb.head.store(
+            head + 1,
+            std::memory_order_release
+        );
+    }
+}
+
+
+inline bool midi_pop(uint8_t& byte)
+{
+    uint32_t tail =
+        midi_in_rb.tail.load(std::memory_order_relaxed);
+
+    uint32_t head =
+        midi_in_rb.head.load(std::memory_order_acquire);
+
+    if (tail == head) {
+        return false;
+    }
+
+    byte = midi_in_rb.data[tail & (MIDI_IN_BUF - 1)];
+
+    midi_in_rb.tail.store(
+        tail + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
+
+
+// ============================================================
+// MIDI PARSER
+// ============================================================
+
+struct MidiParser {
+    uint8_t msg[3] = {0, 0, 0};
+    int idx = 0;
+    int expected = 0;
+};
+
+inline MidiParser core0_parser;
+
+
+inline void parse_raw_midi_byte(
+    uint8_t byte,
+    MidiParser& p,
+    void (*handler)(uint8_t, uint8_t, uint8_t))
+{
+    // Realtime messages can occur anywhere.
+    if (byte >= 0xF8) {
+        handler(byte, 0, 0);
+        return;
+    }
+
+    if (byte & 0x80) {
+
+        p.msg[0] = byte;
+        p.idx = 1;
+
+        uint8_t type = byte & 0xF0;
+
+        if (type == 0xC0 || type == 0xD0) {
+            p.expected = 2;
+        }
+        else if (byte == 0xF2) {
+            p.expected = 3;
+        }
+        else if (byte == 0xF1 || byte == 0xF3) {
+            p.expected = 2;
+        }
+        else if (byte < 0xF0) {
+            p.expected = 3;
+        }
+        else {
+            p.idx = 0;
+            p.expected = 0;
+        }
+    }
+    else if (p.idx > 0 && p.idx < 3) {
+
+        p.msg[p.idx++] = byte;
+    }
+
+    if (p.idx != 0 && p.idx == p.expected) {
+
+        handler(
+            p.msg[0],
+            p.msg[1],
+            (p.expected == 3) ? p.msg[2] : 0
+        );
+
+        if (p.msg[0] < 0xF0) {
+
+            // Running status.
+            p.idx = 1;
         }
         else {
 
-            // Standard active-low button
-            gpio_set_dir(pin, GPIO_IN);
-            gpio_pull_up(pin);
-
-            bool is_pressed = !gpio_get(pin);
-
-            btns[index].state.store(is_pressed, std::memory_order_relaxed);
-            btns[index].last = is_pressed;
-            btns[index].raw_prev = is_pressed;
+            p.idx = 0;
+            p.expected = 0;
         }
-
-        btns[index].last_time = 0;
-        btns[index].toggle_state = false;
-        btns[index].reset_at = 0;
-
-        if (index >= n_btn)
-            n_btn = index + 1;
-    }
-
-
-    inline void addKnob(int index, uint32_t pin) {
-        start_adc();
-        adc_gpio_init(pin);
-        knobs[index].adc_ch = pin - 26;
-        knobs[index].value.store(0.0f, std::memory_order_relaxed);
-        knobs[index].last_val = 0.0f;
-        knobs[index].coeff = 0.1f; 
-        if (index >= n_knob) n_knob = index + 1;
-    }
-
-
-    inline void addCV(int index, uint32_t pin) {
-        addKnob(index, pin); 
-        knobs[index].coeff = 1.0f; 
-    }
-
-
-    inline void addEncoder(int index, uint32_t pinA, uint32_t pinB) {
-        gpio_init(pinA);
-        gpio_set_dir(pinA, GPIO_IN);
-        gpio_pull_up(pinA);
-        gpio_init(pinB);
-        gpio_set_dir(pinB, GPIO_IN);
-        gpio_pull_up(pinB);
-
-        encoder[index].pinA = pinA;
-        encoder[index].pinB = pinB;
-        encoder[index].last_clk = gpio_get(pinA);
-        encoder[index].last_dt  = gpio_get(pinB);
-        encoder[index].value.store(0, std::memory_order_relaxed);
-        encoder[index].last_sent_count = 0;
-        if (index >= n_encoder) n_encoder = index + 1;
-    }
-
-
-    inline void addJoystick(int index, uint32_t pinX, uint32_t pinY) {
-        start_adc();
-        adc_gpio_init(pinX);
-        adc_gpio_init(pinY);
-        joystick[index].adcX = pinX - 26;
-        joystick[index].adcY = pinY - 26;
-        adc_select_input(joystick[index].adcX);
-        joystick[index].centerX = adc_read();
-        adc_select_input(joystick[index].adcY);
-        joystick[index].centerY = adc_read();
-        joystick[index].smoothX = (float)joystick[index].centerX;
-        joystick[index].smoothY = (float)joystick[index].centerY;
-        joystick[index].x.store(0, std::memory_order_relaxed);
-        joystick[index].y.store(0, std::memory_order_relaxed);
-        if (index >= n_joystick) n_joystick = index + 1;
-    }
-
-
-   inline void update(uint32_t now) {
-    uint32_t all_pins = gpio_get_all();
-
-    for (int i = 0; i < n_btn; i++) {
-
-        if (btns[i].mode == GATE_OUT) {
-            if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                gpio_put(btns[i].pin, 0);
-                btns[i].state.store(false, std::memory_order_relaxed);
-                btns[i].reset_at = 0;
-            }
-            continue;
-        }
-
-        // Capacitive touch input
-        if (btns[i].mode == TOUCH) {
-            uint32_t touch_value = readCapTouch(btns[i].pin);
-            bool r = (touch_value >= CAP_TOUCH_THRESHOLD_US);
-
-            if (r != btns[i].raw_prev) {
-                btns[i].last_time = now;
-                btns[i].raw_prev = r;
-            } else if ((now - btns[i].last_time) > 20) {
-                btns[i].state.store(r, std::memory_order_relaxed);
-            }
-
-            continue;
-        }
-
-        // Ordinary active-low inputs
-        bool r = (all_pins & btns[i].mask) == 0;
-
-        if (btns[i].mode == GATE_IN) {
-            btns[i].state.store(r, std::memory_order_relaxed);
-        } else {
-            if (r != btns[i].raw_prev) {
-                btns[i].last_time = now;
-                btns[i].raw_prev = r;
-            } else if ((now - btns[i].last_time) > 20) {
-                btns[i].state.store(r, std::memory_order_relaxed);
-            }
-        }
-    }
-
-    // Encoders
-    for (int i = 0; i < n_encoder; i++) {
-        bool clk = (all_pins & (1u << encoder[i].pinA)) != 0;
-        bool dt  = (all_pins & (1u << encoder[i].pinB)) != 0;
-
-        if (clk != encoder[i].last_clk) {
-            if (clk) {
-                if (clk != dt)
-                    encoder[i].value.fetch_sub(1, std::memory_order_relaxed);
-                else
-                    encoder[i].value.fetch_add(1, std::memory_order_relaxed);
-            }
-            encoder[i].last_clk = clk;
-        }
-    }
-
-    // Knobs
-    for (int i = 0; i < n_knob; i++) {
-        adc_select_input(knobs[i].adc_ch);
-        float raw = (float)adc_read() / 4095.0f;
-        float prev = knobs[i].value.load(std::memory_order_relaxed);
-
-        if (fabsf(raw - prev) > 0.001f) {
-            float next_val = prev + (raw - prev) * knobs[i].coeff;
-            knobs[i].value.store(next_val, std::memory_order_relaxed);
-        }
-    }
-
-    // Joysticks
-    for (int i = 0; i < n_joystick; i++) {
-        adc_select_input(joystick[i].adcX);
-        float rawX = (float)adc_read();
-
-        adc_select_input(joystick[i].adcY);
-        float rawY = (float)adc_read();
-
-        if (fabsf(rawX - joystick[i].smoothX) > 1.0f)
-            joystick[i].smoothX += (rawX - joystick[i].smoothX) * 0.1f;
-
-        if (fabsf(rawY - joystick[i].smoothY) > 1.0f)
-            joystick[i].smoothY += (rawY - joystick[i].smoothY) * 0.1f;
-
-        int16_t dx = (int16_t)joystick[i].centerX - (int16_t)joystick[i].smoothX;
-        int16_t dy = (int16_t)joystick[i].centerY - (int16_t)joystick[i].smoothY;
-
-        joystick[i].x.store((abs(dx) > 60) ? dx : 0, std::memory_order_relaxed);
-        joystick[i].y.store((abs(dy) > 60) ? dy : 0, std::memory_order_relaxed);
     }
 }
 
 
-    inline void updateGate(int index, float val) {
-        if (index < 12 && btns[index].mode == GATE_OUT) {
-            int state = (val > 0.5f) ? 1 : 0;
-            uint32_t duration = btns[index].pulse_duration; 
-            if (state == 1) {
-                gpio_put(btns[index].pin, 1);
-                btns[index].state.store(true, std::memory_order_relaxed);
-                if (duration > 0) btns[index].reset_at = to_ms_since_boot(get_absolute_time()) + duration;
-            } else if (duration == 0) {
-                gpio_put(btns[index].pin, 0);
-                btns[index].state.store(false, std::memory_order_relaxed);
+// ============================================================
+// MIDI -> HEAVY QUEUE HANDLER
+// ============================================================
+//
+// Called by the Core 0 MIDI parser.
+// It does not call Heavy directly.
+// ============================================================
+
+inline void midi_queue_handler(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2)
+{
+    heavy_input_push_midi(
+        status,
+        data1,
+        data2
+    );
+}
+
+
+// ============================================================
+// USB MIDI DEVICE STATE
+// ============================================================
+
+inline int usb_midi_dev0 = -1;
+
+
+// ============================================================
+// USB INITIALIZATION
+// ============================================================
+
+#if !defined(WEB) || (WEB == 0)
+
+inline void usb_init()
+{
+    usb_midi_dev0 = -1;
+
+    #ifdef MIDI_HOST
+        tusb_init(0, NULL);
+    #else
+        tusb_init();
+    #endif
+}
+
+#endif
+
+
+// ============================================================
+// MIDI TASK
+// ============================================================
+//
+// Call from Core 0.
+//
+// Processes:
+//   1. TinyUSB tasks.
+//   2. Incoming raw MIDI bytes.
+//   3. Parsed MIDI events -> Heavy SPSC queue.
+//   4. Outgoing MIDI events.
+//
+// IMPORTANT:
+// handle_midi_message() is NOT called here.
+// It is called by Core 1 after heavy_input_pop().
+// ============================================================
+
+void handle_midi_message(
+    uint8_t status,
+    uint8_t data1,
+    uint8_t data2);
+
+
+inline void midi_task()
+{
+    // --------------------------------------------------------
+    // 1. TinyUSB tasks
+    // --------------------------------------------------------
+
+#if !defined(WEB) || (WEB == 0)
+
+    #ifdef MIDI_HOST
+
+        tuh_task();
+
+    #else
+
+        tud_task();
+
+    #endif
+
+#endif
+
+
+    // --------------------------------------------------------
+    // 2. Process incoming MIDI
+    // --------------------------------------------------------
+
+    uint8_t b;
+    uint32_t count = 0;
+
+    while (count++ < 64 && midi_pop(b)) {
+
+        parse_raw_midi_byte(
+            b,
+            core0_parser,
+            midi_queue_handler
+        );
+    }
+
+
+    // --------------------------------------------------------
+    // 3. USB MIDI output
+    // --------------------------------------------------------
+
+#if !defined(WEB) || (WEB == 0)
+
+    #ifdef MIDI_HOST
+
+        // ----------------------------------------------------
+        // USB MIDI HOST OUTPUT
+        // ----------------------------------------------------
+
+        if (usb_midi_dev0 != -1 &&
+            tuh_midi_mounted(usb_midi_dev0))
+        {
+            uint32_t head =
+                midi_out_rb.head.load(std::memory_order_acquire);
+
+            uint32_t tail =
+                midi_out_rb.tail.load(std::memory_order_relaxed);
+
+            uint32_t out_count = 0;
+
+            while (tail != head && out_count++ < 64) {
+
+                uint32_t m =
+                    midi_out_rb.data[
+                        tail & (MIDI_OUT_BUF - 1)
+                    ];
+
+                uint8_t status = (uint8_t)(m >> 16);
+
+                uint8_t pkt[4] = {
+                    (uint8_t)(status >> 4),
+                    status,
+                    (uint8_t)(m >> 8),
+                    (uint8_t)m
+                };
+
+                if (tuh_midi_packet_write(usb_midi_dev0, pkt)) {
+
+                    midi_out_rb.tail.store(
+                        ++tail,
+                        std::memory_order_release
+                    );
+                }
+                else {
+                    break;
+                }
+            }
+
+            tuh_midi_write_flush(usb_midi_dev0);
+        }
+
+    #else
+
+        // ----------------------------------------------------
+        // USB MIDI DEVICE OUTPUT
+        // ----------------------------------------------------
+
+        if (tud_midi_mounted()) {
+
+            uint32_t head =
+                midi_out_rb.head.load(std::memory_order_acquire);
+
+            uint32_t tail =
+                midi_out_rb.tail.load(std::memory_order_relaxed);
+
+            uint32_t out_count = 0;
+
+            while (tail != head && out_count++ < 64) {
+
+                uint32_t m =
+                    midi_out_rb.data[
+                        tail & (MIDI_OUT_BUF - 1)
+                    ];
+
+                uint8_t status = (uint8_t)(m >> 16);
+
+                uint8_t pkt[4] = {
+                    (uint8_t)(status >> 4),
+                    status,
+                    (uint8_t)(m >> 8),
+                    (uint8_t)m
+                };
+
+                if (tud_midi_packet_write(pkt)) {
+
+                    midi_out_rb.tail.store(
+                        ++tail,
+                        std::memory_order_release
+                    );
+                }
+                else {
+                    break;
+                }
             }
         }
-    }
+
+    #endif
+
+#endif
+}
 
 
-    inline bool buttonPressed(int i) {
-        bool s = btns[i].state.load(std::memory_order_relaxed);
-        if (s && !btns[i].last) { btns[i].last = true; return true; }
-        if (!s) btns[i].last = false;
-        return false;
-    }
+// ============================================================
+// UART MIDI INPUT
+// ============================================================
 
-
-    inline bool buttonToggled(int i, bool& outState) {
-        bool s = btns[i].state.load(std::memory_order_relaxed);
-        if (s && !btns[i].last) {
-            btns[i].last = true;
-            btns[i].toggle_state = !btns[i].toggle_state;
-            outState = btns[i].toggle_state;
-            return true;
-        }
-        if (!s) btns[i].last = false;
-        return false;
-    }
-
-    inline bool buttonChanged(int i, bool& outState) {
-        bool s = btns[i].state.load(std::memory_order_relaxed);
-        if (s != btns[i].last) { btns[i].last = s; outState = s; return true; }
-        return false;
-    }
-
-    inline int touchGPIO(int i) {
-        bool s = btns[i].state.load(std::memory_order_relaxed);
-
-        if (s != btns[i].last) {
-            btns[i].last = s;
-            return s ? 1 : -1;
-        }
-
-        return 0;
-    }
-
-    inline bool processEnc(int index, float &val) {
-        int current_count = encoder[index].value.load(std::memory_order_relaxed);
-        int diff = current_count - encoder[index].last_sent_count;
-        if (abs(diff) >= 1) {
-            val = (diff > 0) ? 1.0f : -1.0f;
-            encoder[index].last_sent_count = current_count;
-            return true;
-        }
-        return false;
-    }
-
-  
-    inline void processPin(
-        int i,
-        float &outVal,
-        bool &shouldSend,
-        bool &shouldBang
-    ) {
-        uint32_t now = to_ms_since_boot(get_absolute_time());
-        bool s;
-
-        shouldSend = false;
-        shouldBang = false;
-
-        switch (btns[i].mode) {
-
-            case BANG:
-                if (buttonPressed(i)) {
-                    outVal = 1.0f;
-                    shouldSend = true;
-                    btns[i].reset_at = now + 10;
-                }
-
-                if (btns[i].reset_at > 0 && now >= btns[i].reset_at) {
-                    btns[i].reset_at = 0;
-                    outVal = 0.0f;
-                    shouldSend = true;
-                }
-                break;
-
-            case TOUCH: {
-                int edge = touchGPIO(i);
-
-                if (edge == 1) {
-                    shouldBang = true;
-                }
-                else if (edge == -1) {
-                    outVal = 0.0f;
-                    shouldSend = true;
-                }
-                break;
-            }
-
-            case TOGGLE:
-                if (buttonToggled(i, s)) {
-                    outVal = s ? 1.0f : 0.0f;
-                    shouldSend = true;
-                }
-                break;
-
-            case SWITCH:
-            case GATE_IN:
-                if (buttonChanged(i, s)) {
-                    outVal = s ? 1.0f : 0.0f;
-                    shouldSend = true;
-                }
-                break;
-
-            case GATE_OUT:
-                if (buttonChanged(i, s)) {
-                    outVal = s ? 1.0f : 0.0f;
-                    shouldSend = true;
-                    gpio_put(btns[i].pin, s);
-                }
-                break;
-        }
-    }
-
-
-    inline bool processKnob(int i, float& outVal) {
-        float v = knobs[i].value.load(std::memory_order_relaxed);
-        if (std::abs(v - knobs[i].last_val) > 0.005f) { knobs[i].last_val = v; outVal = v; return true; }
-        return false;
-    }
-
-
-    inline bool processJoystick(int id, float &outX, float &outY, bool &cX, bool &cY, bool midi_range = false) {
-        if (id >= n_joystick) return false;
-        float newX = fmaxf(-1.0f, fminf(1.0f, (float)joystick[id].x.load() / 2048.0f));
-        float newY = fmaxf(-1.0f, fminf(1.0f, (float)joystick[id].y.load() / 2048.0f));
-        if (midi_range) {
-            newX = (float)((int)((newX + 1.0f) * 0.5f * 126.0f) + 1);
-            newY = (float)((int)((newY + 1.0f) * 0.5f * 126.0f) + 1);
-        }
-        float threshold = midi_range ? 2.0f : 0.05f; 
-        cX = (std::abs(newX - joystick[id].lastSentX) > threshold);
-        cY = (std::abs(newY - joystick[id].lastSentY) > threshold);
-        if (cX) { outX = newX; joystick[id].lastSentX = newX; }
-        if (cY) { outY = newY; joystick[id].lastSentY = newY; }
-        return (cX || cY);
+extern "C" inline void on_uart_rx()
+{
+    while (uart_is_readable(uart0)) {
+        midi_push(uart_getc(uart0));
     }
 }
 
+
+inline void uart_midi_init()
+{
+    uart_deinit(uart0);
+
+    uart_init(uart0, 31250);
+
+    gpio_set_function(0, GPIO_FUNC_UART);
+    gpio_set_function(1, GPIO_FUNC_UART);
+
+    uart_set_format(
+        uart0,
+        8,
+        1,
+        UART_PARITY_NONE
+    );
+
+    uart_set_hw_flow(uart0, false, false);
+    uart_set_fifo_enabled(uart0, true);
+
+    irq_set_exclusive_handler(
+        UART0_IRQ,
+        on_uart_rx
+    );
+
+    uart_set_irq_enables(
+        uart0,
+        true,
+        false
+    );
+
+    irq_set_enabled(
+        UART0_IRQ,
+        true
+    );
+}
+
+
+// ============================================================
+// USB MIDI CALLBACKS
+// ============================================================
+
+#if !defined(WEB) || (WEB == 0)
+
+extern "C" {
+
+#ifdef MIDI_HOST
+
+    // --------------------------------------------------------
+    // USB MIDI HOST RECEIVE
+    // --------------------------------------------------------
+
+    void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t qt)
+    {
+        (void)qt;
+
+        uint8_t packet[4];
+
+        while (tuh_midi_packet_read(dev_addr, packet)) {
+
+            uint8_t cin = packet[0] & 0x0F;
+            uint8_t len = 0;
+
+            switch (cin) {
+
+                case 0x05:
+                case 0x0F:
+                    len = 1;
+                    break;
+
+                case 0x02:
+                case 0x06:
+                case 0x0C:
+                case 0x0D:
+                    len = 2;
+                    break;
+
+                case 0x03:
+                case 0x04:
+                case 0x07:
+                case 0x08:
+                case 0x09:
+                case 0x0A:
+                case 0x0B:
+                case 0x0E:
+                    len = 3;
+                    break;
+
+                default:
+                    continue;
+            }
+
+            for (uint8_t i = 0; i < len; i++) {
+                midi_push(packet[i + 1]);
+            }
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // USB MIDI HOST MOUNT
+    // --------------------------------------------------------
+
+    void tuh_midi_mount_cb(
+        uint8_t dev_addr,
+        const tuh_midi_mount_cb_t* mount_cb_data)
+    {
+        (void)mount_cb_data;
+
+        if (usb_midi_dev0 == -1) {
+            usb_midi_dev0 = dev_addr;
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // USB MIDI HOST UNMOUNT
+    // --------------------------------------------------------
+
+    void tuh_midi_umount_cb(uint8_t dev_addr)
+    {
+        if (usb_midi_dev0 == dev_addr) {
+            usb_midi_dev0 = -1;
+        }
+    }
+
+#else
+
+    // --------------------------------------------------------
+    // USB MIDI DEVICE RECEIVE
+    // --------------------------------------------------------
+
+    void tud_midi_rx_cb(uint8_t itf)
+    {
+        (void)itf;
+
+        uint8_t packet[4];
+
+        while (tud_midi_available()) {
+
+            if (tud_midi_packet_read(packet)) {
+
+                uint8_t cin = packet[0] & 0x0F;
+                uint8_t len = 0;
+
+                switch (cin) {
+
+                    case 0x05:
+                    case 0x0F:
+                        len = 1;
+                        break;
+
+                    case 0x02:
+                    case 0x06:
+                    case 0x0C:
+                    case 0x0D:
+                        len = 2;
+                        break;
+
+                    case 0x03:
+                    case 0x04:
+                    case 0x07:
+                    case 0x08:
+                    case 0x09:
+                    case 0x0A:
+                    case 0x0B:
+                    case 0x0E:
+                        len = 3;
+                        break;
+
+                    default:
+                        break;
+                }
+
+                for (uint8_t i = 0; i < len; i++) {
+                    midi_push(packet[i + 1]);
+                }
+            }
+        }
+    }
+
+#endif
+
+}
+
+#endif
+
+
+
+// ============================================================
+// HEAVY PRINT SPSC QUEUE
+// Producer: Core 1
+// Consumer: Core 0
+// ============================================================
+
+enum PrintAtomType : uint8_t {
+    PRINT_ATOM_FLOAT,
+    PRINT_ATOM_SYMBOL,
+    PRINT_ATOM_BANG,
+    PRINT_ATOM_HASH
+};
+
+struct PrintAtom {
+    uint8_t type;
+
+    union {
+        float value;
+        uint32_t hash;
+        char symbol[PRINT_SYMBOL_SIZE];
+    };
+};
+
+struct PrintMsg {
+    char name[PRINT_NAME_SIZE];
+    uint8_t atom_count;
+    PrintAtom atoms[PRINT_MAX_ATOMS];
+};
+
+struct PrintQueue {
+    PrintMsg data[PRINT_QUEUE_SIZE];
+
+    std::atomic<uint32_t> head{0};
+    std::atomic<uint32_t> tail{0};
+    std::atomic<uint32_t> dropped{0};
+};
+
+inline PrintQueue print_queue_rb;
+
+
+// ------------------------------------------------------------
+// Producer: Core 1
+// ------------------------------------------------------------
+
+
+inline bool print_push(const char* name, const HvMessage* hvMsg)
+{
+#if ENABLE_DEBUG
+
+    if (!hvMsg) {
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // Rate-limit Heavy print producer (Core 1)
+    // --------------------------------------------------------
+
+    static uint32_t lastPrintTime = 0;
+
+    const uint32_t now =
+        to_ms_since_boot(get_absolute_time());
+
+    if ((uint32_t)(now - lastPrintTime) < PRINT_INTERVAL_MS) {
+        return false;
+    }
+
+    lastPrintTime = now;
+
+    // --------------------------------------------------------
+    // Check queue capacity
+    // --------------------------------------------------------
+
+    uint32_t head =
+        print_queue_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        print_queue_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= PRINT_QUEUE_SIZE) {
+        print_queue_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    PrintMsg& msg =
+        print_queue_rb.data[head & PRINT_QUEUE_MASK];
+
+    // --------------------------------------------------------
+    // Copy message name
+    // --------------------------------------------------------
+
+    if (!name) {
+        name = "";
+    }
+
+    size_t nameLen = 0;
+
+    while (nameLen < PRINT_NAME_SIZE - 1 && name[nameLen]) {
+        msg.name[nameLen] = name[nameLen];
+        ++nameLen;
+    }
+
+    msg.name[nameLen] = '\0';
+
+    // --------------------------------------------------------
+    // Capture Heavy atoms without formatting
+    // --------------------------------------------------------
+
+    msg.atom_count = 0;
+
+    const int count = msg_getNumElements(hvMsg);
+
+    for (int i = 0;
+         i < count && msg.atom_count < PRINT_MAX_ATOMS;
+         ++i)
+    {
+        PrintAtom& atom = msg.atoms[msg.atom_count];
+
+        switch (msg_getType(hvMsg, i)) {
+
+            case HV_MSG_FLOAT:
+                atom.type = PRINT_ATOM_FLOAT;
+                atom.value = msg_getFloat(hvMsg, i);
+                break;
+
+            case HV_MSG_SYMBOL:
+            {
+                atom.type = PRINT_ATOM_SYMBOL;
+
+                const char* symbol = msg_getSymbol(hvMsg, i);
+
+                if (!symbol) {
+                    symbol = "";
+                }
+
+                size_t len = 0;
+
+                while (
+                    len < PRINT_SYMBOL_SIZE - 1 &&
+                    symbol[len]
+                ) {
+                    atom.symbol[len] = symbol[len];
+                    ++len;
+                }
+
+                atom.symbol[len] = '\0';
+                break;
+            }
+
+            case HV_MSG_BANG:
+                atom.type = PRINT_ATOM_BANG;
+                break;
+
+            case HV_MSG_HASH:
+                atom.type = PRINT_ATOM_HASH;
+                atom.hash = msg_getHash(hvMsg, i);
+                break;
+
+            default:
+                continue;
+        }
+
+        ++msg.atom_count;
+    }
+
+    // --------------------------------------------------------
+    // Publish message to Core 0
+    // --------------------------------------------------------
+
+    print_queue_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+
+#else
+
+    (void)name;
+    (void)hvMsg;
+
+    return false;
+
+#endif
+}
+
+
+// ------------------------------------------------------------
+// Consumer: Core 0
+// ------------------------------------------------------------
+
+inline void print_queue(bool debug)
+{
+#if ENABLE_DEBUG && !defined(MIDI_HOST) //&& !WEB
+
+    if (!debug || !tud_cdc_connected()) {
+        return;
+    }
+
+    constexpr uint32_t MAX_MESSAGES = 4;
+
+    constexpr size_t OUTPUT_SIZE =
+        PRINT_NAME_SIZE +
+        PRINT_MAX_ATOMS * (PRINT_SYMBOL_SIZE + 16) +
+        16;
+
+    // Core 0 only: retain progress if CDC accepts a partial write.
+    static uint32_t pending_tail = UINT32_MAX;
+    static uint32_t pending_offset = 0;
+    static size_t pending_length = 0;
+    static char pending_output[OUTPUT_SIZE];
+
+    // Rate-limit CDC flushing, not message processing.
+    static uint32_t lastFlushTime = 0;
+
+    const uint32_t now =
+        to_ms_since_boot(get_absolute_time());
+
+    bool flush_needed = false;
+
+    for (uint32_t i = 0; i < MAX_MESSAGES; ++i) {
+
+        const uint32_t tail =
+            print_queue_rb.tail.load(std::memory_order_relaxed);
+
+        const uint32_t head =
+            print_queue_rb.head.load(std::memory_order_acquire);
+
+        if (tail == head) {
+            pending_tail = UINT32_MAX;
+            pending_offset = 0;
+            pending_length = 0;
+            break;
+        }
+
+        // Format only when starting a new message.
+        if (pending_tail != tail) {
+
+            const PrintMsg& msg =
+                print_queue_rb.data[tail & PRINT_QUEUE_MASK];
+
+            size_t used = 0;
+
+            int n = snprintf(
+                pending_output,
+                sizeof(pending_output),
+                "%s: ",
+                msg.name
+            );
+
+            if (n < 0 || (size_t)n >= sizeof(pending_output)) {
+                print_queue_rb.tail.store(
+                    tail + 1,
+                    std::memory_order_release
+                );
+                continue;
+            }
+
+            used = (size_t)n;
+
+            for (uint8_t atom_index = 0;
+                 atom_index < msg.atom_count;
+                 ++atom_index)
+            {
+                const PrintAtom& atom = msg.atoms[atom_index];
+
+                if (atom_index > 0) {
+                    if (used >= sizeof(pending_output)) {
+                        break;
+                    }
+                    pending_output[used++] = ' ';
+                }
+
+                if (used >= sizeof(pending_output)) {
+                    break;
+                }
+
+                switch (atom.type) {
+
+                    case PRINT_ATOM_FLOAT:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "%.3f",
+                            atom.value
+                        );
+                        break;
+
+                    case PRINT_ATOM_SYMBOL:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "%s",
+                            atom.symbol
+                        );
+                        break;
+
+                    case PRINT_ATOM_BANG:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "bang"
+                        );
+                        break;
+
+                    case PRINT_ATOM_HASH:
+                        n = snprintf(
+                            pending_output + used,
+                            sizeof(pending_output) - used,
+                            "0x%08lX",
+                            (unsigned long)atom.hash
+                        );
+                        break;
+
+                    default:
+                        n = 0;
+                        break;
+                }
+
+                if (n < 0 || (size_t)n >=
+                    sizeof(pending_output) - used) {
+                    used = 0;
+                    break;
+                }
+
+                used += (size_t)n;
+            }
+
+            if (used == 0 || used + 2 >= sizeof(pending_output)) {
+                print_queue_rb.tail.store(
+                    tail + 1,
+                    std::memory_order_release
+                );
+                continue;
+            }
+
+            pending_output[used++] = '\r';
+            pending_output[used++] = '\n';
+
+            pending_tail = tail;
+            pending_offset = 0;
+            pending_length = used;
+        }
+
+        const uint32_t remaining =
+            (uint32_t)pending_length - pending_offset;
+
+        const uint32_t available =
+            tud_cdc_write_available();
+
+        if (available == 0) {
+            break;
+        }
+
+        const uint32_t to_write =
+            (available < remaining) ? available : remaining;
+
+        const uint32_t written =
+            tud_cdc_write(
+                pending_output + pending_offset,
+                to_write
+            );
+
+        if (written > 0) {
+            pending_offset += written;
+            flush_needed = true;
+        }
+
+        // Preserve partial writes for the next invocation.
+        if (pending_offset < pending_length) {
+            break;
+        }
+
+        print_queue_rb.tail.store(
+            tail + 1,
+            std::memory_order_release
+        );
+
+        pending_tail = UINT32_MAX;
+        pending_offset = 0;
+        pending_length = 0;
+    }
+
+    // Flush at most once per PRINT_INTERVAL_MS.
+    if (flush_needed &&
+        (uint32_t)(now - lastFlushTime) >= PRINT_INTERVAL_MS)
+    {
+        tud_cdc_write_flush();
+        lastFlushTime = now;
+    }
+
+#else
+
+    (void)debug;
+
+#endif
+}
+
+
+// ============================================================
+// RP2040 ATOMIC STUBS
+// ============================================================
+// These are not thread-safe implementations. They should not
+// be relied upon for synchronization between cores.
+// The SPSC queues above use atomic 32-bit head/tail counters
+// and do not depend on these stubs.
+// ============================================================
+
+#if defined(PICO_RP2040)
+
+extern "C" {
+
+bool __atomic_test_and_set(volatile void* ptr, int memorder)
+{
+    (void)memorder;
+
+    bool old = *(volatile bool*)ptr;
+    *(volatile bool*)ptr = true;
+
+    return old;
+}
+
+void __atomic_clear(volatile void* ptr, int memorder)
+{
+    (void)memorder;
+
+    *(volatile bool*)ptr = false;
+}
+
+}
+
+#endif
