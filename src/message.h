@@ -99,16 +99,15 @@
 
 enum HeavyInputType : uint8_t {
     HEAVY_INPUT_MIDI,
-    HEAVY_INPUT_FLOAT
+    HEAVY_INPUT_FLOAT,
+    HEAVY_INPUT_BANG
 };
 
 struct HeavyInputEvent {
     HeavyInputType type;
-
     uint8_t status;
     uint8_t data1;
     uint8_t data2;
-
     uint32_t hash;
     float value;
 };
@@ -218,6 +217,47 @@ inline bool heavy_input_push_float(
     return true;
 }
 
+
+// ------------------------------------------------------------
+// Core 0: enqueue bang receiver event
+// ------------------------------------------------------------
+
+inline bool heavy_input_push_bang(uint32_t hash)
+{
+    uint32_t head =
+        heavy_input_rb.head.load(std::memory_order_relaxed);
+
+    uint32_t tail =
+        heavy_input_rb.tail.load(std::memory_order_acquire);
+
+    if (head - tail >= HEAVY_INPUT_QUEUE_SIZE) {
+        heavy_input_rb.dropped.fetch_add(
+            1,
+            std::memory_order_relaxed
+        );
+
+        return false;
+    }
+
+    HeavyInputEvent& event =
+        heavy_input_rb.data[head & HEAVY_INPUT_QUEUE_MASK];
+
+    event.type = HEAVY_INPUT_BANG;
+
+    event.status = 0;
+    event.data1 = 0;
+    event.data2 = 0;
+
+    event.hash = hash;
+    event.value = 0.0f;
+
+    heavy_input_rb.head.store(
+        head + 1,
+        std::memory_order_release
+    );
+
+    return true;
+}
 
 // ------------------------------------------------------------
 // Core 1: dequeue Heavy input event
