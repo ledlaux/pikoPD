@@ -53,7 +53,7 @@ PikoPD takes advantage of the Pico and Pico 2 multicore processing:
 * Maps hardware controls to Pure Data patch parameters.
 
 ### Core 1 — Audio Engine
-* Handles real-time audio generation 
+* Handles real-time audio generation and processes Pd messages.
 * Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
 
 ## Requirements
@@ -160,12 +160,9 @@ https://ledlaux.github.io/pikoPD/
 
 You can upload your .pd patch and map controls to the corresponding patch receivers and senders. 
 Click a pin on the board to add a component, or drag a Pd object tag directly onto a pin to assign.
-Some of the hardware objects like enc (encoder) are automatically recognized and placed in the corresponding category.     
-Finally export the board.json.    
+Some of the hardware objects like enc (encoder) are automatically recognized and placed in the corresponding category. Finally export the board.json.    
 
-This tool still needs further development, and unfortunately I don't have the time or capacity to work on it right now. 
-
-In the future, it could evolve into a community for sharing custom user firmwares and a playful educational tool for exploring and interacting with pikoPD projects.
+This tool still needs further development. In the near future, it could evolve into a community for sharing custom user firmwares and a playful educational tool for exploring and interacting with pikoPD projects.
 
 
 
