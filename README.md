@@ -53,7 +53,7 @@ PikoPD takes advantage of the Pico and Pico 2 multicore processing:
 * Maps hardware controls to Pure Data patch parameters.
 
 ### Core 1 — Audio Engine
-* Handles real-time audio generation 
+* Handles real-time audio generation and processes Pd messages.
 * Uses PIO for accurate audio output timing (I2S or high-frequency PWM).
 
 ## Requirements
