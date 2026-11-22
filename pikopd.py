@@ -628,9 +628,7 @@ class PicoUF2Generator:
                     if not cny_enabled and "cny70" in filename:
                         continue
 
-                    if not distance_enabled and (
-                        "hc-sr04" in filename or filename.endswith(".pio")
-                    ):
+                    if not distance_enabled and "hc-sr04" in filename:
                         continue
 
                     if (
