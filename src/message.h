@@ -72,7 +72,6 @@
 #define PRINT_NAME_SIZE   64
 #define PRINT_SYMBOL_SIZE 24
 #define PRINT_MAX_ATOMS   8
-#define PRINT_INTERVAL_MS 40
 
 // ============================================================
 // HEAVY INPUT SPSC QUEUE
@@ -1020,7 +1019,6 @@ inline PrintQueue print_queue_rb;
 // Producer: Core 1
 // ------------------------------------------------------------
 
-
 inline bool print_push(const char* name, const HvMessage* hvMsg)
 {
 #if ENABLE_DEBUG
@@ -1028,25 +1026,6 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
     if (!hvMsg) {
         return false;
     }
-
-    // --------------------------------------------------------
-    // Rate-limit Heavy print producer (Core 1)
-    // --------------------------------------------------------
-
-    static uint32_t lastPrintTime = 0;
-
-    const uint32_t now =
-        to_ms_since_boot(get_absolute_time());
-
-    if ((uint32_t)(now - lastPrintTime) < PRINT_INTERVAL_MS) {
-        return false;
-    }
-
-    lastPrintTime = now;
-
-    // --------------------------------------------------------
-    // Check queue capacity
-    // --------------------------------------------------------
 
     uint32_t head =
         print_queue_rb.head.load(std::memory_order_relaxed);
@@ -1059,16 +1038,11 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
             1,
             std::memory_order_relaxed
         );
-
         return false;
     }
 
     PrintMsg& msg =
         print_queue_rb.data[head & PRINT_QUEUE_MASK];
-
-    // --------------------------------------------------------
-    // Copy message name
-    // --------------------------------------------------------
 
     if (!name) {
         name = "";
@@ -1082,11 +1056,6 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
     }
 
     msg.name[nameLen] = '\0';
-
-    // --------------------------------------------------------
-    // Capture Heavy atoms without formatting
-    // --------------------------------------------------------
-
     msg.atom_count = 0;
 
     const int count = msg_getNumElements(hvMsg);
@@ -1109,17 +1078,11 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
                 atom.type = PRINT_ATOM_SYMBOL;
 
                 const char* symbol = msg_getSymbol(hvMsg, i);
-
-                if (!symbol) {
-                    symbol = "";
-                }
+                if (!symbol) symbol = "";
 
                 size_t len = 0;
 
-                while (
-                    len < PRINT_SYMBOL_SIZE - 1 &&
-                    symbol[len]
-                ) {
+                while (len < PRINT_SYMBOL_SIZE - 1 && symbol[len]) {
                     atom.symbol[len] = symbol[len];
                     ++len;
                 }
@@ -1144,10 +1107,6 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
         ++msg.atom_count;
     }
 
-    // --------------------------------------------------------
-    // Publish message to Core 0
-    // --------------------------------------------------------
-
     print_queue_rb.head.store(
         head + 1,
         std::memory_order_release
@@ -1159,7 +1118,6 @@ inline bool print_push(const char* name, const HvMessage* hvMsg)
 
     (void)name;
     (void)hvMsg;
-
     return false;
 
 #endif
