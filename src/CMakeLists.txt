@@ -154,8 +154,14 @@ set(DISTANCE_SENSOR_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pico-distance-sensor"
 
 if(ENABLE_DISTANCE_SENSOR)
     target_compile_definitions(pikopd PRIVATE DISTANCE_SENSOR_ENABLED=1)
+
     add_subdirectory(${DISTANCE_SENSOR_PATH} pico_distance_sensor)
-    pico_generate_pio_header(pikopd ${CMAKE_CURRENT_LIST_DIR}/src/sensors/hc-sr04.pio)
+
+    pico_generate_pio_header(
+        pikopd
+        ${CMAKE_CURRENT_LIST_DIR}/hc-sr04.pio
+    )
+
     target_link_libraries(pikopd PRIVATE distance-sensor)
 else()
     target_compile_definitions(pikopd PRIVATE DISTANCE_SENSOR_ENABLED=0)
@@ -165,7 +171,12 @@ target_include_directories(pikopd PRIVATE "${DISTANCE_SENSOR_PATH}/include")
 
 if(PICO_ZERO_BOARD)
     target_compile_definitions(pikopd PRIVATE PICO_ZERO=1)
-    pico_generate_pio_header(pikopd ${CMAKE_CURRENT_LIST_DIR}/src/led/ws2812.pio)
+
+    pico_generate_pio_header(
+        pikopd
+        ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio
+    )
+
     target_link_libraries(pikopd PRIVATE hardware_pio)
 endif()
 
