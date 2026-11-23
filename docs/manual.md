@@ -601,7 +601,8 @@ PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.js
 "midi_mode": "uart"    // Default pins tx 0, rx 1 
 "midi_mode": "host"    // Use otg cable to power pico and usb midi device
 ```
-Midi clock and start/stop messages work with Pd `[midirealtimein]` object.
+Standard Pd midi objects such as [notein], [noteout], [ctlin], [ctlout] and [midiout] can be used in Pd patches.
+Midi clock and start/stop messages also work with Pd `[midirealtimein]` object.
 
 | CC Number | Parameter               |
 |----------:|-------------------------|
@@ -620,7 +621,6 @@ Midi clock and start/stop messages work with Pd `[midirealtimein]` object.
 | 120       | Debug Toggle            |
 
 You can enable the masterFX in the board.json. To use safe volume it is recomended to keep limiter on. 
-
 
 # Polyphonic Input
 
