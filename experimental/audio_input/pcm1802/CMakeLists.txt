@@ -5,13 +5,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(WIN32)
-    set(USERHOME $ENV{USERPROFILE})
-else()
-    set(USERHOME $ENV{HOME})
-endif()
 
-set(PICO_BOARD pico_w CACHE STRING "Board type")
+set(PICO_BOARD pico2 CACHE STRING "Board type")
 
 include(pico_sdk_import.cmake)
 
@@ -80,7 +75,6 @@ target_link_libraries(pico_i2s PRIVATE
     hardware_pio
     hardware_dma
     hardware_clocks
-    pico_cyw43_arch_none
     pico_multicore
 
 )
