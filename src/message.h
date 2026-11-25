@@ -72,6 +72,7 @@
 #define PRINT_NAME_SIZE   64
 #define PRINT_SYMBOL_SIZE 24
 #define PRINT_MAX_ATOMS   8
+#define PRINT_INTERVAL_MS 10
 
 // ============================================================
 // HEAVY INPUT SPSC QUEUE
