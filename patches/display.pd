@@ -1,0 +1,17 @@
+#N canvas 100 100 600 300 10;
+#X obj 245 76 loadbang;
+#X obj 775 6 print 1;
+#X obj 262 122 metro 300;
+#X obj 265 191 random 10;
+#X obj 108 477 s screen @hv_param;
+#X obj 265 477 s screen1 @hv_param;
+#X obj 423 477 s screen2 @hv_param;
+#X obj 581 477 s screen3 @hv_param;
+#X obj 0 477 print screen;
+#X connect 0 0 2 0;
+#X connect 2 0 3 0;
+#X connect 3 0 4 0;
+#X connect 3 0 5 0;
+#X connect 3 0 6 0;
+#X connect 3 0 7 0;
+#X connect 3 0 8 0;
