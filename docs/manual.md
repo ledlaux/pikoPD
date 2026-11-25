@@ -591,8 +591,8 @@ Wire colours can vary between load cells. Always check your load cell's datashee
 
 PikoPD supports SSD1306 display. There are 2 modes which can be set in `board.json`:
 
-1. console - outputs adjusted parameter [print] object.
-2. pd - outputs first 4 [print] objects as dashboard.
+1. console - outputs adjusted parameter [print] object float value.
+2. pd - outputs 4 [s screen @hv_param] object float values as 2x2 dashboard. Add index 1-4 to the object name.
 
 # MIDI 
 
