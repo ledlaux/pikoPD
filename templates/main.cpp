@@ -260,18 +260,43 @@ constexpr int NUM_ACTIVE_MPR_PADS = {{ active_mpr_pads|length }};
 
 // ---- Display objects ----
 
-{% if board.display and board.display.enabled -%}
+{% if board.display is defined and board.display.enabled %}
+
+{% set screen_sends = [] %}
+{% for s in hv_manifest.sends | sort(attribute='name') if 'screen' in s.name %}
+    {% set _ = screen_sends.append(s) %}
+{% endfor %}
+{% set screen_sends = screen_sends[:4] %}
+
+#define NUM_SCREEN_SLOTS 4
+
 static ssd1306_t display_inst;
-static const uint32_t screen_slots[4] = {
-    {%- set count = 0 -%}
-    {%- for s in hv_manifest.sends -%}
-        {%- if "screen" in s.name and count < 4 -%}
-            {{ s.hash }}{{ "," if not loop.last else "" }}
-            {%- set count = count + 1 -%}
-        {%- endif -%}
-    {%- endfor -%}
+
+static const uint32_t screen_slots[NUM_SCREEN_SLOTS] = {
+{% for i in range(4) %}
+    {{ screen_sends[i].hash if i < screen_sends|length else 0 }},
+{% endfor %}
 };
-{%- endif %}
+
+static const char* printNames[NUM_SCREEN_SLOTS] = {
+{% for i in range(4) %}
+    "{{ screen_sends[i].name if i < screen_sends|length else '' }}",
+{% endfor %}
+};
+
+constexpr int NUM_PRINT_NAMES = NUM_SCREEN_SLOTS;
+
+// Latest [s screen...] values: Core 1 writes, Core 0 reads
+static std::atomic<float> screen_vals[NUM_SCREEN_SLOTS];
+static std::atomic<bool>  screen_dirty[NUM_SCREEN_SLOTS];
+
+// Latest [print] message: Core 1 writes, Core 0 reads
+static char screen_print_name[24];
+static char screen_print_text[40];
+static std::atomic<bool> screen_print_ready{false};
+
+{% endif %}
+
 
 #define FLASH_DURATION_MS 40
 #define CLOCK_FLASH_MS 30 
@@ -696,12 +721,18 @@ void heavyMidiOutHook(HeavyContextInterface *c, const char *receiverName, hv_uin
     {%- endif %}
 }
 
+
+
 void sendHookHandler(HeavyContextInterface *vc, const char *name,
                      uint32_t hash, const HvMessage *m) {
 
-    if (msg_getNumElements(m) < 1) return;
+    if (!m || msg_getNumElements(m) < 1) return;
 
-    float val0 = msg_getFloat(m, 0);
+    const bool hasFloat =
+        msg_getType(m, 0) == HV_MSG_FLOAT;
+
+    const float val0 =
+        hasFloat ? msg_getFloat(m, 0) : 0.0f;
 
     switch (hash) {
 
@@ -710,45 +741,48 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
         {% for l in board.leds -%}
             {%- for s in hv_manifest.sends if s.name == l.name -%}
         case {{ s.hash }}U:
+            if (!hasFloat) return;
+
             {% if l.is_rgb -%}
-            Pico::led_hue[{{ loop.index0 }}].store(val0, std::memory_order_relaxed);
-            if (msg_getNumElements(m) >= 2)
+            Pico::led_hue[{{ loop.index0 }}].store(
+                val0, std::memory_order_relaxed);
+
+            if (msg_getNumElements(m) >= 2 &&
+                msg_getType(m, 1) == HV_MSG_FLOAT) {
                 Pico::led_intensity[{{ loop.index0 }}].store(
-                    msg_getFloat(m, 1), std::memory_order_relaxed);
+                    msg_getFloat(m, 1),
+                    std::memory_order_relaxed);
+            }
             {%- else -%}
             Pico::led_vals[{{ loop.index0 }}].store(
                 val0, std::memory_order_relaxed);
             {%- endif %}
-            break;
+            return;
             {%- endfor -%}
         {%- endfor %}
 
         /* --- Hardware MCP4725 CV Outputs --- */
 
-       {% for mcp in active_mcp4725 -%}
+        {% for mcp in active_mcp4725 -%}
         case {{ mcp.hash }}U:
-            if (msg_isFloat(m, 0)) {
+            if (hasFloat) {
                 uint32_t bits;
                 memcpy(&bits, &val0, sizeof(bits));
 
                 cv_out_{{ loop.index0 }}_bits.store(
-                    bits,
-                    std::memory_order_relaxed
-                );
+                    bits, std::memory_order_relaxed);
 
                 cv_out_{{ loop.index0 }}_dirty.store(
-                    true,
-                    std::memory_order_release
-                );
+                    true, std::memory_order_release);
             }
-            break;
+            return;
         {% endfor %}
 
         /* --- MCP4822 Outputs --- */
 
         {% for mcp in active_mcp4822 -%}
         case {{ mcp.hash }}U: {
-            if (msg_isFloat(m, 0)) {
+            if (hasFloat) {
                 uint32_t bits;
                 memcpy(&bits, &val0, sizeof(bits));
 
@@ -764,7 +798,7 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
                     true, std::memory_order_release);
                 {% endif %}
             }
-            break;
+            return;
         }
         {% endfor %}
 
@@ -775,19 +809,44 @@ void sendHookHandler(HeavyContextInterface *vc, const char *name,
         {% for s in hv_manifest.sends -%}
             {% if s.name.startswith('web') %}
         case {{ s.hash }}U:
-            web_values[{{ web_count.index }}] = val0;
-            {% set web_count.index = web_count.index + 1 %}
-            if (web_float_handler)
-                web_float_handler("{{ s.name }}", val0);
+            if (hasFloat) {
+                web_values[{{ web_count.index }}] = val0;
+                if (web_float_handler)
+                    web_float_handler("{{ s.name }}", val0);
+            }
             return;
+            {% set web_count.index = web_count.index + 1 %}
 
             {% elif s.name.startswith('osc') %}
         case {{ s.hash }}U:
-            osc_send_float("{{ s.name }}", val0);
+            if (hasFloat)
+                osc_send_float("{{ s.name }}", val0);
             return;
             {% endif %}
         {% endfor %}
         {%- endif %}
+
+        /* --- OLED Screen Values --- */
+
+        {% for s in hv_manifest.sends %}
+            {% if s.name.startswith('screen') %}
+        case {{ s.hash }}U:
+            if (msg_getNumElements(m) > 0 &&
+                msg_getType(m, 0) == HV_MSG_FLOAT) {
+
+                screen_vals[{{ loop.index0 }}].store(
+                    msg_getFloat(m, 0),
+                    std::memory_order_relaxed
+                );
+
+                screen_dirty[{{ loop.index0 }}].store(
+                    true,
+                    std::memory_order_release
+                );
+            }
+            return;
+            {% endif %}
+        {% endfor %}
 
         default:
             heavyMidiOutHook(vc, name, hash, m);
@@ -872,7 +931,7 @@ void __not_in_flash_func(audioFunc)(float* buffer, int frames)
 // Core 1 produces print messages; Core 0 dispatches them to Serial.
 // ============================================================
 
-{%- if board.console %}
+{% if board.console %}
 
 void hv_print_handler(
     HeavyContextInterface* context,
@@ -881,7 +940,20 @@ void hv_print_handler(
     const HvMessage* msg)
 {
     (void)context;
-    (void)str;
+
+    {% if board.display is defined and board.display.enabled %}
+        {% if board.display.mode != "pd" %}
+    if (!screen_print_ready.load(std::memory_order_acquire)) {
+        snprintf(screen_print_name, sizeof(screen_print_name),
+                 "%s", printName ? printName : "");
+
+        snprintf(screen_print_text, sizeof(screen_print_text),
+                 "%s", str ? str : "");
+
+        screen_print_ready.store(true, std::memory_order_release);
+    }
+        {% endif %}
+    {% endif %}
 
     print_push(printName, msg);
 }
@@ -917,9 +989,9 @@ int main() {
 // Other init
 // ====================================================
 
-    {%- if board.pico_board == 'zero' %}
-    Pico::init_neopixel();
-    {%- endif %}
+    // {%- if board.pico_board == 'zero' %}
+    // Pico::init_neopixel();
+    // {%- endif %}
 
     {% if board.pico_board == 'pico_w' or board.pico_board == 'pico2_w' %}
         {% if board.web and board.web.enabled %}
@@ -975,9 +1047,6 @@ int main() {
         Pico::MCPMode::{{ mcp.mode }});
     {%- endfor %}
 
-// ====================================================
-// MCP4822 CV Out init
-// ====================================================
 // ====================================================
 // MCP4822 CV Out init
 // ====================================================
@@ -1124,6 +1193,7 @@ int main() {
             Pico::SCREEN_MODE_{{ board.display.mode | upper }}
         );
         {%- endif %}
+        
 
 // ====================================================
 // Peripherals init 
@@ -1168,7 +1238,7 @@ int main() {
     {%- endfor %}
 
     {%- for cny in active_cny70 %}
-    Pico::addCNY70({{ cny.adc_pin }}, 380, 750, 0.6f, 2, {{ loop.index0 }});
+    Pico::addCNY70({{ cny.adc_pin }}, 380, 1000, 0.6f, 2, {{ loop.index0 }});
     {% endfor %}
 
     {%- for d in active_dist %}
@@ -1231,38 +1301,50 @@ int main() {
     // DISPLAY
     // ========================================================
 
-    {% if board.display is defined and board.display.enabled -%}
+    {% if board.display is defined and board.display.enabled %}
 
-    for (int i = 0; i < PRINT_POOL_SIZE; ++i) {
+    {% if board.display.mode == "pd" %}
 
-        if (print_pool[i].busy.load(std::memory_order_acquire)) {
+    // PD mode: update dashboard values 
 
-            uint32_t msg_id = print_pool[i].id;
-            float msg_val = print_pool[i].val;
+    for (int i = 0; i < NUM_SCREEN_SLOTS; ++i) {
 
-            bool is_dashboard_item = false;
+        Pico::Screen::update_value(
+            i,
+            screen_vals[i].load(std::memory_order_relaxed)
+        );
+    }
 
-            for (int slot = 0; slot < 4; slot++) {
+    {% else %}
 
-                if (msg_id == screen_slots[slot]) {
+    // Console mode: focused values and print messages.
 
-                    Pico::Screen::update_focus(slot, msg_val);
+    for (int i = 0; i < NUM_SCREEN_SLOTS; ++i) {
 
-                    is_dashboard_item = true;
-                    break;
-                }
-            }
-
-            if (!is_dashboard_item) {
-                Pico::Screen::update_focus(msg_id, msg_val);
-            }
-
-            print_pool[i].busy.store(
+        if (screen_dirty[i].exchange(
                 false,
-                std::memory_order_release
+                std::memory_order_acquire
+            )) {
+
+            Pico::Screen::update_focus(
+                i,
+                screen_vals[i].load(std::memory_order_relaxed)
             );
         }
     }
+
+    if (screen_print_ready.exchange(
+            false,
+            std::memory_order_acquire
+        )) {
+
+        Pico::Screen::show_print(
+            screen_print_name,
+            screen_print_text
+        );
+    }
+
+    {% endif %}
 
     Pico::Screen::process(
         now,
@@ -1270,8 +1352,7 @@ int main() {
         NUM_PRINT_NAMES
     );
 
-    {%- endif %}
-
+    {% endif %}
 
     // ========================================================
     // HARDWARE UPDATE
